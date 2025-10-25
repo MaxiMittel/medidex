@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
+import { Toaster } from "../components/ui/sonner";
 
 const ibmPlexSans = IBM_Plex_Sans({
   variable: "--font-ibm-plex-sans",
@@ -29,6 +30,7 @@ export default function RootLayout({
         className={`${ibmPlexSans.variable} ${ibmPlexMono.variable} antialiased`}
       >
         {children}
+        <Toaster />
       </body>
     </html>
   );
