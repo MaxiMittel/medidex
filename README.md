@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Medidex
 
-## Getting Started
+A Next.js application with user authentication and role-based access control.
 
-First, run the development server:
+## Prerequisites
+
+- Node.js 20.x or higher
+- PostgreSQL 14.x or higher
+- npm (or pnpm/yarn/bun)
+
+## Installation
+
+1. Clone the repository and install dependencies:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Create a `.env` file in the root directory:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cp env.template .env
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. Edit `.env` and configure your database:
 
-## Learn More
+```env
+DATABASE_URL="postgresql://username:password@localhost:5432/medidex?schema=public"
+```
 
-To learn more about Next.js, take a look at the following resources:
+Replace `username`, `password`, and database name with your PostgreSQL credentials.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. Generate Prisma
+```bash
+npx prisma generate
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Deploy on Vercel
+## Common Prisma Commands
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+# Generate Prisma Client
+npx prisma generate
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Run migrations
+npx prisma migrate deploy
+
+# Create new migration (development)
+npx prisma migrate dev --name migration_name
+
+# Open database GUI
+npx prisma studio
+
+# Reset database (deletes all data)
+npx prisma migrate reset
+```
+
+## Build for Production
+
+```bash
+npm run build
+npm run start
+```
+
+## Environment Variables
+
+### Required
+
+- `DATABASE_URL` - PostgreSQL connection string
+
+### Optional
+
+- `BETTER_AUTH_SECRET` - Auth secret key (auto-generated in development)
+- `BETTER_AUTH_URL` - Base URL (default: http://localhost:3000)
+
+## Tech Stack
+
+- Next.js 16
+- TypeScript
+- PostgreSQL
+- Prisma ORM
+- Better Auth
+- Tailwind CSS
+- Radix UI
