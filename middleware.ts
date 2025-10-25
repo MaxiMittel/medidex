@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function middleware(request: NextRequest) {
-  const cookie = request.cookies.get("better-auth.session_token");
+  const stage = process.env.STAGE!;
+  const cookie = request.cookies.get(
+    stage === "local"
+      ? "better-auth.session_token"
+      : "__Secure-better-auth.session_token"
+  );
 
   if (!cookie || !cookie.value) {
     return NextResponse.redirect(new URL("/login", request.url));
