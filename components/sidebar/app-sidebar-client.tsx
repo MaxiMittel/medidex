@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { LifeBuoy, Search, Send, Table, Users } from "lucide-react";
+import { LifeBuoy, Search, Send, Table, Upload, Users } from "lucide-react";
 
 import { NavMain } from "@/components/sidebar/nav-main";
 import { NavSecondary } from "@/components/sidebar/nav-secondary";
 import { NavUser } from "@/components/sidebar/nav-user";
+import { NavStudies } from "@/components/sidebar/nav-studies";
 import {
   Sidebar,
   SidebarContent,
@@ -25,6 +26,16 @@ const data = {
       url: "/",
       icon: Search,
       isActive: true,
+    },
+    {
+      title: "All Studies",
+      url: "/studies",
+      icon: Table,
+    },
+    {
+      title: "Upload Studies",
+      url: "/upload",
+      icon: Upload,
     },
   ],
   navAdmin: [
@@ -50,6 +61,7 @@ const data = {
 
 export function AppSidebarClient({
   user,
+  studies,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   user: {
@@ -58,6 +70,11 @@ export function AppSidebarClient({
     avatar: string;
     roles: Role[];
   } | null;
+  studies: {
+    id: string;
+    title: string;
+    status: string;
+  }[];
 }) {
   const isAdmin = user?.roles.includes(Role.ADMIN);
 
@@ -84,6 +101,7 @@ export function AppSidebarClient({
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} title="Platform" />
+        <NavStudies studies={studies} />
         {isAdmin && <NavMain items={data.navAdmin} title="Administration" />}
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
