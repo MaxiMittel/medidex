@@ -25,6 +25,14 @@ const breadcrumbMap: Record<string, BreadcrumbConfig[]> = {
   "/": [{ label: "Search Studies" }],
   "/login": [{ label: "Authentication", href: "#" }, { label: "Login" }],
   "/register": [{ label: "Authentication", href: "#" }, { label: "Register" }],
+  "/studies": [
+    { label: "Studies", href: "#" },
+    { label: "All Studies" },
+  ],
+  "/upload": [
+    { label: "Platform", href: "#" },
+    { label: "Upload Studies" },
+  ],
   "/user-management": [
     { label: "Administration", href: "#" },
     { label: "User Management" },

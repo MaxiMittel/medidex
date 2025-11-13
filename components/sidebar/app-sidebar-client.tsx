@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { LifeBuoy, Search, Send, Table, Users } from "lucide-react";
+import { LifeBuoy, Search, Send, Table, Upload, Users } from "lucide-react";
 
 import { NavMain } from "@/components/sidebar/nav-main";
 import { NavSecondary } from "@/components/sidebar/nav-secondary";
@@ -21,10 +21,14 @@ import { Role } from "../../enums/role.enum";
 const data = {
   navMain: [
     {
-      title: "Search Studies",
-      url: "/",
-      icon: Search,
-      isActive: true,
+      title: "Articles",
+      url: "/articles",
+      icon: Table,
+    },
+    {
+      title: "Upload Studies",
+      url: "/upload",
+      icon: Upload,
     },
   ],
   navAdmin: [
@@ -50,6 +54,7 @@ const data = {
 
 export function AppSidebarClient({
   user,
+  studies,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   user: {
@@ -58,6 +63,11 @@ export function AppSidebarClient({
     avatar: string;
     roles: Role[];
   } | null;
+  studies: {
+    id: string;
+    title: string;
+    status: string;
+  }[];
 }) {
   const isAdmin = user?.roles.includes(Role.ADMIN);
 
