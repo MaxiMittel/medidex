@@ -119,7 +119,7 @@ export function StudyDetails({ interventions, conditions, outcomes, design }: St
                     <p className="text-xs font-medium text-muted-foreground mb-2">Primary Outcomes</p>
                     <div className="space-y-2">
                       {primaryOutcomes.map((outcome) => (
-                        <div key={outcome.id} className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900">
+                        <div key={outcome.id} className="p-3 rounded-lg border bg-card">
                           <p className="text-sm font-medium">{outcome.name}</p>
                           <p className="text-xs text-muted-foreground mt-1">
                             Timeframe: {outcome.timeframe}
@@ -134,7 +134,7 @@ export function StudyDetails({ interventions, conditions, outcomes, design }: St
                     <p className="text-xs font-medium text-muted-foreground mb-2">Secondary Outcomes</p>
                     <div className="space-y-2">
                       {secondaryOutcomes.map((outcome) => (
-                        <div key={outcome.id} className="p-3 rounded-lg bg-muted/50">
+                        <div key={outcome.id} className="p-3 rounded-lg bg-muted">
                           <p className="text-sm font-medium">{outcome.name}</p>
                           <p className="text-xs text-muted-foreground mt-1">
                             Timeframe: {outcome.timeframe}

@@ -32,21 +32,21 @@ interface StudyOverviewProps {
 export function StudyOverview({ study }: StudyOverviewProps) {
   const countries = study.Countries.split("//").filter(Boolean);
   
-  const statusColor = {
-    "Completed": "bg-green-500",
-    "Active": "bg-blue-500",
-    "Ongoing": "bg-blue-500",
-    "Recruiting": "bg-yellow-500",
-    "Terminated": "bg-red-500",
-    "Pending": "bg-gray-500",
-  }[study.StatusofStudy] || "bg-gray-500";
+  const statusVariant = {
+    "Completed": "default" as const,
+    "Active": "default" as const,
+    "Ongoing": "default" as const,
+    "Recruiting": "secondary" as const,
+    "Terminated": "destructive" as const,
+    "Pending": "secondary" as const,
+  }[study.StatusofStudy] || "secondary" as const;
 
-  const submissionColor = {
-    "Approved": "bg-green-500",
-    "In Progress": "bg-yellow-500",
-    "Pending": "bg-orange-500",
-    "Rejected": "bg-red-500",
-  }[study.CENTRALSubmissionStatus] || "bg-gray-500";
+  const submissionVariant = {
+    "Approved": "default" as const,
+    "In Progress": "secondary" as const,
+    "Pending": "secondary" as const,
+    "Rejected": "destructive" as const,
+  }[study.CENTRALSubmissionStatus] || "secondary" as const;
 
   return (
     <Card>
@@ -57,8 +57,8 @@ export function StudyOverview({ study }: StudyOverviewProps) {
             Study Overview
           </CardTitle>
           <div className="flex gap-2">
-            <Badge className={statusColor}>{study.StatusofStudy}</Badge>
-            <Badge className={submissionColor} variant="outline">
+            <Badge variant={statusVariant}>{study.StatusofStudy}</Badge>
+            <Badge variant={submissionVariant}>
               {study.CENTRALSubmissionStatus}
             </Badge>
           </div>
@@ -67,32 +67,32 @@ export function StudyOverview({ study }: StudyOverviewProps) {
       <CardContent className="space-y-4">
         {/* Key metrics grid */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20">
-            <Users className="h-5 w-5 text-blue-600 mt-0.5" />
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-muted">
+            <Users className="h-5 w-5 mt-0.5" />
             <div>
               <p className="text-xs text-muted-foreground">Participants</p>
               <p className="text-lg font-semibold">{study.NumberParticipants}</p>
             </div>
           </div>
           
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-purple-50 dark:bg-purple-950/20">
-            <Clock className="h-5 w-5 text-purple-600 mt-0.5" />
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-muted">
+            <Clock className="h-5 w-5 mt-0.5" />
             <div>
               <p className="text-xs text-muted-foreground">Duration</p>
               <p className="text-lg font-semibold">{study.Duration}</p>
             </div>
           </div>
           
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/20">
-            <MapPin className="h-5 w-5 text-green-600 mt-0.5" />
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-muted">
+            <MapPin className="h-5 w-5 mt-0.5" />
             <div>
               <p className="text-xs text-muted-foreground">Countries</p>
               <p className="text-lg font-semibold">{countries.length}</p>
             </div>
           </div>
           
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20">
-            <Hash className="h-5 w-5 text-orange-600 mt-0.5" />
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-muted">
+            <Hash className="h-5 w-5 mt-0.5" />
             <div>
               <p className="text-xs text-muted-foreground">Phase</p>
               <p className="text-lg font-semibold">{study.UDef4}</p>
@@ -141,7 +141,7 @@ export function StudyOverview({ study }: StudyOverviewProps) {
 
         {/* Notes */}
         {study.Notes && (
-          <div className="p-3 rounded-lg bg-muted/50">
+          <div className="p-3 rounded-lg border">
             <p className="text-sm font-medium mb-1 flex items-center gap-2">
               <AlertCircle className="h-4 w-4" />
               Notes

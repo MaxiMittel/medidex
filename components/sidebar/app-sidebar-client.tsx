@@ -6,7 +6,6 @@ import { LifeBuoy, Search, Send, Table, Upload, Users } from "lucide-react";
 import { NavMain } from "@/components/sidebar/nav-main";
 import { NavSecondary } from "@/components/sidebar/nav-secondary";
 import { NavUser } from "@/components/sidebar/nav-user";
-import { NavStudies } from "@/components/sidebar/nav-studies";
 import {
   Sidebar,
   SidebarContent,
@@ -22,14 +21,8 @@ import { Role } from "../../enums/role.enum";
 const data = {
   navMain: [
     {
-      title: "Search Studies",
-      url: "/",
-      icon: Search,
-      isActive: true,
-    },
-    {
-      title: "All Studies",
-      url: "/studies",
+      title: "Articles",
+      url: "/articles",
       icon: Table,
     },
     {
@@ -101,7 +94,6 @@ export function AppSidebarClient({
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} title="Platform" />
-        <NavStudies studies={studies} />
         {isAdmin && <NavMain items={data.navAdmin} title="Administration" />}
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
