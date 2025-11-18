@@ -39,7 +39,7 @@ export function StudyDetailContent({
       <Panel
         defaultSize={40}
         minSize={25}
-        className="border-r bg-background"
+        className="border-r bg-background min-w-0"
       >
         <div className="h-full p-4 md:px-6 overflow-hidden">
           <ReportsList reports={reports} />
@@ -48,7 +48,7 @@ export function StudyDetailContent({
 
       <PanelResizeHandle className="w-1 bg-border hover:bg-primary transition-colors cursor-col-resize" />
 
-      <Panel defaultSize={60} minSize={35}>
+      <Panel defaultSize={60} minSize={35} className="min-w-0">
         <div className="h-full flex flex-col min-w-0 overflow-hidden">
           <div className="flex-1 min-h-0 overflow-y-auto p-4 md:px-8">
             <StudyRelevanceTable
