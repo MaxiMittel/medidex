@@ -37,6 +37,60 @@ export default function ReportsPage() {
     }));
   }, [reportsByBatch, selectedBatchHash]);
 
+  const relevanceStudies = [
+    {
+      Linked: false,
+      CRGStudyID: 1001,
+      ShortName: "Study Alpha",
+      Relevance: 0.86,
+      NumberParticipants: 245,
+      Duration: "12 months",
+      Comparison: "{Drug A vs. Placebo}",
+      StatusofStudy: "Completed",
+      CENTRALSubmissionStatus: "Published",
+      TrialistContactDetails: "Dr. John Doe",
+      Countries: "USA//Canada",
+      ISRCTN: "ISRCTN0000001",
+      Notes: "Primary outcome achieved",
+      UDef4: "Phase 3",
+      reports: [
+        {
+          CRGReportID: 5001,
+          CENTRALReportID: 2001,
+          Title: "Primary efficacy outcomes of Study Alpha",
+        },
+      ],
+    },
+    {
+      Linked: true,
+      CRGStudyID: 1002,
+      ShortName: "Study Beta",
+      Relevance: 0.72,
+      NumberParticipants: 312,
+      Duration: "18 months",
+      Comparison: "{Drug B vs. Drug C}",
+      StatusofStudy: "Active",
+      CENTRALSubmissionStatus: "In progress",
+      TrialistContactDetails: "Dr. Jane Smith",
+      Countries: "UK//Germany",
+      ISRCTN: "ISRCTN0000002",
+      Notes: "Enrollment ongoing",
+      UDef4: "Phase 2",
+      reports: [
+        {
+          CRGReportID: 5002,
+          CENTRALReportID: 2002,
+          Title: "Interim safety analysis of Study Beta",
+        },
+        {
+          CRGReportID: 5003,
+          CENTRALReportID: null,
+          Title: "Baseline characteristics overview",
+        },
+      ],
+    },
+  ];
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-6 border-b">
@@ -59,7 +113,10 @@ export default function ReportsPage() {
       )}
 
       {!loading && reports.length > 0 ? (
-        <StudyDetailContent reports={reports} relevanceStudies={[]} />
+        <StudyDetailContent
+          reports={reports}
+          relevanceStudies={relevanceStudies}
+        />
       ) : (
         !loading && (
           <div className="p-6 text-muted-foreground">
