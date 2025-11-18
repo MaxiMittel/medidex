@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { StudyRelevanceTable } from "./study-relevance-table";
 import { ReportsList } from "./reports-list";
+import {
+  PanelGroup,
+  Panel,
+  PanelResizeHandle,
+} from "react-resizable-panels";
 
 interface StudyDetailContentProps {
   reports: Array<{
@@ -30,34 +35,39 @@ export function StudyDetailContent({
   );
 
   return (
-    <div className="h-screen flex overflow-hidden">
-      {/* Left Column - Reports List (Full Height) */}
-      <div className="w-1/3 border-r overflow-hidden shrink-0">
-        <div className="h-full p-4 md:px-6">
+    <PanelGroup direction="horizontal" className="h-screen">
+      <Panel
+        defaultSize={40}
+        minSize={25}
+        className="border-r bg-background"
+      >
+        <div className="h-full p-4 md:px-6 overflow-hidden">
           <ReportsList reports={reports} />
         </div>
-      </div>
+      </Panel>
 
-      {/* Right Column - Relevance Table */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Relevance Studies Table */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 md:px-8">
-          <StudyRelevanceTable
-            studies={relevanceStudies}
-            onStudySelect={(studyId) => {
-              setSelectedStudyId(studyId);
-              if (studyId) {
-                const study = relevanceStudies.find(
-                  (s) => s.CRGStudyID === studyId
-                );
-                setSelectedStudyName(study?.ShortName || null);
-              } else {
-                setSelectedStudyName(null);
-              }
-            }}
-          />
+      <PanelResizeHandle className="w-1 bg-border hover:bg-primary transition-colors cursor-col-resize" />
+
+      <Panel defaultSize={60} minSize={35}>
+        <div className="h-full flex flex-col min-w-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 md:px-8">
+            <StudyRelevanceTable
+              studies={relevanceStudies}
+              onStudySelect={(studyId) => {
+                setSelectedStudyId(studyId);
+                if (studyId) {
+                  const study = relevanceStudies.find(
+                    (s) => s.CRGStudyID === studyId
+                  );
+                  setSelectedStudyName(study?.ShortName || null);
+                } else {
+                  setSelectedStudyName(null);
+                }
+              }}
+            />
+          </div>
         </div>
-      </div>
-    </div>
+      </Panel>
+    </PanelGroup>
   );
 }
