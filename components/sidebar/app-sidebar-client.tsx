@@ -21,8 +21,8 @@ import { Role } from "../../enums/role.enum";
 const data = {
   navMain: [
     {
-      title: "Articles",
-      url: "/articles",
+      title: "Reports",
+      url: "/reports",
       icon: Table,
     },
     {
