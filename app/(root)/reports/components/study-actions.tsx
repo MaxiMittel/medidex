@@ -18,8 +18,8 @@ export function StudyActions({ studyId, studyName }: StudyActionsProps) {
     toast.info("LLM assistant feature coming soon!");
   };
 
-  const handleMatchArticle = () => {
-    toast.info("Article matching feature coming soon!");
+  const handleMatchReport = () => {
+    toast.info("Report matching feature coming soon!");
   };
 
   const handleExport = () => {
@@ -31,11 +31,11 @@ export function StudyActions({ studyId, studyName }: StudyActionsProps) {
       <Button 
         size="sm" 
         variant="outline"
-        onClick={handleMatchArticle}
+        onClick={handleMatchReport}
         className="gap-2"
       >
         <FileCheck className="h-4 w-4" />
-        <span className="hidden sm:inline">Match Article</span>
+        <span className="hidden sm:inline">Match Report</span>
         <span className="sm:hidden">Match</span>
       </Button>
       

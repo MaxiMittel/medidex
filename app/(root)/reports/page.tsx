@@ -57,7 +57,7 @@ function getMockStudy(id: string) {
           TypeofReportID: 1,
           PublicationTypeID: 1,
           Edition: "1st",
-          Medium: "Journal Article",
+          Medium: "Journal Report",
           StudyDesign: "Randomized Controlled Trial",
           DOI: "10.1056/NEJMoa2024001",
           UDef3: "High impact",
@@ -99,7 +99,7 @@ function getMockStudy(id: string) {
           TypeofReportID: 1,
           PublicationTypeID: 1,
           Edition: "1st",
-          Medium: "Journal Article",
+          Medium: "Journal Report",
           StudyDesign: "Safety Analysis",
           DOI: "10.1016/S0140-6736(24)01234-5",
           UDef3: "High impact",
@@ -265,7 +265,7 @@ function getMockStudy(id: string) {
           TypeofReportID: 1,
           PublicationTypeID: 1,
           Edition: "1st",
-          Medium: "Journal Article",
+          Medium: "Journal Report",
           StudyDesign: "Randomized Controlled Trial",
           DOI: "10.2337/dc24-0123",
           UDef3: "High impact",
@@ -633,7 +633,7 @@ function getMockRelevanceStudies() {
   ];
 }
 
-export default async function ArticlesPage() {
+export default async function ReportsPage() {
   const study = getMockStudy("1");
 
   if (!study) {

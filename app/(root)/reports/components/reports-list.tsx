@@ -96,7 +96,7 @@ export function ReportsList({
     <div className="h-full flex flex-col">
       <div className="flex items-center gap-2 mb-4 pb-3 border-b shrink-0">
         <FileText className="h-5 w-5 text-primary" />
-        <h2 className="text-xl font-semibold">Articles</h2>
+        <h2 className="text-xl font-semibold">Reports</h2>
         <span className="text-sm text-muted-foreground">
           ({filteredReports.length}
           {searchQuery && ` of ${reports.length}`})
@@ -108,7 +108,7 @@ export function ReportsList({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search articles..."
+            placeholder="Search reports..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -172,7 +172,7 @@ export function ReportsList({
           {filteredReports.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="font-medium">No articles found</p>
+              <p className="font-medium">No reports found</p>
               {searchQuery && (
                 <p className="text-sm mt-1">Try adjusting your search query</p>
               )}
@@ -206,7 +206,7 @@ export function ReportsList({
                     hasAbstract && toggleReport(report.CRGReportID)
                   }
                 >
-                  {/* Article Content */}
+                  {/* Report Content */}
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex-1 min-w-0">
