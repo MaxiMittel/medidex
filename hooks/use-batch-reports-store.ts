@@ -2,6 +2,9 @@
 
 import { create } from "zustand";
 import type { BatchDto, ReportDetailDto } from "../types/apiDTOs";
+import { getBatches, getReportData } from "../lib/api/batchApi";
+import { login } from "../lib/api/authApi";
+import apiClient from "../lib/api/apiClient";
 
 export interface BatchReportsState {
   batches: BatchDto[];
@@ -22,23 +25,39 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
   fetchBatchesWithReports: async () => {
     set({ loading: true, error: undefined });
     try {
-      const response = await fetch("/api/meerkat/batches");
-      if (!response.ok) {
-        const payload = await response.json().catch(() => undefined);
-        throw new Error(
-          payload?.error || "Failed to load batches and reports."
-        );
+      const username = process.env.NEXT_PUBLIC_MEERKAT_USERNAME;
+      const password = process.env.NEXT_PUBLIC_MEERKAT_PASSWORD;
+
+      if (!username || !password) {
+        throw new Error("Meerkat credentials are not configured.");
       }
 
-      const data = (await response.json()) as {
-        batches: BatchDto[];
-        reportsByBatch: Record<string, ReportDetailDto[]>;
-      };
+      const token = await login(username, password);
+      apiClient.defaults.headers.common[
+        "Authorization"
+      ] = `Bearer ${token.access_token}`;
+
+      const batches = await getBatches();
+      const reportsByBatch: Record<string, ReportDetailDto[]> = {};
+
+      for (const batch of batches) {
+        if (!batch.number_reports || batch.number_reports <= 0) {
+          reportsByBatch[batch.batch_hash] = [];
+          continue;
+        }
+
+        const reportPromises = Array.from(
+          { length: batch.number_reports },
+          (_, reportIndex) => getReportData(batch.batch_hash, reportIndex)
+        );
+
+        reportsByBatch[batch.batch_hash] = await Promise.all(reportPromises);
+      }
 
       set({
-        batches: data.batches,
-        reportsByBatch: data.reportsByBatch,
-        selectedBatchHash: data.batches[0]?.batch_hash,
+        batches,
+        reportsByBatch,
+        selectedBatchHash: batches[0]?.batch_hash,
         loading: false,
       });
     } catch (error) {
