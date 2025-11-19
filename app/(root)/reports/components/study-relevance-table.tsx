@@ -262,7 +262,7 @@ export function StudyRelevanceTable({
         ) : (
           <div className="space-y-3">
             {/* Header */}
-            <div className="grid grid-cols-12 p-3 pl-6 font-medium border-b bg-muted/30 sticky top-0 z-10">
+            <div className="grid grid-cols-12 md:grid-cols-[repeat(12,minmax(0,1fr))] p-3 pl-6 font-medium border-b bg-muted/30 sticky top-0 z-10 gap-2">
               <div className="col-span-1 text-xs text-muted-foreground">Linked</div>
               <div className="col-span-1 text-xs text-muted-foreground">ID</div>
               <div className="col-span-1 text-xs text-muted-foreground px-3">Relevance</div>
@@ -295,7 +295,7 @@ export function StudyRelevanceTable({
                     className="border-none"
                   >
                     <AccordionTrigger className="hover:no-underline p-0 [&>svg]:hidden group">
-                      <div className="grid grid-cols-12 p-3 pl-6 mb-2 bg-secondary/50 hover:bg-secondary rounded-xl relative w-full items-center transition-all duration-200 border border-transparent hover:border-primary/20 group-hover:shadow-sm">
+                      <div className="grid grid-cols-12 md:grid-cols-[repeat(12,minmax(0,1fr))] p-3 pl-6 mb-2 bg-secondary/50 hover:bg-secondary rounded-xl relative w-full items-center transition-all duration-200 border border-transparent hover:border-primary/20 group-hover:shadow-sm gap-2">
                         {/* Left indicator bar with relevance color */}
                         <div
                           className={`${getRelevanceColor(
@@ -594,4 +594,3 @@ export function StudyRelevanceTable({
     </div>
   );
 }
-
