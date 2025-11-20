@@ -7,7 +7,6 @@ import {
   Users,
   Link2,
   ChevronDown,
-  Sparkles,
   Search,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,6 +15,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 interface Report {
+  reportIndex: number;
+  batchHash: string;
+  assignedStudyIds: number[];
   CENTRALReportID?: number | null;
   CRGReportID: number;
   Title: string;
@@ -40,14 +42,14 @@ interface ReportsListProps {
   studyTitle?: string;
   studyAuthors?: string;
   studyAbstract?: StudyAbstract;
-  selectedStudyId?: number;
-  selectedStudyName?: string;
+  selectedReportIndex?: number;
+  onReportSelect?: (report: Report) => void;
 }
 
 export function ReportsList({
   reports,
-  selectedStudyId,
-  selectedStudyName,
+  selectedReportIndex,
+  onReportSelect,
 }: ReportsListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [assignmentFilter, setAssignmentFilter] = useState<
@@ -151,22 +153,6 @@ export function ReportsList({
         </div>
       </div>
 
-      {/* Selected Study Indicator (Outside scroll) */}
-      {selectedStudyId && (
-        <div className="mb-4 shrink-0">
-          <div className="p-3 rounded-lg border-2 border-primary bg-primary/5">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">
-                  Selected Study: {selectedStudyName || `ID ${selectedStudyId}`}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       <ScrollArea className="flex-1 h-0">
         <div className="space-y-3 pr-4">
           {filteredReports.length === 0 ? (
@@ -194,17 +180,16 @@ export function ReportsList({
                 : null;
 
               const isExpanded = expandedReports.has(report.CRGReportID);
+              const isSelected = report.reportIndex === selectedReportIndex;
               const hasAbstract = report.Abstract && report.Abstract.length > 0;
 
               return (
                 <div
                   key={report.CRGReportID || report.CENTRALReportID || idx}
                   className={`rounded-lg border bg-card hover:border-primary/20 transition-all overflow-hidden ${
-                    hasAbstract ? "cursor-pointer" : ""
+                    isSelected ? "border-primary" : ""
                   }`}
-                  onClick={() =>
-                    hasAbstract && toggleReport(report.CRGReportID)
-                  }
+                  onClick={() => onReportSelect?.(report)}
                 >
                   {/* Report Content */}
                   <div className="p-4">
@@ -249,11 +234,22 @@ export function ReportsList({
                           </Badge>
                         )}
                         {hasAbstract && (
-                          <ChevronDown
-                            className={`h-4 w-4 text-muted-foreground transition-transform duration-200 shrink-0 ${
-                              isExpanded ? "rotate-180" : ""
-                            }`}
-                          />
+                          <button
+                            className="text-muted-foreground hover:text-foreground transition-colors"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleReport(report.CRGReportID);
+                            }}
+                            aria-label={
+                              isExpanded ? "Hide abstract" : "Show abstract"
+                            }
+                          >
+                            <ChevronDown
+                              className={`h-4 w-4 transition-transform duration-200 shrink-0 ${
+                                isExpanded ? "rotate-180" : ""
+                              }`}
+                            />
+                          </button>
                         )}
                       </div>
                     </div>
