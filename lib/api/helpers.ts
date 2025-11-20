@@ -1,4 +1,3 @@
-import { URLSearchParams } from 'url';
 export const serializeParams = (params: Record<string, any>): string => {
   const searchParams = new URLSearchParams();
   

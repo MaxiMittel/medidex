@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { RelevanceStudy, StudyReportSummary } from "@/types/reports";
 import {
   Sheet,
   SheetContent,
@@ -45,39 +46,16 @@ import {
 } from "lucide-react";
 import { StudyOverview } from "./study-overview";
 
-interface StudyReport {
-  CENTRALReportID?: number | null;
-  CRGReportID: number;
-  Title: string;
-}
-
-interface RelevanceStudy {
-  Linked: boolean;
-  CRGStudyID: number;
-  Relevance: number;
-  ShortName: string;
-  NumberParticipants: string | number;
-  Duration: string;
-  Comparison: string;
-  reports: StudyReport[];
-  // Additional fields for sheet
-  StatusofStudy?: string;
-  CENTRALSubmissionStatus?: string;
-  TrialistContactDetails?: string;
-  Countries?: string;
-  ISRCTN?: string;
-  Notes?: string;
-  UDef4?: string;
-}
-
 interface StudyRelevanceTableProps {
   studies: RelevanceStudy[];
+  loading?: boolean;
   onLinkedChange?: (studyId: number, linked: boolean) => void;
   onStudySelect?: (studyId: number | null) => void;
 }
 
 export function StudyRelevanceTable({
   studies,
+  loading,
   onLinkedChange,
   onStudySelect,
 }: StudyRelevanceTableProps) {
@@ -89,6 +67,12 @@ export function StudyRelevanceTable({
   const [selectedStudy, setSelectedStudy] = useState<RelevanceStudy | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
+  useEffect(() => {
+    setLinkedStudies(
+      new Set(studies.filter((s) => s.Linked).map((s) => s.CRGStudyID))
+    );
+  }, [studies]);
+
   // Filter and sort studies
   const filteredStudies = useMemo(() => {
     let filtered = [...studies];
@@ -99,8 +83,13 @@ export function StudyRelevanceTable({
         (study) =>
           study.ShortName.toLowerCase().includes(query) ||
           study.CRGStudyID.toString().includes(query) ||
-          study.Comparison.toLowerCase().includes(query) ||
-          study.NumberParticipants.toString().toLowerCase().includes(query)
+          (study.Comparison || "").toLowerCase().includes(query) ||
+          (study.NumberParticipants !== null &&
+            study.NumberParticipants !== undefined &&
+            study.NumberParticipants
+              .toString()
+              .toLowerCase()
+              .includes(query))
       );
     }
     
@@ -152,14 +141,20 @@ export function StudyRelevanceTable({
 
   // Convert RelevanceStudy to study format for StudyOverview
   const getStudyForSheet = (study: RelevanceStudy) => {
+    const numberParticipants = study.NumberParticipants;
+    const formattedParticipants =
+      numberParticipants === null || numberParticipants === undefined
+        ? "-"
+        : typeof numberParticipants === "number"
+        ? numberParticipants.toString()
+        : numberParticipants;
+
     return {
       ShortName: study.ShortName,
       StatusofStudy: study.StatusofStudy || "Unknown",
       CENTRALSubmissionStatus: study.CENTRALSubmissionStatus || "Unknown",
       TrialistContactDetails: study.TrialistContactDetails || "",
-      NumberParticipants: typeof study.NumberParticipants === "number" 
-        ? study.NumberParticipants.toString() 
-        : study.NumberParticipants,
+      NumberParticipants: formattedParticipants,
       Countries: study.Countries || "",
       Duration: study.Duration || "",
       Comparison: study.Comparison || "",
@@ -249,7 +244,12 @@ export function StudyRelevanceTable({
         )}
       </div>
 
-      {filteredStudies.length === 0 ? (
+      {loading && filteredStudies.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <Sparkles className="h-8 w-8 mx-auto mb-3 animate-pulse" />
+          <p className="font-medium">Loading relevant studies...</p>
+        </div>
+      ) : filteredStudies.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p className="font-medium">No studies found</p>
@@ -377,7 +377,7 @@ export function StudyRelevanceTable({
                           <span>
                             {typeof study.NumberParticipants === "number"
                               ? study.NumberParticipants.toLocaleString()
-                              : study.NumberParticipants}
+                              : study.NumberParticipants || "-"}
                           </span>
                         </div>
 
