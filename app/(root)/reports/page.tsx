@@ -44,9 +44,11 @@ export default function ReportsPage() {
     <div className="flex flex-col h-full">
       <div className="p-6 border-b">
         <h1 className="text-2xl font-semibold">Reports</h1>
-        <p className="text-muted-foreground text-sm">
-          Fetching batches and report details from Meerkat API via Zustand.
-        </p>
+        {loading && (
+          <p className="text-muted-foreground text-sm">
+            Fetching batches and report details from Meerkat API via Zustand.
+          </p>
+        )}
       </div>
 
       {error && (
