@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Mail,
   Hash,
+  Calendar,
 } from "lucide-react";
 
 interface StudyOverviewProps {
@@ -26,6 +27,11 @@ interface StudyOverviewProps {
     ISRCTN: string;
     Notes: string;
     UDef4: string;
+    DateEntered?: string;
+    DateEdited?: string;
+    TrialRegistrationID?: string;
+    CENTRALStudyID?: number;
+    CRGStudyID?: number;
   };
 }
 
@@ -124,10 +130,32 @@ export function StudyOverview({ study }: StudyOverviewProps) {
           <p className="text-sm text-muted-foreground">{study.Comparison}</p>
         </div>
 
-        {/* ISRCTN */}
-        <div>
-          <p className="text-sm font-medium mb-1">ISRCTN Number</p>
-          <code className="text-xs bg-muted px-2 py-1 rounded">{study.ISRCTN}</code>
+        {/* Trial IDs */}
+        <div className="grid grid-cols-2 gap-4">
+          {study.ISRCTN && (
+            <div>
+              <p className="text-sm font-medium mb-1">ISRCTN Number</p>
+              <code className="text-xs bg-muted px-2 py-1 rounded block">{study.ISRCTN}</code>
+            </div>
+          )}
+          {study.TrialRegistrationID && (
+            <div>
+              <p className="text-sm font-medium mb-1">Trial Registration ID</p>
+              <code className="text-xs bg-muted px-2 py-1 rounded block">{study.TrialRegistrationID}</code>
+            </div>
+          )}
+          {study.CRGStudyID && (
+            <div>
+              <p className="text-sm font-medium mb-1">CRG Study ID</p>
+              <code className="text-xs bg-muted px-2 py-1 rounded block">{study.CRGStudyID}</code>
+            </div>
+          )}
+          {study.CENTRALStudyID && (
+            <div>
+              <p className="text-sm font-medium mb-1">CENTRAL Study ID</p>
+              <code className="text-xs bg-muted px-2 py-1 rounded block">{study.CENTRALStudyID}</code>
+            </div>
+          )}
         </div>
 
         {/* Contact */}
@@ -138,6 +166,34 @@ export function StudyOverview({ study }: StudyOverviewProps) {
           </p>
           <p className="text-sm text-muted-foreground">{study.TrialistContactDetails}</p>
         </div>
+
+        {/* Dates */}
+        {(study.DateEntered || study.DateEdited) && (
+          <div className="grid grid-cols-2 gap-4">
+            {study.DateEntered && (
+              <div>
+                <p className="text-sm font-medium mb-1 flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Date Entered
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {new Date(study.DateEntered).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+            {study.DateEdited && (
+              <div>
+                <p className="text-sm font-medium mb-1 flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Date Edited
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {new Date(study.DateEdited).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Notes */}
         {study.Notes && (
