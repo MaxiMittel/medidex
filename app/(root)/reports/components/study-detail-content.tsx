@@ -30,9 +30,11 @@ interface StudyDetailContentProps {
     Assigned?: boolean;
     AssignedTo?: string;
   }>;
+  loadingMore?: boolean;
+  totalReports?: number;
 }
 
-export function StudyDetailContent({ reports }: StudyDetailContentProps) {
+export function StudyDetailContent({ reports, loadingMore, totalReports }: StudyDetailContentProps) {
   const {
     similarStudiesByReport,
     similarStudiesLoading,
@@ -117,6 +119,8 @@ export function StudyDetailContent({ reports }: StudyDetailContentProps) {
             onReportSelect={(report) => {
               setSelectedReportIndex(report.reportIndex);
             }}
+            loadingMore={loadingMore}
+            totalReports={totalReports}
           />
         </div>
       </Panel>

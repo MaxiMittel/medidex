@@ -18,6 +18,7 @@ export default function ReportsPage() {
     selectedBatchHash,
     loading,
     loadingReports,
+    loadingMoreReports,
     error,
     fetchBatches,
     selectBatch,
@@ -101,6 +102,12 @@ export default function ReportsPage() {
         </div>
       )}
 
+      {loadingMoreReports && !loadingReports && (
+        <div className="p-4 text-sm text-muted-foreground border-b bg-blue-50">
+          Loading additional reports in background...
+        </div>
+      )}
+
       {!loading && batches.length === 0 && !error && (
         <div className="p-6 text-muted-foreground">
           No batches available. Upload a batch to get started.
@@ -108,7 +115,11 @@ export default function ReportsPage() {
       )}
 
       {!loadingReports && selectedBatchHash && reports.length > 0 ? (
-        <StudyDetailContent reports={reports} />
+        <StudyDetailContent 
+          reports={reports}
+          loadingMore={loadingMoreReports}
+          totalReports={selectedBatch?.number_reports}
+        />
       ) : (
         !loadingReports && selectedBatchHash && reports.length === 0 && (
           <div className="p-6 text-muted-foreground">

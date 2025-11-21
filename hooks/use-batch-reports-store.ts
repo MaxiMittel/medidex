@@ -18,6 +18,7 @@ export interface BatchReportsState {
   selectedBatchHash?: string;
   loading: boolean;
   loadingReports: boolean;
+  loadingMoreReports: boolean;
   error?: string;
   fetchBatches: () => Promise<void>;
   fetchReportsForBatch: (batchHash: string) => Promise<void>;
@@ -40,6 +41,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
   selectedBatchHash: undefined,
   loading: false,
   loadingReports: false,
+  loadingMoreReports: false,
   error: undefined,
   similarStudiesByReport: {},
   similarStudiesLoading: {},
@@ -93,19 +95,44 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
         return;
       }
 
-      const reportPromises = Array.from(
-        { length: batch.number_reports },
+      // Fetch first batch of reports (10) for quick initial render
+      const INITIAL_BATCH_SIZE = 10;
+      const initialBatchSize = Math.min(INITIAL_BATCH_SIZE, batch.number_reports);
+      
+      const initialReportPromises = Array.from(
+        { length: initialBatchSize },
         (_, reportIndex) => getReportData(batchHash, reportIndex)
       );
-      const reports = await Promise.all(reportPromises);
+      const initialReports = await Promise.all(initialReportPromises);
 
+      // Update state with initial reports and mark initial loading as complete
       set((state) => ({
         reportsByBatch: {
           ...state.reportsByBatch,
-          [batchHash]: reports,
+          [batchHash]: initialReports,
         },
         loadingReports: false,
+        loadingMoreReports: batch.number_reports > initialBatchSize,
       }));
+
+      // Fetch remaining reports in the background if there are more
+      if (batch.number_reports > initialBatchSize) {
+        const remainingReportPromises = Array.from(
+          { length: batch.number_reports - initialBatchSize },
+          (_, index) => getReportData(batchHash, index + initialBatchSize)
+        );
+        
+        const remainingReports = await Promise.all(remainingReportPromises);
+        
+        // Merge with initial reports
+        set((state) => ({
+          reportsByBatch: {
+            ...state.reportsByBatch,
+            [batchHash]: [...initialReports, ...remainingReports],
+          },
+          loadingMoreReports: false,
+        }));
+      }
 
       // Don't fetch similar studies here - let them be fetched on-demand when a report is selected
     } catch (error) {
@@ -115,6 +142,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
             ? error.message
             : "Failed to load reports.",
         loadingReports: false,
+        loadingMoreReports: false,
       });
     }
   },
