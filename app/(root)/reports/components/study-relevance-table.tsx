@@ -45,6 +45,8 @@ import {
   Download,
 } from "lucide-react";
 import { StudyOverview } from "./study-overview";
+import { StudyDetails } from "./study-details";
+import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
 
 interface StudyRelevanceTableProps {
   studies: RelevanceStudy[];
@@ -59,6 +61,7 @@ export function StudyRelevanceTable({
   onLinkedChange,
   onStudySelect,
 }: StudyRelevanceTableProps) {
+  const { studyDetails, studyDetailsLoading, fetchStudyDetails } = useBatchReportsStore();
   const [linkedStudies, setLinkedStudies] = useState<Set<number>>(
     new Set(studies.filter((s) => s.Linked).map((s) => s.CRGStudyID))
   );
@@ -137,6 +140,8 @@ export function StudyRelevanceTable({
     setSelectedStudy(study);
     setIsSheetOpen(true);
     onStudySelect?.(study.CRGStudyID);
+    // Fetch detailed study information
+    void fetchStudyDetails(study.CRGStudyID);
   };
 
   // Convert RelevanceStudy to study format for StudyOverview
@@ -148,6 +153,9 @@ export function StudyRelevanceTable({
         : typeof numberParticipants === "number"
         ? numberParticipants.toString()
         : numberParticipants;
+
+    // Get additional details from studyDetails if available
+    const details = studyDetails[study.CRGStudyID];
 
     return {
       ShortName: study.ShortName,
@@ -161,6 +169,11 @@ export function StudyRelevanceTable({
       ISRCTN: study.ISRCTN || "",
       Notes: study.Notes || "",
       UDef4: study.UDef4 || "",
+      DateEntered: details?.studyInfo.DateEntered || study.DateEntered,
+      DateEdited: details?.studyInfo.DateEdited || study.DateEdited,
+      TrialRegistrationID: details?.studyInfo.TrialRegistrationID || undefined,
+      CENTRALStudyID: details?.studyInfo.CENTRALStudyID,
+      CRGStudyID: study.CRGStudyID,
     };
   };
 
@@ -538,6 +551,25 @@ export function StudyRelevanceTable({
               </SheetHeader>
               <div className="mt-6 space-y-6">
                 <StudyOverview study={getStudyForSheet(selectedStudy)} />
+                
+                {/* Study Details Section */}
+                {studyDetails[selectedStudy.CRGStudyID] ? (
+                  <StudyDetails
+                    interventions={studyDetails[selectedStudy.CRGStudyID].interventions}
+                    conditions={studyDetails[selectedStudy.CRGStudyID].conditions}
+                    outcomes={studyDetails[selectedStudy.CRGStudyID].outcomes}
+                    design={studyDetails[selectedStudy.CRGStudyID].design}
+                    loading={false}
+                  />
+                ) : (
+                  <StudyDetails
+                    interventions={[]}
+                    conditions={[]}
+                    outcomes={[]}
+                    design={[]}
+                    loading={studyDetailsLoading[selectedStudy.CRGStudyID] ?? false}
+                  />
+                )}
                 
                 {/* Reports Section with Download */}
                 <div className="space-y-4">

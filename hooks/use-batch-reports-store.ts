@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from "zustand";
-import type { BatchDto, ReportDetailDto } from "../types/apiDTOs";
+import type { BatchDto, ReportDetailDto, StudyDto, InterventionDto, ConditionDto, OutcomeDto } from "../types/apiDTOs";
 import {
   getBatches,
   getReportData,
@@ -9,8 +9,15 @@ import {
 } from "../lib/api/batchApi";
 import { login } from "../lib/api/authApi";
 import apiClient from "../lib/api/apiClient";
-import { getReportsByStudyId } from "../lib/api/studiesApi";
-import type { RelevanceStudy, StudyReportSummary } from "../types/reports";
+import { 
+  getReportsByStudyId, 
+  getStudies,
+  getInterventionsForStudy,
+  getConditionsForStudy,
+  getOutcomesForStudy,
+  getDesignForStudy,
+} from "../lib/api/studiesApi";
+import type { RelevanceStudy, StudyReportSummary, StudyDetailData } from "../types/reports";
 
 export interface BatchReportsState {
   batches: BatchDto[];
@@ -30,6 +37,9 @@ export interface BatchReportsState {
     reportIndex: number,
     assignedStudyIds: number[]
   ) => Promise<void>;
+  studyDetails: Record<number, StudyDetailData>;
+  studyDetailsLoading: Record<number, boolean>;
+  fetchStudyDetails: (studyId: number) => Promise<void>;
 }
 
 export const buildReportKey = (batchHash: string, reportIndex: number) =>
@@ -45,6 +55,8 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
   error: undefined,
   similarStudiesByReport: {},
   similarStudiesLoading: {},
+  studyDetails: {},
+  studyDetailsLoading: {},
   fetchBatches: async () => {
     set({ loading: true, error: undefined });
     try {
@@ -229,6 +241,69 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
         similarStudiesLoading: {
           ...state.similarStudiesLoading,
           [key]: false,
+        },
+      }));
+    }
+  },
+  fetchStudyDetails: async (studyId: number) => {
+    // Check if already loaded or loading
+    if (get().studyDetails[studyId] || get().studyDetailsLoading[studyId]) {
+      return;
+    }
+
+    set((state) => ({
+      studyDetailsLoading: { ...state.studyDetailsLoading, [studyId]: true },
+    }));
+
+    try {
+      // Fetch all study data in parallel
+      const [studyInfoArray, interventions, conditions, outcomes, design] = await Promise.all([
+        getStudies([studyId]),
+        getInterventionsForStudy(studyId),
+        getConditionsForStudy(studyId),
+        getOutcomesForStudy(studyId),
+        getDesignForStudy(studyId),
+      ]);
+
+      const studyInfo = studyInfoArray[0];
+      if (!studyInfo) {
+        throw new Error(`Study ${studyId} not found`);
+      }
+
+      // Transform the data using actual API structure
+      const studyDetailData: StudyDetailData = {
+        studyInfo,
+        interventions: interventions.map((intervention) => ({
+          id: intervention.ID,
+          description: intervention.Description,
+        })),
+        conditions: conditions.map((condition) => ({
+          id: condition.ID,
+          description: condition.Description,
+        })),
+        outcomes: outcomes.map((outcome) => ({
+          id: outcome.ID,
+          description: outcome.Description,
+        })),
+        design,
+      };
+
+      set((state) => ({
+        studyDetails: {
+          ...state.studyDetails,
+          [studyId]: studyDetailData,
+        },
+        studyDetailsLoading: {
+          ...state.studyDetailsLoading,
+          [studyId]: false,
+        },
+      }));
+    } catch (error) {
+      console.error(`Failed fetching details for study ${studyId}`, error);
+      set((state) => ({
+        studyDetailsLoading: {
+          ...state.studyDetailsLoading,
+          [studyId]: false,
         },
       }));
     }
