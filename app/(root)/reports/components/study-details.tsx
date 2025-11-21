@@ -63,7 +63,7 @@ export function StudyDetails({ interventions, conditions, outcomes, design, load
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Accordion type="multiple" defaultValue={["interventions", "conditions", "outcomes", "design"]} className="w-full">
+        <Accordion type="multiple" className="w-full">
           {/* Interventions */}
           <AccordionItem value="interventions">
             <AccordionTrigger className="text-sm font-medium hover:no-underline">
