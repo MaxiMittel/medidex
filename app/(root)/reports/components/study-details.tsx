@@ -1,7 +1,6 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { 
   Activity, 
   Stethoscope, 
@@ -19,34 +18,41 @@ import {
 interface StudyDetailsProps {
   interventions: Array<{
     id: number;
-    name: string;
-    type: string;
+    description: string;
   }>;
   conditions: Array<{
     id: number;
-    name: string;
-    category: string;
+    description: string;
   }>;
   outcomes: Array<{
     id: number;
-    name: string;
-    type: string;
-    timeframe: string;
+    description: string;
   }>;
-  design: {
-    type: string;
-    phase: string;
-    allocation: string;
-    masking: string;
-    assignment: string;
-    enrollment: number;
-    arms: number;
-  };
+  design?: string[] | null;
+  loading?: boolean;
 }
 
-export function StudyDetails({ interventions, conditions, outcomes, design }: StudyDetailsProps) {
-  const primaryOutcomes = outcomes.filter(o => o.type === "Primary");
-  const secondaryOutcomes = outcomes.filter(o => o.type === "Secondary");
+export function StudyDetails({ interventions, conditions, outcomes, design, loading = false }: StudyDetailsProps) {
+  const designArray = design || [];
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Info className="h-5 w-5" />
+            Study Details
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-12 text-muted-foreground">
+            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="font-medium">Loading study details...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -57,7 +63,7 @@ export function StudyDetails({ interventions, conditions, outcomes, design }: St
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Accordion type="multiple" defaultValue={["interventions", "conditions", "outcomes", "design"]} className="w-full">
+        <Accordion type="multiple" className="w-full">
           {/* Interventions */}
           <AccordionItem value="interventions">
             <AccordionTrigger className="text-sm font-medium hover:no-underline">
@@ -68,16 +74,17 @@ export function StudyDetails({ interventions, conditions, outcomes, design }: St
             </AccordionTrigger>
             <AccordionContent>
               <div className="space-y-2 pt-2">
-                {interventions.map((intervention) => (
-                  <div key={intervention.id} className="flex items-start justify-between p-3 rounded-lg bg-muted/50">
-                    <div>
-                      <p className="text-sm font-medium">{intervention.name}</p>
-                      <Badge variant="outline" className="mt-1 text-xs">
-                        {intervention.type}
-                      </Badge>
+                {interventions.length > 0 ? (
+                  interventions.map((intervention) => (
+                    <div key={intervention.id} className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-sm">{intervention.description}</p>
                     </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No interventions available
+                  </p>
+                )}
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -92,14 +99,17 @@ export function StudyDetails({ interventions, conditions, outcomes, design }: St
             </AccordionTrigger>
             <AccordionContent>
               <div className="space-y-2 pt-2">
-                {conditions.map((condition) => (
-                  <div key={condition.id} className="flex items-start justify-between p-3 rounded-lg bg-muted/50">
-                    <div>
-                      <p className="text-sm font-medium">{condition.name}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{condition.category}</p>
+                {conditions.length > 0 ? (
+                  conditions.map((condition) => (
+                    <div key={condition.id} className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-sm">{condition.description}</p>
                     </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No conditions available
+                  </p>
+                )}
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -113,36 +123,17 @@ export function StudyDetails({ interventions, conditions, outcomes, design }: St
               </div>
             </AccordionTrigger>
             <AccordionContent>
-              <div className="space-y-4 pt-2">
-                {primaryOutcomes.length > 0 && (
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-2">Primary Outcomes</p>
-                    <div className="space-y-2">
-                      {primaryOutcomes.map((outcome) => (
-                        <div key={outcome.id} className="p-3 rounded-lg border bg-card">
-                          <p className="text-sm font-medium">{outcome.name}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Timeframe: {outcome.timeframe}
-                          </p>
-                        </div>
-                      ))}
+              <div className="space-y-2 pt-2">
+                {outcomes.length > 0 ? (
+                  outcomes.map((outcome) => (
+                    <div key={outcome.id} className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-sm">{outcome.description}</p>
                     </div>
-                  </div>
-                )}
-                {secondaryOutcomes.length > 0 && (
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-2">Secondary Outcomes</p>
-                    <div className="space-y-2">
-                      {secondaryOutcomes.map((outcome) => (
-                        <div key={outcome.id} className="p-3 rounded-lg bg-muted">
-                          <p className="text-sm font-medium">{outcome.name}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Timeframe: {outcome.timeframe}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No outcomes available
+                  </p>
                 )}
               </div>
             </AccordionContent>
@@ -153,35 +144,22 @@ export function StudyDetails({ interventions, conditions, outcomes, design }: St
             <AccordionTrigger className="text-sm font-medium hover:no-underline">
               <div className="flex items-center gap-2">
                 <Activity className="h-4 w-4" />
-                Study Design
+                Study Design {designArray.length > 0 && `(${designArray.length})`}
               </div>
             </AccordionTrigger>
             <AccordionContent>
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Type</p>
-                  <p className="text-sm font-medium mt-1">{design.type}</p>
-                </div>
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Phase</p>
-                  <p className="text-sm font-medium mt-1">{design.phase}</p>
-                </div>
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Allocation</p>
-                  <p className="text-sm font-medium mt-1">{design.allocation}</p>
-                </div>
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Masking</p>
-                  <p className="text-sm font-medium mt-1">{design.masking}</p>
-                </div>
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Assignment</p>
-                  <p className="text-sm font-medium mt-1">{design.assignment}</p>
-                </div>
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Arms</p>
-                  <p className="text-sm font-medium mt-1">{design.arms}</p>
-                </div>
+              <div className="space-y-2 pt-2">
+                {designArray.length > 0 ? (
+                  designArray.map((item, index) => (
+                    <div key={index} className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-sm">{item}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No design information available
+                  </p>
+                )}
               </div>
             </AccordionContent>
           </AccordionItem>
