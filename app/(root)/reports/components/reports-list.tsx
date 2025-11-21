@@ -44,12 +44,16 @@ interface ReportsListProps {
   studyAbstract?: StudyAbstract;
   selectedReportIndex?: number;
   onReportSelect?: (report: Report) => void;
+  loadingMore?: boolean;
+  totalReports?: number;
 }
 
 export function ReportsList({
   reports,
   selectedReportIndex,
   onReportSelect,
+  loadingMore = false,
+  totalReports,
 }: ReportsListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [assignmentFilter, setAssignmentFilter] = useState<
@@ -101,8 +105,14 @@ export function ReportsList({
         <h2 className="text-xl font-semibold">Reports</h2>
         <span className="text-sm text-muted-foreground">
           ({filteredReports.length}
-          {searchQuery && ` of ${reports.length}`})
+          {searchQuery && ` of ${reports.length}`}
+          {loadingMore && totalReports && ` / ${totalReports} total`})
         </span>
+        {loadingMore && (
+          <span className="text-xs text-blue-600 animate-pulse">
+            Loading more...
+          </span>
+        )}
       </div>
 
       {/* Search and Filters */}

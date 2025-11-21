@@ -17,8 +17,11 @@ export interface BatchReportsState {
   reportsByBatch: Record<string, ReportDetailDto[]>;
   selectedBatchHash?: string;
   loading: boolean;
+  loadingReports: boolean;
+  loadingMoreReports: boolean;
   error?: string;
-  fetchBatchesWithReports: () => Promise<void>;
+  fetchBatches: () => Promise<void>;
+  fetchReportsForBatch: (batchHash: string) => Promise<void>;
   selectBatch: (batchHash: string) => void;
   similarStudiesByReport: Record<string, RelevanceStudy[]>;
   similarStudiesLoading: Record<string, boolean>;
@@ -37,10 +40,12 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
   reportsByBatch: {},
   selectedBatchHash: undefined,
   loading: false,
+  loadingReports: false,
+  loadingMoreReports: false,
   error: undefined,
   similarStudiesByReport: {},
   similarStudiesLoading: {},
-  fetchBatchesWithReports: async () => {
+  fetchBatches: async () => {
     set({ loading: true, error: undefined });
     try {
       const username = process.env.NEXT_PUBLIC_MEERKAT_USERNAME;
@@ -56,46 +61,88 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
       ] = `Bearer ${token.access_token}`;
 
       const batches = await getBatches();
-      const reportsByBatch: Record<string, ReportDetailDto[]> = {};
-
-      for (const batch of batches) {
-        if (!batch.number_reports || batch.number_reports <= 0) {
-          reportsByBatch[batch.batch_hash] = [];
-          continue;
-        }
-        const reportPromises = Array.from(
-          { length: batch.number_reports },
-          (_, reportIndex) => getReportData(batch.batch_hash, reportIndex)
-        );
-        reportsByBatch[batch.batch_hash] = await Promise.all(reportPromises);
-      }
-
-      const selectedBatchHash = batches[0]?.batch_hash;
 
       set({
         batches,
-        reportsByBatch,
-        selectedBatchHash,
         loading: false,
       });
-
-      if (selectedBatchHash) {
-        const batchReports = reportsByBatch[selectedBatchHash] ?? [];
-        batchReports.forEach((report, index) => {
-          void get().fetchSimilarStudiesForReport(
-            selectedBatchHash,
-            index,
-            report.assigned_studies ?? []
-          );
-        });
-      }
     } catch (error) {
       set({
         error:
           error instanceof Error
             ? error.message
-            : "Failed to load batches and reports.",
+            : "Failed to load batches.",
         loading: false,
+      });
+    }
+  },
+  fetchReportsForBatch: async (batchHash: string) => {
+    set({ loadingReports: true, error: undefined });
+    try {
+      const batch = get().batches.find((b) => b.batch_hash === batchHash);
+      if (!batch) {
+        throw new Error("Batch not found.");
+      }
+
+      if (!batch.number_reports || batch.number_reports <= 0) {
+        set((state) => ({
+          reportsByBatch: {
+            ...state.reportsByBatch,
+            [batchHash]: [],
+          },
+          loadingReports: false,
+        }));
+        return;
+      }
+
+      // Fetch first batch of reports (10) for quick initial render
+      const INITIAL_BATCH_SIZE = 10;
+      const initialBatchSize = Math.min(INITIAL_BATCH_SIZE, batch.number_reports);
+      
+      const initialReportPromises = Array.from(
+        { length: initialBatchSize },
+        (_, reportIndex) => getReportData(batchHash, reportIndex)
+      );
+      const initialReports = await Promise.all(initialReportPromises);
+
+      // Update state with initial reports and mark initial loading as complete
+      set((state) => ({
+        reportsByBatch: {
+          ...state.reportsByBatch,
+          [batchHash]: initialReports,
+        },
+        loadingReports: false,
+        loadingMoreReports: batch.number_reports > initialBatchSize,
+      }));
+
+      // Fetch remaining reports in the background if there are more
+      if (batch.number_reports > initialBatchSize) {
+        const remainingReportPromises = Array.from(
+          { length: batch.number_reports - initialBatchSize },
+          (_, index) => getReportData(batchHash, index + initialBatchSize)
+        );
+        
+        const remainingReports = await Promise.all(remainingReportPromises);
+        
+        // Merge with initial reports
+        set((state) => ({
+          reportsByBatch: {
+            ...state.reportsByBatch,
+            [batchHash]: [...initialReports, ...remainingReports],
+          },
+          loadingMoreReports: false,
+        }));
+      }
+
+      // Don't fetch similar studies here - let them be fetched on-demand when a report is selected
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to load reports.",
+        loadingReports: false,
+        loadingMoreReports: false,
       });
     }
   },
@@ -104,14 +151,12 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
       return;
     }
     set({ selectedBatchHash: batchHash });
-    const batchReports = get().reportsByBatch[batchHash] ?? [];
-    batchReports.forEach((report, index) => {
-      void get().fetchSimilarStudiesForReport(
-        batchHash,
-        index,
-        report.assigned_studies ?? []
-      );
-    });
+    
+    // If reports for this batch aren't loaded yet, fetch them
+    const batchReports = get().reportsByBatch[batchHash];
+    if (!batchReports) {
+      void get().fetchReportsForBatch(batchHash);
+    }
   },
   fetchSimilarStudiesForReport: async (
     batchHash: string,
