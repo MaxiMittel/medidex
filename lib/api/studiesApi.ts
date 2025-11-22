@@ -1,6 +1,7 @@
 import { StudyDto , ReportDto, InterventionDto, ConditionDto, OutcomeDto , GetPersonsResponseDto } from "../../types/apiDTOs";
 import { serializeParams } from "./helpers";
 import apiClient from "./apiClient";
+import { report } from "process";
 
 export const getStudies = (study_ids: number[]): Promise<StudyDto[]> => {
   const path = '/studies';
@@ -124,3 +125,21 @@ export const getPersonsForStudy = (study_id: number): Promise<string[]> => {
     });
 };
 
+export const getReportPdf = (report_id: number): Promise<Blob> => {
+  const path = `/reports/${report_id}/pdf`;
+  return apiClient.get<Blob>(path, { responseType: 'blob' })
+    .then(response => {
+      // Check if response is actually an error blob (e.g., JSON error message)
+      if (response.headers['content-type']?.includes('application/json')) {
+        return response.data.text().then((text: string) => {
+          const error = JSON.parse(text);
+          throw new Error(error.detail || 'Unknown error');
+        });
+      }
+      return response.data;
+    })
+    .catch(error => {
+      console.error(`Error fetching PDF for report ${report_id}:`, error.message || error);
+      throw error;
+    });
+}
