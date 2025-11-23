@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import type { RelevanceStudy, StudyReportSummary } from "@/types/reports";
 import {
   Sheet,
@@ -47,6 +48,7 @@ import {
 import { StudyOverview } from "./study-overview";
 import { StudyDetails } from "./study-details";
 import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
+import { getReportPdf } from "@/lib/api/studiesApi";
 
 interface StudyRelevanceTableProps {
   studies: RelevanceStudy[];
@@ -69,6 +71,8 @@ export function StudyRelevanceTable({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudy, setSelectedStudy] = useState<RelevanceStudy | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [downloadingPdfs, setDownloadingPdfs] = useState<Set<number>>(new Set());
+  const [downloadingSingle, setDownloadingSingle] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     setLinkedStudies(
@@ -177,29 +181,65 @@ export function StudyRelevanceTable({
     };
   };
 
-  const handleDownloadReports = (study: RelevanceStudy) => {
-    // Create CSV content
-    const csvContent = [
-      ["CRG Report ID", "CENTRAL Report ID", "Title"],
-      ...study.reports.map((report) => [
-        report.CRGReportID.toString(),
-        report.CENTRALReportID?.toString() || "",
-        report.Title,
-      ]),
-    ]
-      .map((row) => row.map((cell) => `"${cell}"`).join(","))
-      .join("\n");
+  const handleDownloadAllReportPdfs = async (study: RelevanceStudy) => {
+    if (study.reports.length === 0) return;
+    
+    setDownloadingPdfs(new Set([study.CRGStudyID]));
+    let successCount = 0;
+    let failureCount = 0;
+    
+    try {
+      for (const report of study.reports) {
+        try {
+          const blob = await getReportPdf(report.CRGReportID);
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `${study.ShortName}_Report_${report.CRGReportID}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          successCount++;
+        } catch (error) {
+          failureCount++;
+          toast.error(`Failed to download report ${report.CRGReportID}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+        // Add delay between downloads to avoid browser throttling
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      
+      if (successCount > 0) {
+        toast.success(`Downloaded ${successCount} PDF${successCount > 1 ? 's' : ''}${failureCount > 0 ? ` (${failureCount} failed)` : ''}`);
+      }
+    } finally {
+      setDownloadingPdfs(new Set());
+    }
+  };
 
-    // Create blob and download
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `${study.ShortName}_reports.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownloadSingleReportPdf = async (report: any, studyShortName: string) => {
+    setDownloadingSingle(new Set([report.CRGReportID]));
+    
+    try {
+      const blob = await getReportPdf(report.CRGReportID);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${studyShortName}_Report_${report.CRGReportID}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success(`Downloaded report ${report.CRGReportID}`);
+    } catch (error) {
+      toast.error(`Failed to download report ${report.CRGReportID}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setDownloadingSingle((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(report.CRGReportID);
+        return newSet;
+      });
+    }
   };
 
   return (
@@ -458,13 +498,27 @@ export function StudyRelevanceTable({
                     {/* Expanded content - Reports table */}
                     <AccordionContent className="pt-0 pb-4 px-6">
                       <div className="mt-3 border rounded-lg overflow-hidden bg-card">
-                        <div className="bg-muted/30 px-4 py-2 border-b">
+                        <div className="bg-muted/30 px-4 py-3 border-b flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <FileText className="h-4 w-4 text-muted-foreground" />
                             <span className="text-sm font-medium">
                               Associated Reports ({reportCount})
                             </span>
                           </div>
+                          {reportCount > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDownloadAllReportPdfs(study)}
+                              disabled={downloadingPdfs.has(study.CRGStudyID)}
+                              className="h-7 px-2 text-xs flex items-center gap-1"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              {downloadingPdfs.has(study.CRGStudyID)
+                                ? "Downloading..."
+                                : "Download All"}
+                            </Button>
+                          )}
                         </div>
                         <Table>
                           <TableHeader>
@@ -473,6 +527,7 @@ export function StudyRelevanceTable({
                               <TableHead className="font-medium">CENTRAL ID</TableHead>
                               <TableHead className="font-medium">CRG ID</TableHead>
                               <TableHead className="font-medium">Title</TableHead>
+                              <TableHead className="w-12"></TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -509,12 +564,25 @@ export function StudyRelevanceTable({
                                       </Tooltip>
                                     </TooltipProvider>
                                   </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        handleDownloadSingleReportPdf(report, study.ShortName)
+                                      }
+                                      disabled={downloadingSingle.has(report.CRGReportID)}
+                                      className="h-6 w-6 p-0 flex items-center justify-center"
+                                    >
+                                      <Download className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TableCell>
                                 </TableRow>
                               ))
                             ) : (
                               <TableRow>
                                 <TableCell
-                                  colSpan={4}
+                                  colSpan={5}
                                   className="text-center text-muted-foreground py-8"
                                 >
                                   <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
@@ -582,11 +650,14 @@ export function StudyRelevanceTable({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleDownloadReports(selectedStudy)}
+                        onClick={() => handleDownloadAllReportPdfs(selectedStudy)}
+                        disabled={downloadingPdfs.has(selectedStudy.CRGStudyID)}
                         className="flex items-center gap-2"
                       >
                         <Download className="h-4 w-4" />
-                        Download CSV
+                        {downloadingPdfs.has(selectedStudy.CRGStudyID)
+                          ? "Downloading..."
+                          : "Download All PDFs"}
                       </Button>
                     )}
                   </div>
@@ -608,6 +679,17 @@ export function StudyRelevanceTable({
                                 <span>CRG ID: {report.CRGReportID}</span>
                               </div>
                             </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                handleDownloadSingleReportPdf(report, selectedStudy.ShortName)
+                              }
+                              disabled={downloadingSingle.has(report.CRGReportID)}
+                              className="h-8 w-8 p-0 flex items-center justify-center"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
                       ))
