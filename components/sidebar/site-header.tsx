@@ -2,7 +2,6 @@
 
 import { SidebarIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { SearchForm } from "@/components/sidebar/search-form";
 import { BatchSelector } from "@/components/sidebar/batch-selector";
 import {
   Breadcrumb,
