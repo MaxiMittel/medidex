@@ -2,7 +2,7 @@
 
 import { SidebarIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { SearchForm } from "@/components/sidebar/search-form";
+import { BatchSelector } from "@/components/sidebar/batch-selector";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -25,14 +25,8 @@ const breadcrumbMap: Record<string, BreadcrumbConfig[]> = {
   "/": [{ label: "Search Studies" }],
   "/login": [{ label: "Authentication", href: "#" }, { label: "Login" }],
   "/register": [{ label: "Authentication", href: "#" }, { label: "Register" }],
-  "/studies": [
-    { label: "Studies", href: "#" },
-    { label: "All Studies" },
-  ],
-  "/upload": [
-    { label: "Platform", href: "#" },
-    { label: "Upload Studies" },
-  ],
+  "/studies": [{ label: "Studies", href: "#" }, { label: "All Studies" }],
+  "/upload": [{ label: "Platform", href: "#" }, { label: "Upload Studies" }],
   "/user-management": [
     { label: "Administration", href: "#" },
     { label: "User Management" },
@@ -82,6 +76,7 @@ export function SiteHeader() {
   const { toggleSidebar } = useSidebar();
   const pathname = usePathname();
   const breadcrumbs = getBreadcrumbs(pathname || "/");
+  const isReportsPage = pathname === "/reports";
 
   return (
     <header className="bg-background fixed left-0 right-0 top-0 z-50 flex w-full items-center border-b">
@@ -116,7 +111,11 @@ export function SiteHeader() {
             })}
           </BreadcrumbList>
         </Breadcrumb>
-        <SearchForm className="w-full sm:ml-auto sm:w-auto" />
+        {isReportsPage && (
+          <div className="w-full sm:ml-auto sm:w-auto">
+            <BatchSelector />
+          </div>
+        )}
       </div>
     </header>
   );
