@@ -3,6 +3,7 @@
 import { SidebarIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { SearchForm } from "@/components/sidebar/search-form";
+import { BatchSelector } from "@/components/sidebar/batch-selector";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -82,6 +83,7 @@ export function SiteHeader() {
   const { toggleSidebar } = useSidebar();
   const pathname = usePathname();
   const breadcrumbs = getBreadcrumbs(pathname || "/");
+  const isReportsPage = pathname === "/reports";
 
   return (
     <header className="bg-background fixed left-0 right-0 top-0 z-50 flex w-full items-center border-b">
@@ -116,7 +118,13 @@ export function SiteHeader() {
             })}
           </BreadcrumbList>
         </Breadcrumb>
-        <SearchForm className="w-full sm:ml-auto sm:w-auto" />
+        {isReportsPage ? (
+          <div className="w-full sm:ml-auto sm:w-auto">
+            <BatchSelector />
+          </div>
+        ) : (
+          <SearchForm className="w-full sm:ml-auto sm:w-auto" />
+        )}
       </div>
     </header>
   );
