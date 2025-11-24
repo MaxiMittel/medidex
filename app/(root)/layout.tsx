@@ -8,12 +8,12 @@ export default function Layout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="[--header-height:calc(--spacing(14))]">
-      <SidebarProvider className="flex flex-col">
+    <div className="[--header-height:calc(--spacing(14))] h-full overflow-hidden">
+      <SidebarProvider className="flex flex-col h-full overflow-hidden">
         <SiteHeader />
-        <div className="flex flex-1">
+        <div className="flex flex-1 min-h-0 overflow-hidden">
           <AppSidebar />
-          <SidebarInset className="pt-(--header-height)">
+          <SidebarInset className="pt-(--header-height) h-full overflow-hidden flex flex-col">
             {children}
           </SidebarInset>
         </div>

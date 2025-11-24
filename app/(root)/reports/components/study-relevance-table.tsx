@@ -63,16 +63,23 @@ export function StudyRelevanceTable({
   onLinkedChange,
   onStudySelect,
 }: StudyRelevanceTableProps) {
-  const { studyDetails, studyDetailsLoading, fetchStudyDetails } = useBatchReportsStore();
+  const { studyDetails, studyDetailsLoading, fetchStudyDetails } =
+    useBatchReportsStore();
   const [linkedStudies, setLinkedStudies] = useState<Set<number>>(
     new Set(studies.filter((s) => s.Linked).map((s) => s.CRGStudyID))
   );
   const [openStudies, setOpenStudies] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStudy, setSelectedStudy] = useState<RelevanceStudy | null>(null);
+  const [selectedStudy, setSelectedStudy] = useState<RelevanceStudy | null>(
+    null
+  );
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [downloadingPdfs, setDownloadingPdfs] = useState<Set<number>>(new Set());
-  const [downloadingSingle, setDownloadingSingle] = useState<Set<number>>(new Set());
+  const [downloadingPdfs, setDownloadingPdfs] = useState<Set<number>>(
+    new Set()
+  );
+  const [downloadingSingle, setDownloadingSingle] = useState<Set<number>>(
+    new Set()
+  );
 
   useEffect(() => {
     setLinkedStudies(
@@ -83,7 +90,7 @@ export function StudyRelevanceTable({
   // Filter and sort studies
   const filteredStudies = useMemo(() => {
     let filtered = [...studies];
-    
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
@@ -93,13 +100,10 @@ export function StudyRelevanceTable({
           (study.Comparison || "").toLowerCase().includes(query) ||
           (study.NumberParticipants !== null &&
             study.NumberParticipants !== undefined &&
-            study.NumberParticipants
-              .toString()
-              .toLowerCase()
-              .includes(query))
+            study.NumberParticipants.toString().toLowerCase().includes(query))
       );
     }
-    
+
     return filtered.sort((a, b) => b.Relevance - a.Relevance);
   }, [studies, searchQuery]);
 
@@ -183,11 +187,11 @@ export function StudyRelevanceTable({
 
   const handleDownloadAllReportPdfs = async (study: RelevanceStudy) => {
     if (study.reports.length === 0) return;
-    
+
     setDownloadingPdfs(new Set([study.CRGStudyID]));
     let successCount = 0;
     let failureCount = 0;
-    
+
     try {
       for (const report of study.reports) {
         try {
@@ -203,23 +207,34 @@ export function StudyRelevanceTable({
           successCount++;
         } catch (error) {
           failureCount++;
-          toast.error(`Failed to download report ${report.CRGReportID}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          toast.error(
+            `Failed to download report ${report.CRGReportID}: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`
+          );
         }
         // Add delay between downloads to avoid browser throttling
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
-      
+
       if (successCount > 0) {
-        toast.success(`Downloaded ${successCount} PDF${successCount > 1 ? 's' : ''}${failureCount > 0 ? ` (${failureCount} failed)` : ''}`);
+        toast.success(
+          `Downloaded ${successCount} PDF${successCount > 1 ? "s" : ""}${
+            failureCount > 0 ? ` (${failureCount} failed)` : ""
+          }`
+        );
       }
     } finally {
       setDownloadingPdfs(new Set());
     }
   };
 
-  const handleDownloadSingleReportPdf = async (report: any, studyShortName: string) => {
+  const handleDownloadSingleReportPdf = async (
+    report: any,
+    studyShortName: string
+  ) => {
     setDownloadingSingle(new Set([report.CRGReportID]));
-    
+
     try {
       const blob = await getReportPdf(report.CRGReportID);
       const url = URL.createObjectURL(blob);
@@ -232,7 +247,11 @@ export function StudyRelevanceTable({
       URL.revokeObjectURL(url);
       toast.success(`Downloaded report ${report.CRGReportID}`);
     } catch (error) {
-      toast.error(`Failed to download report ${report.CRGReportID}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(
+        `Failed to download report ${report.CRGReportID}: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     } finally {
       setDownloadingSingle((prev) => {
         const newSet = new Set(prev);
@@ -243,66 +262,70 @@ export function StudyRelevanceTable({
   };
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-semibold">Relevant Studies</h2>
-          <Badge variant="secondary">
-            {filteredStudies.length}
-            {searchQuery && ` of ${studies.length}`}
-          </Badge>
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Header - Sticky */}
+      <div className="shrink-0 space-y-4 pb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-semibold">Relevant Studies</h2>
+            <Badge variant="secondary">
+              {filteredStudies.length}
+              {searchQuery && ` of ${studies.length}`}
+            </Badge>
+          </div>
+          {filteredStudies.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleBulkToggle(!allFilteredLinked)}
+              className="text-xs"
+            >
+              {allFilteredLinked ? (
+                <>
+                  <X className="h-3 w-3 mr-1" />
+                  Deselect All
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Select All
+                </>
+              )}
+            </Button>
+          )}
         </div>
-        {filteredStudies.length > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleBulkToggle(!allFilteredLinked)}
-            className="text-xs"
-          >
-            {allFilteredLinked ? (
-              <>
-                <X className="h-3 w-3 mr-1" />
-                Deselect All
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                Select All
-              </>
-            )}
-          </Button>
-        )}
-      </div>
-      
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by name, ID, comparison, or participants..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
-        />
-        {searchQuery && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
-            onClick={() => setSearchQuery("")}
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        )}
+
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by name, ID, comparison, or participants..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+          {searchQuery && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+              onClick={() => setSearchQuery("")}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
       </div>
 
-      {loading && filteredStudies.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <Sparkles className="h-8 w-8 mx-auto mb-3 animate-pulse" />
-          <p className="font-medium">Loading relevant studies...</p>
-        </div>
-      ) : filteredStudies.length === 0 ? (
+      {/* Scrollable Content */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {loading && filteredStudies.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <Sparkles className="h-8 w-8 mx-auto mb-3 animate-pulse" />
+            <p className="font-medium">Loading relevant studies...</p>
+          </div>
+        ) : filteredStudies.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p className="font-medium">No studies found</p>
@@ -314,15 +337,27 @@ export function StudyRelevanceTable({
           </div>
         ) : (
           <div className="space-y-3">
-            {/* Header */}
-            <div className="grid grid-cols-12 md:grid-cols-[repeat(12,minmax(0,1fr))] p-3 pl-6 font-medium border-b bg-muted/30 sticky top-0 z-10 gap-2">
-              <div className="col-span-1 text-xs text-muted-foreground">Linked</div>
+            {/* Table Header - Sticky */}
+            <div className="grid grid-cols-12 md:grid-cols-12 p-3 pl-6 font-medium border-b bg-muted/30 sticky top-0 z-10 gap-2 backdrop-blur-sm">
+              <div className="col-span-1 text-xs text-muted-foreground">
+                Linked
+              </div>
               <div className="col-span-1 text-xs text-muted-foreground">ID</div>
-              <div className="col-span-1 text-xs text-muted-foreground px-3">Relevance</div>
-              <div className="col-span-2 text-xs text-muted-foreground">Short Name</div>
-              <div className="col-span-2 text-xs text-muted-foreground">Participants</div>
-              <div className="col-span-2 text-xs text-muted-foreground">Duration</div>
-              <div className="col-span-2 text-xs text-muted-foreground">Comparison</div>
+              <div className="col-span-1 text-xs text-muted-foreground px-3">
+                Relevance
+              </div>
+              <div className="col-span-2 text-xs text-muted-foreground">
+                Short Name
+              </div>
+              <div className="col-span-2 text-xs text-muted-foreground">
+                Participants
+              </div>
+              <div className="col-span-2 text-xs text-muted-foreground">
+                Duration
+              </div>
+              <div className="col-span-2 text-xs text-muted-foreground">
+                Comparison
+              </div>
               <div className="col-span-1 text-xs text-muted-foreground text-right pr-2">
                 Reports
               </div>
@@ -348,7 +383,7 @@ export function StudyRelevanceTable({
                     className="border-none"
                   >
                     <AccordionTrigger className="hover:no-underline p-0 [&>svg]:hidden group">
-                      <div className="grid grid-cols-12 md:grid-cols-[repeat(12,minmax(0,1fr))] p-3 pl-6 mb-2 bg-secondary/50 hover:bg-secondary rounded-xl relative w-full items-center transition-all duration-200 border border-transparent hover:border-primary/20 group-hover:shadow-sm gap-2">
+                      <div className="grid grid-cols-12 md:grid-cols-12 p-3 pl-6 mb-2 bg-secondary/50 hover:bg-secondary rounded-xl relative w-full items-center transition-all duration-200 border border-transparent hover:border-primary/20 group-hover:shadow-sm gap-2">
                         {/* Left indicator bar with relevance color */}
                         <div
                           className={`${getRelevanceColor(
@@ -415,7 +450,9 @@ export function StudyRelevanceTable({
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className="truncate">{study.ShortName}</span>
+                                <span className="truncate">
+                                  {study.ShortName}
+                                </span>
                               </TooltipTrigger>
                               <TooltipContent>
                                 <p>{study.ShortName}</p>
@@ -464,34 +501,34 @@ export function StudyRelevanceTable({
                           </TooltipProvider>
                         </div>
 
-                                {/* Report count, Show Details button, and chevron */}
-                                <div className="col-span-1 flex items-center justify-end gap-2 pr-2">
-                                  {reportCount > 0 && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs px-1.5 py-0 h-5 flex items-center gap-1"
-                                    >
-                                      <FileText className="h-3 w-3" />
-                                      {reportCount}
-                                    </Badge>
-                                  )}
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 px-2 text-xs"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleStudyClick(study);
-                                    }}
-                                  >
-                                    Details
-                                  </Button>
-                                  <ChevronDown
-                                    className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
-                                      isOpen ? "rotate-180" : ""
-                                    }`}
-                                  />
-                                </div>
+                        {/* Report count, Show Details button, and chevron */}
+                        <div className="col-span-1 flex items-center justify-end gap-2 pr-2">
+                          {reportCount > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs px-1.5 py-0 h-5 flex items-center gap-1"
+                            >
+                              <FileText className="h-3 w-3" />
+                              {reportCount}
+                            </Badge>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStudyClick(study);
+                            }}
+                          >
+                            Details
+                          </Button>
+                          <ChevronDown
+                            className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
+                              isOpen ? "rotate-180" : ""
+                            }`}
+                          />
+                        </div>
                       </div>
                     </AccordionTrigger>
 
@@ -524,9 +561,15 @@ export function StudyRelevanceTable({
                           <TableHeader>
                             <TableRow className="hover:bg-transparent">
                               <TableHead className="w-12"></TableHead>
-                              <TableHead className="font-medium">CENTRAL ID</TableHead>
-                              <TableHead className="font-medium">CRG ID</TableHead>
-                              <TableHead className="font-medium">Title</TableHead>
+                              <TableHead className="font-medium">
+                                CENTRAL ID
+                              </TableHead>
+                              <TableHead className="font-medium">
+                                CRG ID
+                              </TableHead>
+                              <TableHead className="font-medium">
+                                Title
+                              </TableHead>
                               <TableHead className="w-12"></TableHead>
                             </TableRow>
                           </TableHeader>
@@ -544,7 +587,9 @@ export function StudyRelevanceTable({
                                   </TableCell>
                                   <TableCell className="font-mono text-xs">
                                     {report.CENTRALReportID || (
-                                      <span className="text-muted-foreground/50">-</span>
+                                      <span className="text-muted-foreground/50">
+                                        -
+                                      </span>
                                     )}
                                   </TableCell>
                                   <TableCell className="font-mono text-xs">
@@ -559,7 +604,9 @@ export function StudyRelevanceTable({
                                           </div>
                                         </TooltipTrigger>
                                         <TooltipContent className="max-w-md">
-                                          <p className="text-sm">{report.Title}</p>
+                                          <p className="text-sm">
+                                            {report.Title}
+                                          </p>
                                         </TooltipContent>
                                       </Tooltip>
                                     </TooltipProvider>
@@ -569,9 +616,14 @@ export function StudyRelevanceTable({
                                       variant="ghost"
                                       size="sm"
                                       onClick={() =>
-                                        handleDownloadSingleReportPdf(report, study.ShortName)
+                                        handleDownloadSingleReportPdf(
+                                          report,
+                                          study.ShortName
+                                        )
                                       }
-                                      disabled={downloadingSingle.has(report.CRGReportID)}
+                                      disabled={downloadingSingle.has(
+                                        report.CRGReportID
+                                      )}
                                       className="h-6 w-6 p-0 flex items-center justify-center"
                                     >
                                       <Download className="h-3.5 w-3.5" />
@@ -586,7 +638,9 @@ export function StudyRelevanceTable({
                                   className="text-center text-muted-foreground py-8"
                                 >
                                   <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                                  <p className="text-sm">No reports available</p>
+                                  <p className="text-sm">
+                                    No reports available
+                                  </p>
                                 </TableCell>
                               </TableRow>
                             )}
@@ -600,10 +654,11 @@ export function StudyRelevanceTable({
             </Accordion>
           </div>
         )}
+      </div>
 
       {/* Sheet for Study Details */}
-      <Sheet 
-        open={isSheetOpen} 
+      <Sheet
+        open={isSheetOpen}
         onOpenChange={(open) => {
           setIsSheetOpen(open);
           if (!open) {
@@ -611,7 +666,10 @@ export function StudyRelevanceTable({
           }
         }}
       >
-        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-2xl overflow-y-auto"
+        >
           {selectedStudy && (
             <>
               <SheetHeader>
@@ -619,12 +677,16 @@ export function StudyRelevanceTable({
               </SheetHeader>
               <div className="mt-6 space-y-6">
                 <StudyOverview study={getStudyForSheet(selectedStudy)} />
-                
+
                 {/* Study Details Section */}
                 {studyDetails[selectedStudy.CRGStudyID] ? (
                   <StudyDetails
-                    interventions={studyDetails[selectedStudy.CRGStudyID].interventions}
-                    conditions={studyDetails[selectedStudy.CRGStudyID].conditions}
+                    interventions={
+                      studyDetails[selectedStudy.CRGStudyID].interventions
+                    }
+                    conditions={
+                      studyDetails[selectedStudy.CRGStudyID].conditions
+                    }
                     outcomes={studyDetails[selectedStudy.CRGStudyID].outcomes}
                     design={studyDetails[selectedStudy.CRGStudyID].design}
                     loading={false}
@@ -635,10 +697,12 @@ export function StudyRelevanceTable({
                     conditions={[]}
                     outcomes={[]}
                     design={[]}
-                    loading={studyDetailsLoading[selectedStudy.CRGStudyID] ?? false}
+                    loading={
+                      studyDetailsLoading[selectedStudy.CRGStudyID] ?? false
+                    }
                   />
                 )}
-                
+
                 {/* Reports Section with Download */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -650,7 +714,9 @@ export function StudyRelevanceTable({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleDownloadAllReportPdfs(selectedStudy)}
+                        onClick={() =>
+                          handleDownloadAllReportPdfs(selectedStudy)
+                        }
                         disabled={downloadingPdfs.has(selectedStudy.CRGStudyID)}
                         className="flex items-center gap-2"
                       >
@@ -661,7 +727,7 @@ export function StudyRelevanceTable({
                       </Button>
                     )}
                   </div>
-                  
+
                   <div className="space-y-2">
                     {selectedStudy.reports.length > 0 ? (
                       selectedStudy.reports.map((report, idx) => (
@@ -671,10 +737,14 @@ export function StudyRelevanceTable({
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1">
-                              <p className="text-sm font-medium">{report.Title}</p>
+                              <p className="text-sm font-medium">
+                                {report.Title}
+                              </p>
                               <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                                 {report.CENTRALReportID && (
-                                  <span>CENTRAL ID: {report.CENTRALReportID}</span>
+                                  <span>
+                                    CENTRAL ID: {report.CENTRALReportID}
+                                  </span>
                                 )}
                                 <span>CRG ID: {report.CRGReportID}</span>
                               </div>
@@ -683,9 +753,14 @@ export function StudyRelevanceTable({
                               variant="ghost"
                               size="sm"
                               onClick={() =>
-                                handleDownloadSingleReportPdf(report, selectedStudy.ShortName)
+                                handleDownloadSingleReportPdf(
+                                  report,
+                                  selectedStudy.ShortName
+                                )
                               }
-                              disabled={downloadingSingle.has(report.CRGReportID)}
+                              disabled={downloadingSingle.has(
+                                report.CRGReportID
+                              )}
                               className="h-8 w-8 p-0 flex items-center justify-center"
                             >
                               <Download className="h-4 w-4" />
