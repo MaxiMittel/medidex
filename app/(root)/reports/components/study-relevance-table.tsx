@@ -337,32 +337,6 @@ export function StudyRelevanceTable({
           </div>
         ) : (
           <div className="space-y-3">
-            {/* Table Header - Sticky */}
-            <div className="grid grid-cols-12 md:grid-cols-12 p-3 pl-6 font-medium border-b bg-muted/30 sticky top-0 z-10 gap-2 backdrop-blur-sm">
-              <div className="col-span-1 text-xs text-muted-foreground">
-                Linked
-              </div>
-              <div className="col-span-1 text-xs text-muted-foreground">ID</div>
-              <div className="col-span-1 text-xs text-muted-foreground px-3">
-                Relevance
-              </div>
-              <div className="col-span-2 text-xs text-muted-foreground">
-                Short Name
-              </div>
-              <div className="col-span-2 text-xs text-muted-foreground">
-                Participants
-              </div>
-              <div className="col-span-2 text-xs text-muted-foreground">
-                Duration
-              </div>
-              <div className="col-span-2 text-xs text-muted-foreground">
-                Comparison
-              </div>
-              <div className="col-span-1 text-xs text-muted-foreground text-right pr-2">
-                Reports
-              </div>
-            </div>
-
             {/* Studies list */}
             <Accordion
               type="multiple"
@@ -383,151 +357,150 @@ export function StudyRelevanceTable({
                     className="border-none"
                   >
                     <AccordionTrigger className="hover:no-underline p-0 [&>svg]:hidden group">
-                      <div className="grid grid-cols-12 md:grid-cols-12 p-3 pl-6 mb-2 bg-secondary/50 hover:bg-secondary rounded-xl relative w-full items-center transition-all duration-200 border border-transparent hover:border-primary/20 group-hover:shadow-sm gap-2">
+                      <div className="p-4 mb-2 bg-secondary/50 hover:bg-secondary rounded-xl relative w-full transition-all duration-200 border border-transparent hover:border-primary/20 group-hover:shadow-sm">
                         {/* Left indicator bar with relevance color */}
                         <div
                           className={`${getRelevanceColor(
                             study.Relevance
-                          )} rounded-full h-3/4 w-1 absolute left-2 top-1/2 -translate-y-1/2 transition-all`}
+                          )} rounded-full h-full w-1 absolute left-0 top-0 bottom-0 transition-all`}
                         ></div>
 
-                        {/* Checkbox */}
-                        <div
-                          className="col-span-1 flex items-center"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div>
-                                  <Checkbox
-                                    checked={isLinked}
-                                    onCheckedChange={(checked) =>
-                                      handleLinkedChange(
-                                        study.CRGStudyID,
-                                        checked as boolean
-                                      )
-                                    }
-                                    className="data-[state=checked]:bg-primary"
-                                  />
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {isLinked ? "Unlink study" : "Link study"}
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-
-                        {/* CRGStudyID */}
-                        <div className="col-span-1 text-sm flex items-center font-mono text-muted-foreground">
-                          {study.CRGStudyID}
-                        </div>
-
-                        {/* Relevance with visual indicator */}
-                        <div className="col-span-1 flex items-center gap-3 px-4">
-                          <div className="flex flex-col w-full">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm font-semibold">
-                                {relevancePercentage}%
-                              </span>
-                            </div>
-                            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mt-0.5">
+                        <div className="flex flex-col gap-3 pl-4">
+                          {/* Top row: Checkbox, Short Name, and Details button */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              {/* Checkbox - smaller */}
                               <div
-                                className={`h-full ${getRelevanceColor(
-                                  study.Relevance
-                                )} transition-all duration-300`}
-                                style={{
-                                  width: `${study.Relevance * 100}%`,
+                                className="flex items-center shrink-0"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div>
+                                        <Checkbox
+                                          checked={isLinked}
+                                          onCheckedChange={(checked) =>
+                                            handleLinkedChange(
+                                              study.CRGStudyID,
+                                              checked as boolean
+                                            )
+                                          }
+                                          className="data-[state=checked]:bg-primary h-4 w-4"
+                                        />
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {isLinked ? "Unlink study" : "Link study"}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+
+                              {/* ShortName */}
+                              <div className="flex-1 min-w-0">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <h3 className="text-base font-semibold truncate">
+                                        {study.ShortName}
+                                      </h3>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>{study.ShortName}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            </div>
+
+                            {/* Details button - more prominent */}
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="h-8 px-3 text-sm font-medium"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStudyClick(study);
                                 }}
+                              >
+                                Details
+                              </Button>
+                              <ChevronDown
+                                className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
+                                  isOpen ? "rotate-180" : ""
+                                }`}
                               />
                             </div>
                           </div>
-                        </div>
 
-                        {/* ShortName */}
-                        <div className="col-span-2 text-sm flex items-center font-medium">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="truncate">
-                                  {study.ShortName}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{study.ShortName}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-
-                        {/* NumberParticipants */}
-                        <div className="col-span-2 text-sm flex items-center gap-1.5 text-muted-foreground">
-                          <Users className="h-3.5 w-3.5" />
-                          <span>
-                            {typeof study.NumberParticipants === "number"
-                              ? study.NumberParticipants.toLocaleString()
-                              : study.NumberParticipants || "-"}
-                          </span>
-                        </div>
-
-                        {/* Duration */}
-                        <div className="col-span-2 text-sm flex items-center gap-1.5 text-muted-foreground">
-                          {study.Duration ? (
-                            <>
-                              <Calendar className="h-3.5 w-3.5" />
-                              <span>{study.Duration}</span>
-                            </>
-                          ) : (
-                            <span className="text-muted-foreground/50">-</span>
-                          )}
-                        </div>
-
-                        {/* Comparison */}
-                        <div className="col-span-2 text-sm flex items-center">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="truncate text-muted-foreground">
-                                  {study.Comparison || "-"}
-                                </span>
-                              </TooltipTrigger>
-                              {study.Comparison && (
-                                <TooltipContent className="max-w-xs">
-                                  <p>{study.Comparison}</p>
-                                </TooltipContent>
-                              )}
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-
-                        {/* Report count, Show Details button, and chevron */}
-                        <div className="col-span-1 flex items-center justify-end gap-2 pr-2">
-                          {reportCount > 0 && (
+                          {/* Relevance */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+                              Relevance:
+                            </span>
                             <Badge
-                              variant="outline"
-                              className="text-xs px-1.5 py-0 h-5 flex items-center gap-1"
+                              variant="secondary"
+                              className="font-semibold text-sm px-2.5 py-0.5"
                             >
-                              <FileText className="h-3 w-3" />
-                              {reportCount}
+                              {relevancePercentage}%
                             </Badge>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 px-2 text-xs"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleStudyClick(study);
-                            }}
-                          >
-                            Details
-                          </Button>
-                          <ChevronDown
-                            className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
-                              isOpen ? "rotate-180" : ""
-                            }`}
-                          />
+                          </div>
+
+                          {/* Bottom row: Participants, Duration, Comparison */}
+                          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 text-sm">
+                            {/* NumberParticipants */}
+                            <div className="flex items-center gap-1.5 text-muted-foreground">
+                              <Users className="h-4 w-4 shrink-0" />
+                              <span className="font-medium">Participants:</span>
+                              <span>
+                                {typeof study.NumberParticipants === "number"
+                                  ? study.NumberParticipants.toLocaleString()
+                                  : study.NumberParticipants || "-"}
+                              </span>
+                            </div>
+
+                            {/* Duration */}
+                            <div className="flex items-center gap-1.5 text-muted-foreground">
+                              {study.Duration ? (
+                                <>
+                                  <Calendar className="h-4 w-4 shrink-0" />
+                                  <span className="font-medium">Duration:</span>
+                                  <span>{study.Duration}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Calendar className="h-4 w-4 shrink-0 opacity-30" />
+                                  <span className="font-medium">Duration:</span>
+                                  <span className="text-muted-foreground/50">
+                                    -
+                                  </span>
+                                </>
+                              )}
+                            </div>
+
+                            {/* Comparison */}
+                            <div className="flex items-start gap-1.5 text-muted-foreground flex-1 min-w-0">
+                              <span className="font-medium shrink-0">
+                                Comparison:
+                              </span>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="truncate">
+                                      {study.Comparison || "-"}
+                                    </span>
+                                  </TooltipTrigger>
+                                  {study.Comparison && (
+                                    <TooltipContent className="max-w-xs">
+                                      <p>{study.Comparison}</p>
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </AccordionTrigger>

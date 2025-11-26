@@ -20,17 +20,22 @@ export default function ReportsPage() {
       return [];
     }
     const batchReports = reportsByBatch[selectedBatchHash] || [];
-    return batchReports.map((report, index) => ({
-      reportIndex: index,
-      batchHash: selectedBatchHash,
-      assignedStudyIds: report.assigned_studies ?? [],
-      CENTRALReportID: report.trial_id ? Number(report.trial_id) || null : null,
-      CRGReportID: index,
-      Title: report.title,
-      Abstract: report.abstract ?? undefined,
-      Assigned: report.assigned_studies.length > 0,
-      AssignedTo: report.assigned_studies.join(", "),
-    }));
+    return batchReports.map((report, index) => {
+      const assignedStudies = report.assigned_studies ?? [];
+      return {
+        reportIndex: index,
+        batchHash: selectedBatchHash,
+        assignedStudyIds: assignedStudies,
+        CENTRALReportID: report.trial_id
+          ? Number(report.trial_id) || null
+          : null,
+        CRGReportID: index,
+        Title: report.title,
+        Abstract: report.abstract ?? undefined,
+        Assigned: assignedStudies.length > 0,
+        AssignedTo: assignedStudies.join(", "),
+      };
+    });
   }, [reportsByBatch, selectedBatchHash]);
 
   const selectedBatch = useMemo(() => {
