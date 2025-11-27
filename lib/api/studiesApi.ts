@@ -143,3 +143,4 @@ export const getReportPdf = (report_id: number): Promise<Blob> => {
       throw error;
     });
 }
+

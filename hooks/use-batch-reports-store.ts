@@ -3,9 +3,11 @@
 import { create } from "zustand";
 import type { BatchDto, ReportDetailDto, StudyDto, InterventionDto, ConditionDto, OutcomeDto } from "../types/apiDTOs";
 import {
+  assignStudiesToReport,
   getBatches,
   getReportData,
   getSimilarStudies,
+  removeStudiesFromReport,
 } from "../lib/api/batchApi";
 import { login } from "../lib/api/authApi";
 import apiClient from "../lib/api/apiClient";
@@ -40,6 +42,17 @@ export interface BatchReportsState {
   studyDetails: Record<number, StudyDetailData>;
   studyDetailsLoading: Record<number, boolean>;
   fetchStudyDetails: (studyId: number) => Promise<void>;
+  // Add new functions for assignment
+  assignStudyToReport: (
+    batchHash: string,
+    reportIndex: number,
+    studyId: number
+  ) => Promise<void>;
+  unassignStudyFromReport: (
+    batchHash: string,
+    reportIndex: number,
+    studyId: number
+  ) => Promise<void>;
 }
 
 export const buildReportKey = (batchHash: string, reportIndex: number) =>
@@ -306,6 +319,144 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
           [studyId]: false,
         },
       }));
+    }
+  },
+  
+  // Add assignment functions
+  assignStudyToReport: async (
+    batchHash: string,
+    reportIndex: number,
+    studyId: number
+  ) => {
+    try {
+      // Get current assigned studies for this report
+      const currentReport = get().reportsByBatch[batchHash]?.[reportIndex];
+      if (!currentReport) {
+        throw new Error("Report not found");
+      }
+
+      const currentAssignedStudies = currentReport.assigned_studies || [];
+      
+      // Check if already assigned
+      if (currentAssignedStudies.includes(studyId)) {
+        return; // Already assigned, nothing to do
+      }
+
+      // Add the new study to the list
+      const updatedStudies = [...currentAssignedStudies, studyId];
+
+      // Call API to assign
+      await assignStudiesToReport(batchHash, reportIndex, updatedStudies);
+
+      // Update local state
+      set((state) => {
+        const updatedReports = [...(state.reportsByBatch[batchHash] || [])];
+        if (updatedReports[reportIndex]) {
+          updatedReports[reportIndex] = {
+            ...updatedReports[reportIndex],
+            assigned_studies: updatedStudies,
+          };
+        }
+
+        return {
+          reportsByBatch: {
+            ...state.reportsByBatch,
+            [batchHash]: updatedReports,
+          },
+        };
+      });
+
+      // Update the similar studies list to reflect the change
+      const key = buildReportKey(batchHash, reportIndex);
+      const similarStudies = get().similarStudiesByReport[key];
+      if (similarStudies) {
+        const updatedSimilarStudies = similarStudies.map((study) =>
+          study.CRGStudyID === studyId
+            ? { ...study, Linked: true }
+            : study
+        );
+        set((state) => ({
+          similarStudiesByReport: {
+            ...state.similarStudiesByReport,
+            [key]: updatedSimilarStudies,
+          },
+        }));
+      }
+    } catch (error) {
+      console.error("Failed to assign study to report:", error);
+      throw error;
+    }
+  },
+
+  unassignStudyFromReport: async (
+    batchHash: string,
+    reportIndex: number,
+    studyId: number
+  ) => {
+    try {
+      // Get current assigned studies for this report
+      const currentReport = get().reportsByBatch[batchHash]?.[reportIndex];
+      if (!currentReport) {
+        throw new Error("Report not found");
+      }
+
+      const currentAssignedStudies = currentReport.assigned_studies || [];
+      
+      // Check if not assigned
+      if (!currentAssignedStudies.includes(studyId)) {
+        return; // Not assigned, nothing to do
+      }
+
+      // Remove the study from the list
+      const updatedStudies = currentAssignedStudies.filter(
+        (id) => id !== studyId
+      );
+
+      // Call API to update assignments
+      if (updatedStudies.length > 0) {
+        await assignStudiesToReport(batchHash, reportIndex, updatedStudies);
+      } else {
+        // If no studies left, call remove endpoint
+        await removeStudiesFromReport(batchHash, reportIndex);
+      }
+
+      // Update local state
+      set((state) => {
+        const updatedReports = [...(state.reportsByBatch[batchHash] || [])];
+        if (updatedReports[reportIndex]) {
+          updatedReports[reportIndex] = {
+            ...updatedReports[reportIndex],
+            assigned_studies: updatedStudies,
+          };
+        }
+
+        return {
+          reportsByBatch: {
+            ...state.reportsByBatch,
+            [batchHash]: updatedReports,
+          },
+        };
+      });
+
+      // Update the similar studies list to reflect the change
+      const key = buildReportKey(batchHash, reportIndex);
+      const similarStudies = get().similarStudiesByReport[key];
+      if (similarStudies) {
+        const updatedSimilarStudies = similarStudies.map((study) =>
+          study.CRGStudyID === studyId
+            ? { ...study, Linked: false }
+            : study
+        );
+        set((state) => ({
+          similarStudiesByReport: {
+            ...state.similarStudiesByReport,
+            [key]: updatedSimilarStudies,
+          },
+        }));
+      }
+    } catch (error) {
+      console.error("Failed to unassign study from report:", error);
+      throw error;
     }
   },
 }));
