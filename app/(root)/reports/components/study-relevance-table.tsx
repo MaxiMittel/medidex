@@ -55,6 +55,9 @@ interface StudyRelevanceTableProps {
   loading?: boolean;
   onLinkedChange?: (studyId: number, linked: boolean) => void;
   onStudySelect?: (studyId: number | null) => void;
+  // Add current report context
+  currentBatchHash?: string;
+  currentReportIndex?: number;
 }
 
 export function StudyRelevanceTable({
@@ -62,9 +65,16 @@ export function StudyRelevanceTable({
   loading,
   onLinkedChange,
   onStudySelect,
+  currentBatchHash,
+  currentReportIndex,
 }: StudyRelevanceTableProps) {
-  const { studyDetails, studyDetailsLoading, fetchStudyDetails } =
-    useBatchReportsStore();
+  const { 
+    studyDetails, 
+    studyDetailsLoading, 
+    fetchStudyDetails, 
+    assignStudyToReport, 
+    unassignStudyFromReport 
+  } = useBatchReportsStore();
   const [linkedStudies, setLinkedStudies] = useState<Set<number>>(
     new Set(studies.filter((s) => s.Linked).map((s) => s.CRGStudyID))
   );
@@ -107,7 +117,8 @@ export function StudyRelevanceTable({
     return filtered.sort((a, b) => b.Relevance - a.Relevance);
   }, [studies, searchQuery]);
 
-  const handleLinkedChange = (studyId: number, checked: boolean) => {
+  const handleLinkedChange = async (studyId: number, checked: boolean) => {
+    // Optimistically update UI
     setLinkedStudies((prev) => {
       const newSet = new Set(prev);
       if (checked) {
@@ -117,15 +128,94 @@ export function StudyRelevanceTable({
       }
       return newSet;
     });
+
+    // Call the callback if provided (for backward compatibility)
     onLinkedChange?.(studyId, checked);
+
+    // If we have report context, persist to backend
+    if (currentBatchHash && currentReportIndex !== undefined) {
+      try {
+        if (checked) {
+          await assignStudyToReport(currentBatchHash, currentReportIndex, studyId);
+          toast.success(`Study assigned to report`);
+        } else {
+          await unassignStudyFromReport(currentBatchHash, currentReportIndex, studyId);
+          toast.success(`Study unassigned from report`);
+        }
+      } catch (error) {
+        // Revert UI on error
+        setLinkedStudies((prev) => {
+          const newSet = new Set(prev);
+          if (checked) {
+            newSet.delete(studyId);
+          } else {
+            newSet.add(studyId);
+          }
+          return newSet;
+        });
+        
+        toast.error(
+          `Failed to ${checked ? "assign" : "unassign"} study: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        );
+      }
+    }
   };
 
-  const handleBulkToggle = (selectAll: boolean) => {
+  const handleBulkToggle = async (selectAll: boolean) => {
+    if (!currentBatchHash || currentReportIndex === undefined) {
+      // Fallback to local state only
+      if (selectAll) {
+        const allIds = new Set(filteredStudies.map((s) => s.CRGStudyID));
+        setLinkedStudies(allIds);
+      } else {
+        setLinkedStudies(new Set());
+      }
+      return;
+    }
+
+    const studiesToProcess = filteredStudies.filter((study) => {
+      const isCurrentlyLinked = linkedStudies.has(study.CRGStudyID);
+      return selectAll ? !isCurrentlyLinked : isCurrentlyLinked;
+    });
+
+    if (studiesToProcess.length === 0) {
+      return;
+    }
+
+    // Optimistically update UI
     if (selectAll) {
       const allIds = new Set(filteredStudies.map((s) => s.CRGStudyID));
       setLinkedStudies(allIds);
     } else {
       setLinkedStudies(new Set());
+    }
+
+    // Process assignments/unassignments
+    try {
+      const promises = studiesToProcess.map((study) =>
+        selectAll
+          ? assignStudyToReport(currentBatchHash, currentReportIndex, study.CRGStudyID)
+          : unassignStudyFromReport(currentBatchHash, currentReportIndex, study.CRGStudyID)
+      );
+
+      await Promise.all(promises);
+      toast.success(
+        selectAll
+          ? `${studiesToProcess.length} studies assigned`
+          : `${studiesToProcess.length} studies unassigned`
+      );
+    } catch (error) {
+      // Revert on error
+      setLinkedStudies(
+        new Set(studies.filter((s) => s.Linked).map((s) => s.CRGStudyID))
+      );
+      toast.error(
+        `Failed to ${selectAll ? "assign" : "unassign"} studies: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
   };
 
