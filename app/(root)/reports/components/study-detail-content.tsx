@@ -132,6 +132,8 @@ export function StudyDetailContent({ reports, loadingMore, totalReports }: Study
           <StudyRelevanceTable
             studies={currentRelevanceStudies}
             loading={relevanceLoading}
+            currentBatchHash={currentReport?.batchHash}
+            currentReportIndex={currentReport?.reportIndex}
           />
         </div>
       </Panel>
