@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { uploadBatch } from "@/lib/api/batchApi";
 import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
 
 interface UploadFile {
@@ -88,7 +87,20 @@ export function UploadSection(props: UploadSectionProps) {
       }, 200);
 
       // Upload the file
-      const batchHash = await uploadBatch(uploadFile.file);
+      const formData = new FormData();
+      formData.append("file", uploadFile.file, uploadFile.file.name);
+
+      const response = await fetch("/api/meerkat/batches/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorMessage = await response.text();
+        throw new Error(errorMessage || "Failed to upload batch via proxy route.");
+      }
+
+      const { batchHash } = (await response.json()) as { batchHash: string };
 
       if (progressInterval) {
         clearInterval(progressInterval);
