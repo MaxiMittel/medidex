@@ -9,4 +9,13 @@ export const apiClient = axios.create({
   },
 });
 
+// Add a request interceptor to handle FormData uploads
+// When FormData is detected, remove Content-Type so axios can set it automatically with boundary
+apiClient.interceptors.request.use((config) => {
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
+  return config;
+});
+
 export default apiClient;
