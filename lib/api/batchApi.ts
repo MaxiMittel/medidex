@@ -16,12 +16,22 @@ export const getBatches = (): Promise<BatchDto[]> => {
 export const uploadBatch = (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append("file", file, file.name);
+    
+    // The apiClient has a request interceptor that automatically removes Content-Type
+    // when FormData is detected, allowing axios to set it with the correct boundary.
     return apiClient.post<string>("/batches", formData)
         .then(response => {
             return response.data;
         })
         .catch(error => {
             console.error("Error uploading batch:", error);
+            // Extract error message from API response
+            if (error.response?.data?.detail) {
+                const errorMessage = typeof error.response.data.detail === 'string' 
+                    ? error.response.data.detail 
+                    : JSON.stringify(error.response.data.detail);
+                throw new Error(errorMessage);
+            }
             throw error;
         });
 }
