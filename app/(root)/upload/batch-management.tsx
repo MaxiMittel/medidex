@@ -30,9 +30,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { deleteBatchByHash, getBatches } from "@/lib/api/batchApi";
-import { login } from "@/lib/api/authApi";
-import apiClient from "@/lib/api/apiClient";
 import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
 import type { BatchDto } from "@/types/apiDTOs";
 import { useState, useEffect, useImperativeHandle, forwardRef } from "react";
@@ -48,26 +45,18 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
   const [deletingHash, setDeletingHash] = useState<string | null>(null);
   const { fetchBatches: refreshStoreBatches } = useBatchReportsStore();
 
-  const ensureAuthenticated = async () => {
-    const username = process.env.NEXT_PUBLIC_MEERKAT_USERNAME;
-    const password = process.env.NEXT_PUBLIC_MEERKAT_PASSWORD;
-
-    if (!username || !password) {
-      throw new Error("Meerkat credentials are not configured.");
-    }
-
-    const token = await login(username, password);
-    apiClient.defaults.headers.common[
-      "Authorization"
-    ] = `Bearer ${token.access_token}`;
-  };
-
   const loadBatches = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      await ensureAuthenticated();
-      const batchList = await getBatches();
+      const response = await fetch("/api/meerkat/batches");
+      if (!response.ok) {
+        const errorMessage = await response.text();
+        throw new Error(
+          errorMessage || "Failed to load batches via proxy route."
+        );
+      }
+      const batchList = (await response.json()) as BatchDto[];
       setBatches(batchList);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load batches");
@@ -88,8 +77,15 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
   const handleDelete = async (batchHash: string) => {
     setDeletingHash(batchHash);
     try {
-      await ensureAuthenticated();
-      await deleteBatchByHash(batchHash);
+      const response = await fetch(`/api/meerkat/batches/${batchHash}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const errorMessage = await response.text();
+        throw new Error(
+          errorMessage || "Failed to delete batch via proxy route."
+        );
+      }
       // Remove from local state
       setBatches((prev) => prev.filter((b) => b.batch_hash !== batchHash));
       // Refresh store batches

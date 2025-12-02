@@ -51,12 +51,18 @@ export const getBatchByHash = (batch_hash: string): Promise<BatchDto> => {
 }
 
 //delete a batch by its hash
-export const deleteBatchByHash = (batch_hash: string): Promise<void> => {
-    return apiClient.delete<void>(`/batches/${batch_hash}`).then(response => {
-        return;
-    }).catch(error => {
-        console.error(`Error deleting batch with hash ${batch_hash}:`, error);
-        throw error;
+export const deleteBatchByHash = (
+  batch_hash: string,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+  return apiClient
+    .delete<void>(`/batches/${batch_hash}`, config)
+    .then(() => {
+      return;
+    })
+    .catch(error => {
+      console.error(`Error deleting batch with hash ${batch_hash}:`, error);
+      throw error;
     });
 }
 
