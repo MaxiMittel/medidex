@@ -7,8 +7,6 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { uploadBatch } from "@/lib/api/batchApi";
-import { login } from "@/lib/api/authApi";
-import apiClient from "@/lib/api/apiClient";
 import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
 
 interface UploadFile {
@@ -30,20 +28,6 @@ export function UploadSection(props: UploadSectionProps) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { fetchBatches } = useBatchReportsStore();
-
-  const ensureAuthenticated = async () => {
-    const username = process.env.NEXT_PUBLIC_MEERKAT_USERNAME;
-    const password = process.env.NEXT_PUBLIC_MEERKAT_PASSWORD;
-
-    if (!username || !password) {
-      throw new Error("Meerkat credentials are not configured.");
-    }
-
-    const token = await login(username, password);
-    apiClient.defaults.headers.common[
-      "Authorization"
-    ] = `Bearer ${token.access_token}`;
-  };
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
@@ -78,9 +62,6 @@ export function UploadSection(props: UploadSectionProps) {
     let progressInterval: NodeJS.Timeout | null = null;
 
     try {
-      // Ensure authenticated
-      await ensureAuthenticated();
-
       // Update status to uploading
       setFiles((prev) =>
         prev.map((f) =>
