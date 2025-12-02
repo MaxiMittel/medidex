@@ -4,22 +4,9 @@ import { create } from "zustand";
 import type { BatchDto, ReportDetailDto, StudyDto, InterventionDto, ConditionDto, OutcomeDto } from "../types/apiDTOs";
 import {
   assignStudiesToReport,
-  getBatches,
-  getReportData,
-  getSimilarStudies,
   removeStudiesFromReport,
 } from "../lib/api/batchApi";
-import { login } from "../lib/api/authApi";
-import apiClient from "../lib/api/apiClient";
-import { 
-  getReportsByStudyId, 
-  getStudies,
-  getInterventionsForStudy,
-  getConditionsForStudy,
-  getOutcomesForStudy,
-  getDesignForStudy,
-} from "../lib/api/studiesApi";
-import type { RelevanceStudy, StudyReportSummary, StudyDetailData } from "../types/reports";
+import type { RelevanceStudy, StudyDetailData } from "../types/reports";
 
 export interface BatchReportsState {
   batches: BatchDto[];
@@ -73,20 +60,16 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
   fetchBatches: async () => {
     set({ loading: true, error: undefined });
     try {
-      const username = process.env.NEXT_PUBLIC_MEERKAT_USERNAME;
-      const password = process.env.NEXT_PUBLIC_MEERKAT_PASSWORD;
+      const response = await fetch("/api/meerkat/batches");
 
-      if (!username || !password) {
-        throw new Error("Meerkat credentials are not configured.");
+      if (!response.ok) {
+        const errorMessage = await response.text();
+        throw new Error(
+          errorMessage || "Failed to load batches via proxy route."
+        );
       }
 
-      const token = await login(username, password);
-      apiClient.defaults.headers.common[
-        "Authorization"
-      ] = `Bearer ${token.access_token}`;
-
-      const batches = await getBatches();
-
+      const batches = (await response.json()) as BatchDto[];
       set({
         batches,
         loading: false,
@@ -120,13 +103,26 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
         return;
       }
 
+      const fetchReport = async (reportIndex: number): Promise<ReportDetailDto> => {
+        const response = await fetch(
+          `/api/meerkat/batches/${batchHash}/${reportIndex}`
+        );
+        if (!response.ok) {
+          const errorMessage = await response.text();
+          throw new Error(
+            errorMessage || `Failed to load report ${reportIndex}.`
+          );
+        }
+        return (await response.json()) as ReportDetailDto;
+      };
+
       // Fetch first batch of reports (10) for quick initial render
       const INITIAL_BATCH_SIZE = 10;
       const initialBatchSize = Math.min(INITIAL_BATCH_SIZE, batch.number_reports);
       
       const initialReportPromises = Array.from(
         { length: initialBatchSize },
-        (_, reportIndex) => getReportData(batchHash, reportIndex)
+        (_, reportIndex) => fetchReport(reportIndex)
       );
       const initialReports = await Promise.all(initialReportPromises);
 
@@ -144,7 +140,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
       if (batch.number_reports > initialBatchSize) {
         const remainingReportPromises = Array.from(
           { length: batch.number_reports - initialBatchSize },
-          (_, index) => getReportData(batchHash, index + initialBatchSize)
+          (_, index) => fetchReport(index + initialBatchSize)
         );
         
         const remainingReports = await Promise.all(remainingReportPromises);
@@ -198,42 +194,23 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
     }));
 
     try {
-      const response = await getSimilarStudies(batchHash, reportIndex, {
-        return_details: true,
-      });
-      const studies: RelevanceStudy[] = await Promise.all(
-        response.CRGStudyID.map(async (studyId, idx) => {
-          let relatedReports: StudyReportSummary[] = [];
-          try {
-            const reports = await getReportsByStudyId(studyId);
-            relatedReports = reports.map((report) => ({
-              CENTRALReportID: report.CENTRALReportID ?? null,
-              CRGReportID: report.CRGReportID,
-              Title: report.Title,
-            }));
-          } catch (error) {
-            console.error(
-              `Failed fetching reports for study ${studyId}`,
-              error
-            );
-          }
+      const params = new URLSearchParams();
+      if (assignedStudyIds.length > 0) {
+        params.set("assignedStudyIds", assignedStudyIds.join(","));
+      }
 
-          return {
-            Linked: assignedStudyIds.includes(studyId),
-            CRGStudyID: studyId,
-            Relevance: Number(response.Relevance[idx] ?? 0),
-            ShortName: response.ShortName[idx] ?? "",
-            NumberParticipants: response.NumberParticipants[idx] ?? null,
-            Duration: response.Duration[idx] ?? null,
-            Comparison: response.Comparison[idx] ?? null,
-            Countries: response.Countries[idx] ?? "",
-            StatusofStudy: response.StatusofStudy[idx] ?? "",
-            DateEntered: response.DateEntered[idx] ?? "",
-            DateEdited: response.DateEdited[idx] ?? "",
-            reports: relatedReports,
-          } satisfies RelevanceStudy;
-        })
+      const response = await fetch(
+        `/api/meerkat/batches/${batchHash}/${reportIndex}/similar-studies?${params.toString()}`
       );
+
+      if (!response.ok) {
+        const errorMessage = await response.text();
+        throw new Error(
+          errorMessage || "Failed to load similar studies via proxy route."
+        );
+      }
+
+      const studies = (await response.json()) as RelevanceStudy[];
 
       set((state) => ({
         similarStudiesByReport: {
@@ -269,19 +246,27 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
     }));
 
     try {
-      // Fetch all study data in parallel
-      const [studyInfoArray, interventions, conditions, outcomes, design] = await Promise.all([
-        getStudies([studyId]),
-        getInterventionsForStudy(studyId),
-        getConditionsForStudy(studyId),
-        getOutcomesForStudy(studyId),
-        getDesignForStudy(studyId),
-      ]);
-
-      const studyInfo = studyInfoArray[0];
-      if (!studyInfo) {
-        throw new Error(`Study ${studyId} not found`);
+      const response = await fetch(`/api/meerkat/studies/${studyId}/details`);
+      if (!response.ok) {
+        const errorMessage = await response.text();
+        throw new Error(
+          errorMessage || `Failed to load study details for ${studyId}.`
+        );
       }
+
+      const {
+        studyInfo,
+        interventions,
+        conditions,
+        outcomes,
+        design,
+      }: {
+        studyInfo: StudyDto;
+        interventions: InterventionDto[];
+        conditions: ConditionDto[];
+        outcomes: OutcomeDto[];
+        design: string[];
+      } = await response.json();
 
       // Transform the data using actual API structure
       const studyDetailData: StudyDetailData = {
@@ -345,8 +330,24 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
       // Add the new study to the list
       const updatedStudies = [...currentAssignedStudies, studyId];
 
-      // Call API to assign
-      await assignStudiesToReport(batchHash, reportIndex, updatedStudies);
+      // Call API to assign via server route
+      const response = await fetch(
+        `/api/meerkat/batches/${batchHash}/${reportIndex}/studies`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ study_ids: updatedStudies }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorMessage = await response.text();
+        throw new Error(
+          errorMessage || "Failed to assign study to report."
+        );
+      }
 
       // Update local state
       set((state) => {
@@ -412,12 +413,39 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
         (id) => id !== studyId
       );
 
-      // Call API to update assignments
+      // Call API to update assignments via server route
       if (updatedStudies.length > 0) {
-        await assignStudiesToReport(batchHash, reportIndex, updatedStudies);
+        const response = await fetch(
+          `/api/meerkat/batches/${batchHash}/${reportIndex}/studies`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ study_ids: updatedStudies }),
+          }
+        );
+
+        if (!response.ok) {
+          const errorMessage = await response.text();
+          throw new Error(
+            errorMessage || "Failed to update assigned studies."
+          );
+        }
       } else {
-        // If no studies left, call remove endpoint
-        await removeStudiesFromReport(batchHash, reportIndex);
+        const response = await fetch(
+          `/api/meerkat/batches/${batchHash}/${reportIndex}/studies`,
+          {
+            method: "DELETE",
+          }
+        );
+
+        if (!response.ok) {
+          const errorMessage = await response.text();
+          throw new Error(
+            errorMessage || "Failed to remove studies from report."
+          );
+        }
       }
 
       // Update local state

@@ -48,7 +48,6 @@ import {
 import { StudyOverview } from "./study-overview";
 import { StudyDetails } from "./study-details";
 import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
-import { getReportPdf } from "@/lib/api/studiesApi";
 
 interface StudyRelevanceTableProps {
   studies: RelevanceStudy[];
@@ -285,7 +284,13 @@ export function StudyRelevanceTable({
     try {
       for (const report of study.reports) {
         try {
-          const blob = await getReportPdf(report.CRGReportID);
+          const response = await fetch(
+            `/api/meerkat/reports/${report.CRGReportID}/pdf`
+          );
+          if (!response.ok) {
+            throw new Error("Failed to download PDF");
+          }
+          const blob = await response.blob();
           const url = URL.createObjectURL(blob);
           const link = document.createElement("a");
           link.href = url;
@@ -326,7 +331,13 @@ export function StudyRelevanceTable({
     setDownloadingSingle(new Set([report.CRGReportID]));
 
     try {
-      const blob = await getReportPdf(report.CRGReportID);
+      const response = await fetch(
+        `/api/meerkat/reports/${report.CRGReportID}/pdf`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to download PDF");
+      }
+      const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
