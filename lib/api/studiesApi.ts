@@ -1,12 +1,17 @@
 import { StudyDto , ReportDto, InterventionDto, ConditionDto, OutcomeDto , GetPersonsResponseDto } from "../../types/apiDTOs";
 import { serializeParams } from "./helpers";
 import apiClient from "./apiClient";
+import { AxiosRequestConfig } from "axios";
 import { report } from "process";
 
-export const getStudies = (study_ids: number[]): Promise<StudyDto[]> => {
+export const getStudies = (
+  study_ids: number[],
+  config?: AxiosRequestConfig
+): Promise<StudyDto[]> => {
   const path = '/studies';
 
-  const config = {
+  const requestConfig = {
+    ...config,
     params: {
       study_ids: study_ids,
     },
@@ -14,7 +19,7 @@ export const getStudies = (study_ids: number[]): Promise<StudyDto[]> => {
       serialize: serializeParams,
     },
   };
-  return apiClient.get<StudyDto[]>(path, config)
+  return apiClient.get<StudyDto[]>(path, requestConfig)
     .then(response => {
       return response.data;
     })
@@ -26,10 +31,15 @@ export const getStudies = (study_ids: number[]): Promise<StudyDto[]> => {
 
 //getStudybyID not really needed since getStudies can take multiple IDs or a single ID
 
-export const getReportsByStudyId = (study_id: number,include_pdf_links?: boolean): Promise<ReportDto[]> => {
+export const getReportsByStudyId = (
+  study_id: number,
+  include_pdf_links?: boolean,
+  config?: AxiosRequestConfig
+): Promise<ReportDto[]> => {
   const path = `/studies/${study_id}/reports`;
 
-  const config = {
+  const requestConfig = {
+    ...config,
     params: {
       include_pdf_links: include_pdf_links,
     },
@@ -37,7 +47,7 @@ export const getReportsByStudyId = (study_id: number,include_pdf_links?: boolean
       serialize: serializeParams,
     },
   };
-  return apiClient.get<ReportDto[]>(path, config)
+  return apiClient.get<ReportDto[]>(path, requestConfig)
     .then(response => {
       return response.data;
     })
@@ -52,9 +62,12 @@ export const getReportsByStudyId = (study_id: number,include_pdf_links?: boolean
 //getDateStudyEntered not implemented because it can be taken from StudyDto
 
 
-export const getInterventionsForStudy = (study_id: number): Promise<InterventionDto[]> => {
+export const getInterventionsForStudy = (
+  study_id: number,
+  config?: AxiosRequestConfig
+): Promise<InterventionDto[]> => {
   const path = `/studies/${study_id}/interventions`;
-  return apiClient.get<InterventionDto[]>(path)
+  return apiClient.get<InterventionDto[]>(path, config)
     .then(response => {
       return response.data;
     })
@@ -64,9 +77,12 @@ export const getInterventionsForStudy = (study_id: number): Promise<Intervention
     });
 }
 
-export const getConditionsForStudy = (study_id: number): Promise<ConditionDto[]> => {
+export const getConditionsForStudy = (
+  study_id: number,
+  config?: AxiosRequestConfig
+): Promise<ConditionDto[]> => {
     const path = `/studies/${study_id}/conditions`;
-    return apiClient.get<ConditionDto[]>(path)
+    return apiClient.get<ConditionDto[]>(path, config)
       .then(response => {
         return response.data;
       })
@@ -76,9 +92,12 @@ export const getConditionsForStudy = (study_id: number): Promise<ConditionDto[]>
       });
 }
 
-export const getOutcomesForStudy = (study_id: number): Promise<OutcomeDto[]> => {
+export const getOutcomesForStudy = (
+  study_id: number,
+  config?: AxiosRequestConfig
+): Promise<OutcomeDto[]> => {
     const path = `/studies/${study_id}/outcomes`;
-    return apiClient.get<OutcomeDto[]>(path)
+    return apiClient.get<OutcomeDto[]>(path, config)
       .then(response => {
         return response.data;
       })
@@ -101,9 +120,12 @@ export const getParticipantsForStudy = (study_id: number): Promise<string[]> => 
       });
 }
 
-export const getDesignForStudy = (study_id: number): Promise<string[]> => {
+export const getDesignForStudy = (
+  study_id: number,
+  config?: AxiosRequestConfig
+): Promise<string[]> => {
     const path = `/studies/${study_id}/design`;
-    return apiClient.get<string[]>(path)
+    return apiClient.get<string[]>(path, config)
       .then(response => {
         return response.data;
       })
@@ -125,17 +147,13 @@ export const getPersonsForStudy = (study_id: number): Promise<string[]> => {
     });
 };
 
-export const getReportPdf = (report_id: number): Promise<Blob> => {
+export const getReportPdf = (
+  report_id: number,
+  config?: AxiosRequestConfig
+): Promise<ArrayBuffer> => {
   const path = `/reports/${report_id}/pdf`;
-  return apiClient.get<Blob>(path, { responseType: 'blob' })
+  return apiClient.get<ArrayBuffer>(path, { responseType: 'arraybuffer', ...config })
     .then(response => {
-      // Check if response is actually an error blob (e.g., JSON error message)
-      if (response.headers['content-type']?.includes('application/json')) {
-        return response.data.text().then((text: string) => {
-          const error = JSON.parse(text);
-          throw new Error(error.detail || 'Unknown error');
-        });
-      }
       return response.data;
     })
     .catch(error => {
@@ -143,4 +161,3 @@ export const getReportPdf = (report_id: number): Promise<Blob> => {
       throw error;
     });
 }
-
