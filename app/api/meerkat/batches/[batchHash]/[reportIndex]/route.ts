@@ -1,16 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getReportData } from "@/lib/api/batchApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
-interface Params {
-  params: {
-    batchHash: string;
-    reportIndex: string;
-  };
-}
-
-export async function GET(_: Request, context: Params) {
-  const { batchHash, reportIndex } = await context.params;
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ batchHash: string; reportIndex: string }> }
+) {
+  const { batchHash, reportIndex } = await params;
 
   if (!batchHash || typeof reportIndex === "undefined") {
     return NextResponse.json(

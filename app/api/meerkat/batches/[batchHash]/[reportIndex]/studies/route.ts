@@ -1,16 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { assignStudiesToReport, removeStudiesFromReport } from "@/lib/api/batchApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
-interface Params {
-  params: {
-    batchHash: string;
-    reportIndex: string;
-  };
-}
-
-export async function PUT(request: Request, context: Params) {
-  const { batchHash, reportIndex } = await context.params;
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ batchHash: string; reportIndex: string }> }
+) {
+  const { batchHash, reportIndex } = await params;
 
   if (!batchHash || typeof reportIndex === "undefined") {
     return NextResponse.json(
@@ -58,8 +54,11 @@ export async function PUT(request: Request, context: Params) {
   }
 }
 
-export async function DELETE(_: Request, context: Params) {
-  const { batchHash, reportIndex } = await context.params;
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ batchHash: string; reportIndex: string }> }
+) {
+  const { batchHash, reportIndex } = await params;
 
   if (!batchHash || typeof reportIndex === "undefined") {
     return NextResponse.json(

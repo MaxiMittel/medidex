@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   getStudies,
   getInterventionsForStudy,
@@ -8,14 +8,11 @@ import {
 } from "@/lib/api/studiesApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
-interface Params {
-  params: {
-    studyId: string;
-  };
-}
-
-export async function GET(_: Request, context: Params) {
-  const { studyId } = await context.params;
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ studyId: string }> }
+) {
+  const { studyId } = await params;
 
   if (!studyId) {
     return NextResponse.json(
