@@ -17,27 +17,30 @@ export const getBatches = (config?: AxiosRequestConfig): Promise<BatchDto[]> => 
 }
 
 //upload a new batch
-export const uploadBatch = (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append("file", file, file.name);
-    
-    // The apiClient has a request interceptor that automatically removes Content-Type
-    // when FormData is detected, allowing axios to set it with the correct boundary.
-    return apiClient.post<string>("/batches", formData)
-        .then(response => {
-            return response.data;
-        })
-        .catch(error => {
-            console.error("Error uploading batch:", error);
-            // Extract error message from API response
-            if (error.response?.data?.detail) {
-                const errorMessage = typeof error.response.data.detail === 'string' 
-                    ? error.response.data.detail 
-                    : JSON.stringify(error.response.data.detail);
-                throw new Error(errorMessage);
-            }
-            throw error;
-        });
+export const uploadBatch = (
+  file: File,
+  config?: AxiosRequestConfig
+): Promise<string> => {
+  const formData = new FormData();
+  formData.append("file", file, file.name);
+  
+  // The apiClient has a request interceptor that automatically removes Content-Type
+  // when FormData is detected, allowing axios to set it with the correct boundary.
+  return apiClient.post<string>("/batches", formData, config)
+      .then(response => {
+          return response.data;
+      })
+      .catch(error => {
+          console.error("Error uploading batch:", error);
+          // Extract error message from API response
+          if (error.response?.data?.detail) {
+              const errorMessage = typeof error.response.data.detail === 'string' 
+                  ? error.response.data.detail 
+                  : JSON.stringify(error.response.data.detail);
+              throw new Error(errorMessage);
+          }
+          throw error;
+      });
 }
 
 //get a batch by its hash
@@ -51,12 +54,18 @@ export const getBatchByHash = (batch_hash: string): Promise<BatchDto> => {
 }
 
 //delete a batch by its hash
-export const deleteBatchByHash = (batch_hash: string): Promise<void> => {
-    return apiClient.delete<void>(`/batches/${batch_hash}`).then(response => {
-        return;
-    }).catch(error => {
-        console.error(`Error deleting batch with hash ${batch_hash}:`, error);
-        throw error;
+export const deleteBatchByHash = (
+  batch_hash: string,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+  return apiClient
+    .delete<void>(`/batches/${batch_hash}`, config)
+    .then(() => {
+      return;
+    })
+    .catch(error => {
+      console.error(`Error deleting batch with hash ${batch_hash}:`, error);
+      throw error;
     });
 }
 
