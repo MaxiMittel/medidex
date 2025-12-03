@@ -72,7 +72,8 @@ export function StudyRelevanceTable({
     studyDetailsLoading, 
     fetchStudyDetails, 
     assignStudyToReport, 
-    unassignStudyFromReport 
+    unassignStudyFromReport,
+    fetchSimilarStudiesForReport,
   } = useBatchReportsStore();
   const [linkedStudies, setLinkedStudies] = useState<Set<number>>(
     new Set(studies.filter((s) => s.Linked).map((s) => s.CRGStudyID))
@@ -117,6 +118,13 @@ export function StudyRelevanceTable({
   }, [studies, searchQuery]);
 
   const handleLinkedChange = async (studyId: number, checked: boolean) => {
+    const updatedAssigned = new Set(linkedStudies);
+    if (checked) {
+      updatedAssigned.add(studyId);
+    } else {
+      updatedAssigned.delete(studyId);
+    }
+
     // Optimistically update UI
     setLinkedStudies((prev) => {
       const newSet = new Set(prev);
@@ -141,6 +149,13 @@ export function StudyRelevanceTable({
           await unassignStudyFromReport(currentBatchHash, currentReportIndex, studyId);
           toast.success(`Study unassigned from report`);
         }
+
+        await fetchSimilarStudiesForReport(
+          currentBatchHash,
+          currentReportIndex,
+          Array.from(updatedAssigned),
+          true
+        );
       } catch (error) {
         // Revert UI on error
         setLinkedStudies((prev) => {
@@ -204,6 +219,19 @@ export function StudyRelevanceTable({
         selectAll
           ? `${studiesToProcess.length} studies assigned`
           : `${studiesToProcess.length} studies unassigned`
+      );
+
+      const updatedAssigned = selectAll
+        ? filteredStudies.map((s) => s.CRGStudyID)
+        : filteredStudies
+            .filter((s) => !linkedStudies.has(s.CRGStudyID))
+            .map((s) => s.CRGStudyID);
+
+      await fetchSimilarStudiesForReport(
+        currentBatchHash,
+        currentReportIndex,
+        updatedAssigned,
+        true
       );
     } catch (error) {
       // Revert on error
