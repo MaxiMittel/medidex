@@ -2,10 +2,6 @@
 
 import { create } from "zustand";
 import type { BatchDto, ReportDetailDto, StudyDto, InterventionDto, ConditionDto, OutcomeDto } from "../types/apiDTOs";
-import {
-  assignStudiesToReport,
-  removeStudiesFromReport,
-} from "../lib/api/batchApi";
 import type { RelevanceStudy, StudyDetailData } from "../types/reports";
 
 export interface BatchReportsState {
@@ -24,7 +20,8 @@ export interface BatchReportsState {
   fetchSimilarStudiesForReport: (
     batchHash: string,
     reportIndex: number,
-    assignedStudyIds: number[]
+    assignedStudyIds: number[],
+    force?: boolean
   ) => Promise<void>;
   studyDetails: Record<number, StudyDetailData>;
   studyDetailsLoading: Record<number, boolean>;
@@ -182,10 +179,11 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
   fetchSimilarStudiesForReport: async (
     batchHash: string,
     reportIndex: number,
-    assignedStudyIds: number[]
+    assignedStudyIds: number[],
+    force = false
   ) => {
     const key = buildReportKey(batchHash, reportIndex);
-    if (get().similarStudiesByReport[key]) {
+    if (!force && get().similarStudiesByReport[key]) {
       return;
     }
 
@@ -418,7 +416,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
         const response = await fetch(
           `/api/meerkat/batches/${batchHash}/${reportIndex}/studies`,
           {
-            method: "PUT",
+            method: "DELETE",
             headers: {
               "Content-Type": "application/json",
             },
