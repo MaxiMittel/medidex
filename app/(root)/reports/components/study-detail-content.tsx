@@ -35,15 +35,37 @@ interface StudyDetailContentProps {
 }
 
 export function StudyDetailContent({ reports, loadingMore, totalReports }: StudyDetailContentProps) {
-  const {
-    similarStudiesByReport,
-    similarStudiesLoading,
-    fetchSimilarStudiesForReport,
-  } = useBatchReportsStore();
+  const { similarStudiesByReport, similarStudiesLoading, fetchSimilarStudiesForReport } = useBatchReportsStore();
+  const [selectedReportIndex, setSelectedReportIndex] = useState<number | null>(
+    null
+  );
 
-  const [selectedReportIndex, setSelectedReportIndex] = useState<
-    number | null
-  >(null);
+  // Build a map of study ID -> study name from similar studies
+  const studyNamesById = useMemo(() => {
+    const map: Record<number, string> = {};
+    Object.values(similarStudiesByReport).forEach(studies => {
+      studies.forEach(study => {
+        map[study.CRGStudyID] = study.ShortName;
+      });
+    });
+    return map;
+  }, [similarStudiesByReport]);
+
+  // Preload similar studies for all reports with assigned studies to get study names
+  useEffect(() => {
+    reports.forEach(report => {
+      if (report.assignedStudyIds && report.assignedStudyIds.length > 0) {
+        const key = buildReportKey(report.batchHash, report.reportIndex);
+        if (!similarStudiesByReport[key] && !similarStudiesLoading[key]) {
+          void fetchSimilarStudiesForReport(
+            report.batchHash,
+            report.reportIndex,
+            report.assignedStudyIds
+          );
+        }
+      }
+    });
+  }, [reports, similarStudiesByReport, similarStudiesLoading, fetchSimilarStudiesForReport]);
 
   useEffect(() => {
     if (reports.length === 0) {
@@ -121,6 +143,7 @@ export function StudyDetailContent({ reports, loadingMore, totalReports }: Study
             }}
             loadingMore={loadingMore}
             totalReports={totalReports}
+            studyNamesById={studyNamesById}
           />
         </div>
       </Panel>

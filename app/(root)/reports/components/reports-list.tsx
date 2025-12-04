@@ -47,6 +47,7 @@ interface ReportsListProps {
   onReportSelect?: (report: Report) => void;
   loadingMore?: boolean;
   totalReports?: number;
+  studyNamesById?: Record<number, string>;
 }
 
 export function ReportsList({
@@ -55,6 +56,7 @@ export function ReportsList({
   onReportSelect,
   loadingMore = false,
   totalReports,
+  studyNamesById = {},
 }: ReportsListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [assignmentFilter, setAssignmentFilter] = useState<
@@ -244,7 +246,14 @@ export function ReportsList({
                             className="text-xs flex items-center gap-1.5 px-2 py-1 shrink-0"
                           >
                             <Link2 className="h-3 w-3" />
-                            {report.AssignedTo || "Assigned"}
+                            {report.assignedStudyIds.length > 0 && 
+                             report.assignedStudyIds.every(id => studyNamesById[id]) ? (
+                              report.assignedStudyIds.map(id => studyNamesById[id]).join(", ")
+                            ) : (
+                              <span className="flex items-center gap-1">
+                                <span className="animate-pulse">Loading...</span>
+                              </span>
+                            )}
                           </Badge>
                         )}
                         {hasAbstract && (
