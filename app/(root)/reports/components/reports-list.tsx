@@ -28,6 +28,7 @@ interface Report {
   NumberParticipants?: string | number;
   Assigned?: boolean;
   AssignedTo?: string;
+  Authors?: string;
 }
 
 interface StudyAbstract {
@@ -215,18 +216,21 @@ export function ReportsList({
                               <span>{displayDate}</span>
                             </div>
                           )}
+                          {report.Authors && (
+                            <div className="flex items-center gap-1.5">
+                              <Users className="h-3.5 w-3.5 shrink-0" />
+                              <span className={isExpanded ? "" : "truncate max-w-[200px]"}>
+                                {report.Authors}
+                              </span>
+                            </div>
+                          )}
                           {participantCount && (
                             <div className="flex items-center gap-1.5">
                               <Users className="h-3.5 w-3.5 shrink-0" />
                               <span>{participantCount}</span>
                             </div>
                           )}
-                          {report.CRGReportID && (
-                            <span className="font-mono text-xs">
-                              CRG: {report.CRGReportID}
-                            </span>
-                          )}
-                          {report.CENTRALReportID && (
+                          {report.CENTRALReportID !== null && report.CENTRALReportID !== undefined && (
                             <span className="font-mono text-xs">
                               CENTRAL: {report.CENTRALReportID}
                             </span>

@@ -32,6 +32,7 @@ export default function ReportsPage() {
         CRGReportID: index,
         Title: report.title,
         Abstract: report.abstract ?? undefined,
+        Authors: report.authors ? report.authors.join(", ") : undefined,
         Assigned: assignedStudies.length > 0,
         AssignedTo: assignedStudies.join(", "),
       };
