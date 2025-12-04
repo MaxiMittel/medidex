@@ -403,26 +403,7 @@ export function StudyRelevanceTable({
               {searchQuery && ` of ${studies.length}`}
             </Badge>
           </div>
-          {filteredStudies.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleBulkToggle(!allFilteredLinked)}
-              className="text-xs"
-            >
-              {allFilteredLinked ? (
-                <>
-                  <X className="h-3 w-3 mr-1" />
-                  Deselect All
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  Select All
-                </>
-              )}
-            </Button>
-          )}
+          
         </div>
 
         {/* Search */}
