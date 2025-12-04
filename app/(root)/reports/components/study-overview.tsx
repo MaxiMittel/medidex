@@ -144,16 +144,10 @@ export function StudyOverview({ study }: StudyOverviewProps) {
               <code className="text-xs bg-muted px-2 py-1 rounded block">{study.TrialRegistrationID}</code>
             </div>
           )}
-          {study.CRGStudyID && (
+          {study.CRGStudyID !== null && study.CRGStudyID !== undefined && (
             <div>
               <p className="text-sm font-medium mb-1">CRG Study ID</p>
               <code className="text-xs bg-muted px-2 py-1 rounded block">{study.CRGStudyID}</code>
-            </div>
-          )}
-          {study.CENTRALStudyID && (
-            <div>
-              <p className="text-sm font-medium mb-1">CENTRAL Study ID</p>
-              <code className="text-xs bg-muted px-2 py-1 rounded block">{study.CENTRALStudyID}</code>
             </div>
           )}
         </div>
