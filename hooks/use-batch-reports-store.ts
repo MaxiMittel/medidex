@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { create } from "zustand";
 import type {
@@ -45,6 +45,7 @@ export interface BatchReportsState {
   selectBatch: (batchHash: string) => void;
   similarStudiesByReport: Record<string, RelevanceStudy[]>;
   similarStudiesLoading: Record<string, boolean>;
+  similarStudiesLimit: Record<string, number>; // Track how many studies have been loaded
   assignedStudiesByReport: Record<string, RelevanceStudy[]>;
   assignedStudiesLoading: Record<string, boolean>;
   fetchSimilarStudiesForReport: (
@@ -58,6 +59,11 @@ export interface BatchReportsState {
     reportIndex: number,
     reportCRGId?: number,
     force?: boolean
+  ) => Promise<void>;
+  loadMoreSimilarStudies: (
+    batchHash: string,
+    reportIndex: number,
+    assignedStudyIds: number[]
   ) => Promise<void>;
   studyDetails: Record<number, StudyDetailData>;
   studyDetailsLoading: Record<number, boolean>;
@@ -101,6 +107,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
   similarStudiesLoading: {},
   assignedStudiesByReport: {},
   assignedStudiesLoading: {},
+  similarStudiesLimit: {},
   studyDetails: {},
   studyDetailsLoading: {},
   addStudyDialogOpen: false,
@@ -126,9 +133,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
     } catch (error) {
       set({
         error:
-          error instanceof Error
-            ? error.message
-            : "Failed to load batches.",
+          error instanceof Error ? error.message : "Failed to load batches.",
         loading: false,
       });
     }
@@ -152,7 +157,9 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
         return;
       }
 
-      const fetchReport = async (reportIndex: number): Promise<ReportDetailDto> => {
+      const fetchReport = async (
+        reportIndex: number
+      ): Promise<ReportDetailDto> => {
         const response = await fetch(
           `/api/meerkat/batches/${batchHash}/${reportIndex}`
         );
@@ -167,8 +174,11 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
 
       // Fetch first batch of reports (10) for quick initial render
       const INITIAL_BATCH_SIZE = 10;
-      const initialBatchSize = Math.min(INITIAL_BATCH_SIZE, batch.number_reports);
-      
+      const initialBatchSize = Math.min(
+        INITIAL_BATCH_SIZE,
+        batch.number_reports
+      );
+
       const initialReportPromises = Array.from(
         { length: initialBatchSize },
         (_, reportIndex) => fetchReport(reportIndex)
@@ -191,9 +201,9 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
           { length: batch.number_reports - initialBatchSize },
           (_, index) => fetchReport(index + initialBatchSize)
         );
-        
+
         const remainingReports = await Promise.all(remainingReportPromises);
-        
+
         // Merge with initial reports
         set((state) => ({
           reportsByBatch: {
@@ -208,9 +218,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
     } catch (error) {
       set({
         error:
-          error instanceof Error
-            ? error.message
-            : "Failed to load reports.",
+          error instanceof Error ? error.message : "Failed to load reports.",
         loadingReports: false,
         loadingMoreReports: false,
       });
@@ -221,7 +229,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
       return;
     }
     set({ selectedBatchHash: batchHash });
-    
+
     // If reports for this batch aren't loaded yet, fetch them
     const batchReports = get().reportsByBatch[batchHash];
     if (!batchReports) {
@@ -248,6 +256,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
       if (assignedStudyIds.length > 0) {
         params.set("assignedStudyIds", assignedStudyIds.join(","));
       }
+      params.set("limit", "10");
 
       const response = await fetch(
         `/api/meerkat/batches/${batchHash}/${reportIndex}/similar-studies?${params.toString()}`
@@ -267,6 +276,10 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
           ...state.similarStudiesByReport,
           [key]: studies,
         },
+        similarStudiesLimit: {
+          ...state.similarStudiesLimit,
+          [key]: 10,
+        },
       }));
     } catch (error) {
       console.error("Failed fetching similar studies", error);
@@ -275,6 +288,72 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
           error instanceof Error
             ? error.message
             : "Failed to load relevant studies.",
+      });
+    } finally {
+      set((state) => ({
+        similarStudiesLoading: {
+          ...state.similarStudiesLoading,
+          [key]: false,
+        },
+      }));
+    }
+  },
+  loadMoreSimilarStudies: async (
+    batchHash: string,
+    reportIndex: number,
+    assignedStudyIds: number[]
+  ) => {
+    const key = buildReportKey(batchHash, reportIndex);
+    const currentLimit = get().similarStudiesLimit[key] || 10;
+
+    // Don't load if already loading
+    if (get().similarStudiesLoading[key]) {
+      return;
+    }
+
+    set((state) => ({
+      similarStudiesLoading: { ...state.similarStudiesLoading, [key]: true },
+    }));
+
+    try {
+      const params = new URLSearchParams();
+      if (assignedStudyIds.length > 0) {
+        params.set("assignedStudyIds", assignedStudyIds.join(","));
+      }
+      // Load 10 more studies
+      const newLimit = currentLimit + 10;
+      params.set("limit", newLimit.toString());
+
+      const response = await fetch(
+        `/api/meerkat/batches/${batchHash}/${reportIndex}/similar-studies?${params.toString()}`
+      );
+
+      if (!response.ok) {
+        const errorMessage = await response.text();
+        throw new Error(
+          errorMessage || "Failed to load more similar studies via proxy route."
+        );
+      }
+
+      const allStudies = (await response.json()) as RelevanceStudy[];
+
+      set((state) => ({
+        similarStudiesByReport: {
+          ...state.similarStudiesByReport,
+          [key]: allStudies,
+        },
+        similarStudiesLimit: {
+          ...state.similarStudiesLimit,
+          [key]: newLimit,
+        },
+      }));
+    } catch (error) {
+      console.error("Failed fetching more similar studies", error);
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to load more relevant studies.",
       });
     } finally {
       set((state) => ({
@@ -418,7 +497,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
       }));
     }
   },
-  
+
   // Add assignment functions
   assignStudyToReport: async (
     batchHash: string,
@@ -433,7 +512,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
       }
 
       const currentAssignedStudies = currentReport.assigned_studies || [];
-      
+
       // Check if already assigned
       if (currentAssignedStudies.includes(studyId)) {
         return; // Already assigned, nothing to do
@@ -456,9 +535,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
 
       if (!response.ok) {
         const errorMessage = await response.text();
-        throw new Error(
-          errorMessage || "Failed to assign study to report."
-        );
+        throw new Error(errorMessage || "Failed to assign study to report.");
       }
 
       // Update local state
@@ -484,9 +561,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
       const similarStudies = get().similarStudiesByReport[key];
       if (similarStudies) {
         const updatedSimilarStudies = similarStudies.map((study) =>
-          study.CRGStudyID === studyId
-            ? { ...study, Linked: true }
-            : study
+          study.CRGStudyID === studyId ? { ...study, Linked: true } : study
         );
         set((state) => ({
           similarStudiesByReport: {
@@ -514,7 +589,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
       }
 
       const currentAssignedStudies = currentReport.assigned_studies || [];
-      
+
       // Check if not assigned
       if (!currentAssignedStudies.includes(studyId)) {
         return; // Not assigned, nothing to do
@@ -540,9 +615,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
 
         if (!response.ok) {
           const errorMessage = await response.text();
-          throw new Error(
-            errorMessage || "Failed to update assigned studies."
-          );
+          throw new Error(errorMessage || "Failed to update assigned studies.");
         }
       } else {
         const response = await fetch(
@@ -583,9 +656,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
       const similarStudies = get().similarStudiesByReport[key];
       if (similarStudies) {
         const updatedSimilarStudies = similarStudies.map((study) =>
-          study.CRGStudyID === studyId
-            ? { ...study, Linked: false }
-            : study
+          study.CRGStudyID === studyId ? { ...study, Linked: false } : study
         );
         set((state) => ({
           similarStudiesByReport: {

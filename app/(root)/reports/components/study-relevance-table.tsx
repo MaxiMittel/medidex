@@ -41,14 +41,15 @@ import {
   Calendar,
   Link2,
   X,
-  CheckCircle2,
   Sparkles,
   Download,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { StudyOverview } from "./study-overview";
 import { StudyDetails } from "./study-details";
 import { AddStudyDialog } from "./add-study-dialog";
 import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
+import { LoadMoreStudiesButton } from "./load-more-studies-button";
 
 interface StudyRelevanceTableProps {
   studies: RelevanceStudy[];
@@ -70,6 +71,11 @@ export function StudyRelevanceTable({
   currentReportIndex,
   currentReportCRGId
 }: StudyRelevanceTableProps) {
+  const {
+    studyDetails,
+    studyDetailsLoading,
+    fetchStudyDetails,
+    assignStudyToReport,
   const {
     studyDetails,
     studyDetailsLoading,
@@ -145,10 +151,18 @@ export function StudyRelevanceTable({
     if (currentBatchHash && currentReportIndex !== undefined) {
       try {
         if (checked) {
-          await assignStudyToReport(currentBatchHash, currentReportIndex, studyId);
+          await assignStudyToReport(
+            currentBatchHash,
+            currentReportIndex,
+            studyId
+          );
           toast.success(`Study assigned to report`);
         } else {
-          await unassignStudyFromReport(currentBatchHash, currentReportIndex, studyId);
+          await unassignStudyFromReport(
+            currentBatchHash,
+            currentReportIndex,
+            studyId
+          );
           toast.success(`Study unassigned from report`);
         }
 
@@ -169,7 +183,7 @@ export function StudyRelevanceTable({
           }
           return newSet;
         });
-        
+
         toast.error(
           `Failed to ${checked ? "assign" : "unassign"} study: ${
             error instanceof Error ? error.message : "Unknown error"
@@ -212,8 +226,16 @@ export function StudyRelevanceTable({
     try {
       const promises = studiesToProcess.map((study) =>
         selectAll
-          ? assignStudyToReport(currentBatchHash, currentReportIndex, study.CRGStudyID)
-          : unassignStudyFromReport(currentBatchHash, currentReportIndex, study.CRGStudyID)
+          ? assignStudyToReport(
+              currentBatchHash,
+              currentReportIndex,
+              study.CRGStudyID
+            )
+          : unassignStudyFromReport(
+              currentBatchHash,
+              currentReportIndex,
+              study.CRGStudyID
+            )
       );
 
       await Promise.all(promises);
@@ -404,36 +426,6 @@ export function StudyRelevanceTable({
               {filteredStudies.length}
               {searchQuery && ` of ${studies.length}`}
             </Badge>
-          </div>
-          <div className="flex items-center gap-2">
-            {currentBatchHash !== undefined &&
-              currentReportIndex !== undefined && (
-                <AddStudyDialog
-                  currentBatchHash={currentBatchHash}
-                  currentReportIndex={currentReportIndex}
-                  currentReportCRGId={currentReportCRGId}
-                />
-              )}
-            {filteredStudies.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleBulkToggle(!allFilteredLinked)}
-                className="text-xs"
-              >
-                {allFilteredLinked ? (
-                  <>
-                    <X className="h-3 w-3 mr-1" />
-                    Deselect All
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Select All
-                  </>
-                )}
-              </Button>
-            )}
           </div>
         </div>
 
@@ -766,6 +758,13 @@ export function StudyRelevanceTable({
                 );
               })}
             </Accordion>
+
+            {/* Load More Button */}
+            <LoadMoreStudiesButton
+              currentBatchHash={currentBatchHash}
+              currentReportIndex={currentReportIndex}
+              currentStudiesCount={studies.length}
+            />
           </div>
         )}
       </div>
