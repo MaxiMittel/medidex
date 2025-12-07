@@ -41,13 +41,14 @@ import {
   Calendar,
   Link2,
   X,
-  CheckCircle2,
   Sparkles,
   Download,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { StudyOverview } from "./study-overview";
 import { StudyDetails } from "./study-details";
 import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
+import { LoadMoreStudiesButton } from "./load-more-studies-button";
 
 interface StudyRelevanceTableProps {
   studies: RelevanceStudy[];
@@ -67,11 +68,11 @@ export function StudyRelevanceTable({
   currentBatchHash,
   currentReportIndex,
 }: StudyRelevanceTableProps) {
-  const { 
-    studyDetails, 
-    studyDetailsLoading, 
-    fetchStudyDetails, 
-    assignStudyToReport, 
+  const {
+    studyDetails,
+    studyDetailsLoading,
+    fetchStudyDetails,
+    assignStudyToReport,
     unassignStudyFromReport,
     fetchSimilarStudiesForReport,
   } = useBatchReportsStore();
@@ -143,10 +144,18 @@ export function StudyRelevanceTable({
     if (currentBatchHash && currentReportIndex !== undefined) {
       try {
         if (checked) {
-          await assignStudyToReport(currentBatchHash, currentReportIndex, studyId);
+          await assignStudyToReport(
+            currentBatchHash,
+            currentReportIndex,
+            studyId
+          );
           toast.success(`Study assigned to report`);
         } else {
-          await unassignStudyFromReport(currentBatchHash, currentReportIndex, studyId);
+          await unassignStudyFromReport(
+            currentBatchHash,
+            currentReportIndex,
+            studyId
+          );
           toast.success(`Study unassigned from report`);
         }
 
@@ -167,7 +176,7 @@ export function StudyRelevanceTable({
           }
           return newSet;
         });
-        
+
         toast.error(
           `Failed to ${checked ? "assign" : "unassign"} study: ${
             error instanceof Error ? error.message : "Unknown error"
@@ -210,8 +219,16 @@ export function StudyRelevanceTable({
     try {
       const promises = studiesToProcess.map((study) =>
         selectAll
-          ? assignStudyToReport(currentBatchHash, currentReportIndex, study.CRGStudyID)
-          : unassignStudyFromReport(currentBatchHash, currentReportIndex, study.CRGStudyID)
+          ? assignStudyToReport(
+              currentBatchHash,
+              currentReportIndex,
+              study.CRGStudyID
+            )
+          : unassignStudyFromReport(
+              currentBatchHash,
+              currentReportIndex,
+              study.CRGStudyID
+            )
       );
 
       await Promise.all(promises);
@@ -403,7 +420,6 @@ export function StudyRelevanceTable({
               {searchQuery && ` of ${studies.length}`}
             </Badge>
           </div>
-          
         </div>
 
         {/* Search */}
@@ -735,6 +751,13 @@ export function StudyRelevanceTable({
                 );
               })}
             </Accordion>
+
+            {/* Load More Button */}
+            <LoadMoreStudiesButton
+              currentBatchHash={currentBatchHash}
+              currentReportIndex={currentReportIndex}
+              currentStudiesCount={studies.length}
+            />
           </div>
         )}
       </div>

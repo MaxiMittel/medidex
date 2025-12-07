@@ -21,13 +21,16 @@ export async function GET(
   const assignedIdsParam = url.searchParams.get("assignedStudyIds");
   const assignedStudyIds =
     assignedIdsParam?.split(",").map((id) => Number(id)).filter(Boolean) ?? [];
+  
+  const limitParam = url.searchParams.get("limit");
+  const limit = limitParam ? Number(limitParam) : 10;
 
   try {
     const headers = getMeerkatHeaders();
     const similar = await getSimilarStudies(
       batchHash,
       Number(reportIndex),
-      { return_details: true },
+      { return_details: true, k: limit },
       { headers }
     );
 
