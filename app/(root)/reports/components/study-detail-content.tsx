@@ -35,7 +35,14 @@ interface StudyDetailContentProps {
 }
 
 export function StudyDetailContent({ reports, loadingMore, totalReports }: StudyDetailContentProps) {
-  const { similarStudiesByReport, similarStudiesLoading, fetchSimilarStudiesForReport } = useBatchReportsStore();
+  const {
+    similarStudiesByReport,
+    similarStudiesLoading,
+    fetchSimilarStudiesForReport,
+    assignedStudiesByReport,
+    assignedStudiesLoading,
+    fetchAssignedStudiesForReport,
+  } = useBatchReportsStore();
   const [selectedReportIndex, setSelectedReportIndex] = useState<number | null>(
     null
   );
@@ -43,17 +50,22 @@ export function StudyDetailContent({ reports, loadingMore, totalReports }: Study
   // Build a map of study ID -> study name from similar studies
   const studyNamesById = useMemo(() => {
     const map: Record<number, string> = {};
-    Object.values(similarStudiesByReport).forEach(studies => {
-      studies.forEach(study => {
+    Object.values(similarStudiesByReport).forEach((studies) => {
+      studies.forEach((study) => {
+        map[study.CRGStudyID] = study.ShortName;
+      });
+    });
+    Object.values(assignedStudiesByReport).forEach((studies) => {
+      studies.forEach((study) => {
         map[study.CRGStudyID] = study.ShortName;
       });
     });
     return map;
-  }, [similarStudiesByReport]);
+  }, [similarStudiesByReport, assignedStudiesByReport]);
 
   // Preload similar studies for all reports with assigned studies to get study names
   useEffect(() => {
-    reports.forEach(report => {
+    reports.forEach((report) => {
       if (report.assignedStudyIds && report.assignedStudyIds.length > 0) {
         const key = buildReportKey(report.batchHash, report.reportIndex);
         if (!similarStudiesByReport[key] && !similarStudiesLoading[key]) {
@@ -63,9 +75,24 @@ export function StudyDetailContent({ reports, loadingMore, totalReports }: Study
             report.assignedStudyIds
           );
         }
+        if (!assignedStudiesByReport[key] && !assignedStudiesLoading[key]) {
+          void fetchAssignedStudiesForReport(
+            report.batchHash,
+            report.reportIndex,
+            report.CRGReportID
+          );
+        }
       }
     });
-  }, [reports, similarStudiesByReport, similarStudiesLoading, fetchSimilarStudiesForReport]);
+  }, [
+    reports,
+    similarStudiesByReport,
+    similarStudiesLoading,
+    fetchSimilarStudiesForReport,
+    assignedStudiesByReport,
+    assignedStudiesLoading,
+    fetchAssignedStudiesForReport,
+  ]);
 
   useEffect(() => {
     if (reports.length === 0) {
@@ -103,7 +130,20 @@ export function StudyDetailContent({ reports, loadingMore, totalReports }: Study
         currentReport.assignedStudyIds ?? []
       );
     }
-  }, [currentReport, fetchSimilarStudiesForReport, similarStudiesByReport]);
+    if (!assignedStudiesByReport[key]) {
+      void fetchAssignedStudiesForReport(
+        currentReport.batchHash,
+        currentReport.reportIndex,
+        currentReport.CRGReportID
+      );
+    }
+  }, [
+    currentReport,
+    fetchSimilarStudiesForReport,
+    similarStudiesByReport,
+    assignedStudiesByReport,
+    fetchAssignedStudiesForReport,
+  ]);
 
   const currentRelevanceStudies: RelevanceStudy[] = useMemo(() => {
     if (!currentReport) {
@@ -113,8 +153,28 @@ export function StudyDetailContent({ reports, loadingMore, totalReports }: Study
       currentReport.batchHash,
       currentReport.reportIndex
     );
-    return similarStudiesByReport[key] ?? [];
-  }, [currentReport, similarStudiesByReport]);
+    const assigned = assignedStudiesByReport[key] ?? [];
+    const similar = similarStudiesByReport[key] ?? [];
+
+    const seen = new Set<number>();
+    const merged: RelevanceStudy[] = [];
+
+    assigned.forEach((study) => {
+      if (!seen.has(study.CRGStudyID)) {
+        seen.add(study.CRGStudyID);
+        merged.push(study);
+      }
+    });
+
+    similar.forEach((study) => {
+      if (!seen.has(study.CRGStudyID)) {
+        seen.add(study.CRGStudyID);
+        merged.push(study);
+      }
+    });
+
+    return merged;
+  }, [currentReport, assignedStudiesByReport, similarStudiesByReport]);
 
   const relevanceLoading = useMemo(() => {
     if (!currentReport) {
@@ -124,8 +184,11 @@ export function StudyDetailContent({ reports, loadingMore, totalReports }: Study
       currentReport.batchHash,
       currentReport.reportIndex
     );
-    return similarStudiesLoading[key] ?? false;
-  }, [currentReport, similarStudiesLoading]);
+    return (
+      (similarStudiesLoading[key] ?? false) ||
+      (assignedStudiesLoading[key] ?? false)
+    );
+  }, [currentReport, similarStudiesLoading, assignedStudiesLoading]);
 
   return (
     <PanelGroup direction="horizontal" className="h-full">
@@ -157,6 +220,7 @@ export function StudyDetailContent({ reports, loadingMore, totalReports }: Study
             loading={relevanceLoading}
             currentBatchHash={currentReport?.batchHash}
             currentReportIndex={currentReport?.reportIndex}
+            currentReportCRGId={currentReport?.CRGReportID}
           />
         </div>
       </Panel>

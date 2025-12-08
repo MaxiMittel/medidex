@@ -1,5 +1,4 @@
 "use client";
-
 import { SidebarIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { BatchSelector } from "@/components/sidebar/batch-selector";
@@ -26,7 +25,7 @@ const breadcrumbMap: Record<string, BreadcrumbConfig[]> = {
   "/login": [{ label: "Authentication", href: "#" }, { label: "Login" }],
   "/register": [{ label: "Authentication", href: "#" }, { label: "Register" }],
   "/studies": [{ label: "Studies", href: "#" }, { label: "All Studies" }],
-  "/upload": [{ label: "Platform", href: "#" }, { label: "Upload Studies" }],
+  "/upload": [{ label: "Platform", href: "#" }, { label: "Upload Batch" }],
   "/user-management": [
     { label: "Administration", href: "#" },
     { label: "User Management" },

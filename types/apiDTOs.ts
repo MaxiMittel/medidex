@@ -25,6 +25,7 @@ export interface VectorDto {
 export interface ReportDetailDto {
   title: string;
   abstract: string | null;
+  crgreportid: number;
   authors: string[];
   trial_id: string | null;
   vectors: VectorDto;
