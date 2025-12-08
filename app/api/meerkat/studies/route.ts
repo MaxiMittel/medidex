@@ -63,7 +63,7 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const headers = getMeerkatHeaders();
+    const headers = await getMeerkatHeaders();
     const createdStudy = await createStudy(payload, { headers });
 
     return NextResponse.json(createdStudy, { status: 200 });

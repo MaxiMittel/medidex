@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const headers = getMeerkatHeaders();
+    const headers = await getMeerkatHeaders();
     const batchHash = await uploadBatch(file, { headers });
     return NextResponse.json({ batchHash });
   } catch (error) {

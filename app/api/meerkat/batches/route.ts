@@ -4,7 +4,7 @@ import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
 export async function GET() {
   try {
-    const headers = getMeerkatHeaders();
+    const headers = await getMeerkatHeaders();
     const batches = await getBatches({
       headers,
     });

@@ -20,7 +20,7 @@ export async function GET(
   const date_to = searchParams.get("date_to");
 
   try {
-    const headers = getMeerkatHeaders();
+    const headers = await getMeerkatHeaders();
     const studies = await getStudiesForReport(Number(reportId), {
       date_from: date_from || undefined,
       date_to: date_to || undefined,

@@ -16,7 +16,7 @@ export async function GET(
   }
 
   try {
-    const headers = getMeerkatHeaders();
+    const headers = await getMeerkatHeaders();
     const report = await getReportData(
       batchHash,
       Number(reportIndex),

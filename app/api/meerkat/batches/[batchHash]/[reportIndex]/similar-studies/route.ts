@@ -26,7 +26,7 @@ export async function GET(
   const limit = limitParam ? Number(limitParam) : 10;
 
   try {
-    const headers = getMeerkatHeaders();
+    const headers = await getMeerkatHeaders();
     const similar = await getSimilarStudies(
       batchHash,
       Number(reportIndex),
