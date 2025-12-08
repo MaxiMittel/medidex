@@ -29,7 +29,7 @@ export default function ReportsPage() {
         CENTRALReportID: report.trial_id
           ? Number(report.trial_id) || null
           : null,
-        CRGReportID: index,
+        CRGReportID: report.crgreportid,
         Title: report.title,
         Abstract: report.abstract ?? undefined,
         Authors: report.authors ? report.authors.join(", ") : undefined,

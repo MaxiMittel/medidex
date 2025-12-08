@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import type { RelevanceStudy, StudyReportSummary } from "@/types/reports";
 import {
@@ -47,6 +48,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { StudyOverview } from "./study-overview";
 import { StudyDetails } from "./study-details";
+import { AddStudyDialog } from "./add-study-dialog";
 import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
 import { LoadMoreStudiesButton } from "./load-more-studies-button";
 
@@ -58,6 +60,7 @@ interface StudyRelevanceTableProps {
   // Add current report context
   currentBatchHash?: string;
   currentReportIndex?: number;
+  currentReportCRGId?: number;
 }
 
 export function StudyRelevanceTable({
@@ -67,6 +70,7 @@ export function StudyRelevanceTable({
   onStudySelect,
   currentBatchHash,
   currentReportIndex,
+  currentReportCRGId
 }: StudyRelevanceTableProps) {
   const {
     studyDetails,
@@ -91,7 +95,6 @@ export function StudyRelevanceTable({
   const [downloadingSingle, setDownloadingSingle] = useState<Set<number>>(
     new Set()
   );
-
   useEffect(() => {
     setLinkedStudies(
       new Set(studies.filter((s) => s.Linked).map((s) => s.CRGStudyID))
@@ -419,6 +422,36 @@ export function StudyRelevanceTable({
               {filteredStudies.length}
               {searchQuery && ` of ${studies.length}`}
             </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            {currentBatchHash !== undefined &&
+              currentReportIndex !== undefined && (
+                <AddStudyDialog
+                  currentBatchHash={currentBatchHash}
+                  currentReportIndex={currentReportIndex}
+                  currentReportCRGId={currentReportCRGId}
+                />
+              )}
+            {filteredStudies.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleBulkToggle(!allFilteredLinked)}
+                className="text-xs"
+              >
+                {allFilteredLinked ? (
+                  <>
+                    <X className="h-3 w-3 mr-1" />
+                    Deselect All
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Select All
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
 

@@ -26,7 +26,7 @@ const data = {
       icon: Table,
     },
     {
-      title: "Upload Studies",
+      title: "Upload Batch",
       url: "/upload",
       icon: Upload,
     },

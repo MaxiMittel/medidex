@@ -9,7 +9,28 @@ import type {
   ConditionDto,
   OutcomeDto,
 } from "../types/apiDTOs";
+import type { CreateStudyPayload } from "@/lib/api/studiesApi";
 import type { RelevanceStudy, StudyDetailData } from "../types/reports";
+
+type NewStudyFormState = {
+  short_name: string;
+  status_of_study: string;
+  countries: string;
+  central_submission_status: string;
+  duration: string;
+  number_of_participants: string;
+  comparison: string;
+};
+
+const initialNewStudyForm: NewStudyFormState = {
+  short_name: "",
+  status_of_study: "",
+  countries: "",
+  central_submission_status: "",
+  duration: "",
+  number_of_participants: "",
+  comparison: "",
+};
 
 export interface BatchReportsState {
   batches: BatchDto[];
@@ -24,11 +45,19 @@ export interface BatchReportsState {
   selectBatch: (batchHash: string) => void;
   similarStudiesByReport: Record<string, RelevanceStudy[]>;
   similarStudiesLoading: Record<string, boolean>;
+  assignedStudiesByReport: Record<string, RelevanceStudy[]>;
+  assignedStudiesLoading: Record<string, boolean>;
   similarStudiesLimit: Record<string, number>; // Track how many studies have been loaded
   fetchSimilarStudiesForReport: (
     batchHash: string,
     reportIndex: number,
     assignedStudyIds: number[],
+    force?: boolean
+  ) => Promise<void>;
+  fetchAssignedStudiesForReport: (
+    batchHash: string,
+    reportIndex: number,
+    reportCRGId?: number,
     force?: boolean
   ) => Promise<void>;
   loadMoreSimilarStudies: (
@@ -50,6 +79,17 @@ export interface BatchReportsState {
     reportIndex: number,
     studyId: number
   ) => Promise<void>;
+  // Add study creation form state
+  addStudyDialogOpen: boolean;
+  newStudyForm: NewStudyFormState;
+  creatingStudy: boolean;
+  setAddStudyDialogOpen: (open: boolean) => void;
+  updateNewStudyForm: <K extends keyof NewStudyFormState>(
+    field: K,
+    value: NewStudyFormState[K]
+  ) => void;
+  resetNewStudyForm: () => void;
+  submitNewStudy: (options?: { reportIndex?: number; batchHash?: string; reportCRGId?: number }) => Promise<StudyDto>;
 }
 
 export const buildReportKey = (batchHash: string, reportIndex: number) =>
@@ -65,9 +105,14 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
   error: undefined,
   similarStudiesByReport: {},
   similarStudiesLoading: {},
+  assignedStudiesByReport: {},
+  assignedStudiesLoading: {},
   similarStudiesLimit: {},
   studyDetails: {},
   studyDetailsLoading: {},
+  addStudyDialogOpen: false,
+  newStudyForm: initialNewStudyForm,
+  creatingStudy: false,
   fetchBatches: async () => {
     set({ loading: true, error: undefined });
     try {
@@ -248,6 +293,68 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
       set((state) => ({
         similarStudiesLoading: {
           ...state.similarStudiesLoading,
+          [key]: false,
+        },
+      }));
+    }
+  },
+  fetchAssignedStudiesForReport: async (batchHash, reportIndex, reportCRGId, force = false) => {
+    const key = buildReportKey(batchHash, reportIndex);
+    if (!force && get().assignedStudiesByReport[key]) {
+      return;
+    }
+
+    set((state) => ({
+      assignedStudiesLoading: { ...state.assignedStudiesLoading, [key]: true },
+    }));
+
+    try {
+      const response = await fetch(`/api/meerkat/reports/${reportCRGId}/studies`);
+      if (!response.ok) {
+        const errorMessage = await response.text();
+        throw new Error(errorMessage || "Failed to load assigned studies.");
+      }
+
+      const studies = (await response.json()) as StudyDto[];
+
+      const mapped: RelevanceStudy[] = studies.map((study) => ({
+        Linked: true,
+        CRGStudyID: study.CRGStudyID,
+        Relevance: 1,
+        ShortName: study.ShortName,
+        NumberParticipants: study.NumberParticipants,
+        Duration: study.Duration,
+        Comparison: study.Comparison,
+        Countries: study.Countries || undefined,
+        StatusofStudy: study.StatusofStudy || undefined,
+        DateEntered: study.DateEntered || undefined,
+        DateEdited: study.DateEdited || undefined,
+        TrialistContactDetails: study.TrialistContactDetails || undefined,
+        CENTRALSubmissionStatus: study.CENTRALSubmissionStatus || undefined,
+        ISRCTN: study.ISRCTN || undefined,
+        Notes: study.Notes || undefined,
+        UDef4: study.UDef4 || undefined,
+        reports: [],
+      }));
+
+      set((state) => ({
+        assignedStudiesByReport: {
+          ...state.assignedStudiesByReport,
+          [key]: mapped,
+        },
+      }));
+    } catch (error) {
+      console.error("Failed fetching assigned studies", error);
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to load assigned studies.",
+      });
+    } finally {
+      set((state) => ({
+        assignedStudiesLoading: {
+          ...state.assignedStudiesLoading,
           [key]: false,
         },
       }));
@@ -560,6 +667,98 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
       }
     } catch (error) {
       console.error("Failed to unassign study from report:", error);
+      throw error;
+    }
+  },
+  setAddStudyDialogOpen: (open: boolean) => {
+    set({ addStudyDialogOpen: open });
+    if (!open) {
+      set({ newStudyForm: initialNewStudyForm });
+    }
+  },
+  updateNewStudyForm: (field, value) => {
+    set((state) => ({
+      newStudyForm: {
+        ...state.newStudyForm,
+        [field]: value,
+      },
+    }));
+  },
+  resetNewStudyForm: () => set({ newStudyForm: initialNewStudyForm }),
+  submitNewStudy: async (options) => {
+    const { newStudyForm } = get();
+    const reportIndex = options?.reportIndex;
+    const batchHash = options?.batchHash;
+    const reportCRGId = options?.reportCRGId;
+
+    const countries = newStudyForm.countries
+      .split(",")
+      .map((country) => country.trim())
+      .filter(Boolean);
+
+    const number_of_participants = Number(newStudyForm.number_of_participants);
+
+    const payload: CreateStudyPayload = {
+      short_name: newStudyForm.short_name.trim(),
+      status_of_study: newStudyForm.status_of_study.trim(),
+      countries,
+      central_submission_status: newStudyForm.central_submission_status.trim(),
+      duration: newStudyForm.duration.trim(),
+      number_of_participants,
+      comparison: newStudyForm.comparison.trim(),
+    };
+
+    // Basic required field guard
+    if (
+      !payload.short_name ||
+      !payload.status_of_study ||
+      !payload.central_submission_status ||
+      !payload.duration ||
+      !payload.comparison ||
+      Number.isNaN(number_of_participants)
+    ) {
+      throw new Error("Please fill in all required fields.");
+    }
+
+    if (countries.length === 0) {
+      throw new Error("Please provide at least one country.");
+    }
+
+    set({ creatingStudy: true });
+
+    try {
+      const response = await fetch("/api/meerkat/studies", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorMessage = await response.text();
+        throw new Error(
+          errorMessage || "Failed to create study via Meerkat API."
+        );
+      }
+
+      const createdStudy = (await response.json()) as StudyDto;
+
+      // If we have report context, assign the new study to the report before refreshing
+      if (typeof reportIndex === "number" && batchHash) {
+        await get().assignStudyToReport(batchHash, reportIndex, createdStudy.CRGStudyID);
+        await get().fetchAssignedStudiesForReport(batchHash,reportIndex, reportCRGId, true);
+      } else {
+        throw new Error("Batch context missing for assigning new study.");
+      }
+
+      set({
+        creatingStudy: false,
+        newStudyForm: initialNewStudyForm,
+        addStudyDialogOpen: false,
+      });
+
+      return createdStudy;
+    } catch (error) {
+      set({ creatingStudy: false });
       throw error;
     }
   },
