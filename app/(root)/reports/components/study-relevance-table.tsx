@@ -79,6 +79,7 @@ export function StudyRelevanceTable({
     assignStudyToReport,
     unassignStudyFromReport,
     fetchSimilarStudiesForReport,
+    fetchAssignedStudiesForReport,
   } = useBatchReportsStore();
   const [linkedStudies, setLinkedStudies] = useState<Set<number>>(
     new Set(studies.filter((s) => s.Linked).map((s) => s.CRGStudyID))
@@ -162,12 +163,20 @@ export function StudyRelevanceTable({
           toast.success(`Study unassigned from report`);
         }
 
-        await fetchSimilarStudiesForReport(
-          currentBatchHash,
-          currentReportIndex,
-          Array.from(updatedAssigned),
-          true
-        );
+        await Promise.all([
+          fetchSimilarStudiesForReport(
+            currentBatchHash,
+            currentReportIndex,
+            Array.from(updatedAssigned),
+            true
+          ),
+          fetchAssignedStudiesForReport(
+            currentBatchHash,
+            currentReportIndex,
+            currentReportCRGId,
+            true
+          )
+        ]);
       } catch (error) {
         // Revert UI on error
         setLinkedStudies((prev) => {
@@ -247,12 +256,23 @@ export function StudyRelevanceTable({
             .filter((s) => !linkedStudies.has(s.CRGStudyID))
             .map((s) => s.CRGStudyID);
 
-      await fetchSimilarStudiesForReport(
-        currentBatchHash,
-        currentReportIndex,
-        updatedAssigned,
-        true
-      );
+      await Promise.all(
+        [
+          fetchSimilarStudiesForReport(
+            currentBatchHash,
+            currentReportIndex,
+            updatedAssigned,
+            true
+          ),
+          fetchAssignedStudiesForReport(
+            currentBatchHash,
+            currentReportIndex,
+            currentReportCRGId,
+            true
+          )
+        ]
+      )
+
     } catch (error) {
       // Revert on error
       setLinkedStudies(
