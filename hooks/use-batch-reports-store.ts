@@ -605,7 +605,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
         const response = await fetch(
           `/api/meerkat/batches/${batchHash}/${reportIndex}/studies`,
           {
-            method: "DELETE",
+            method: "PUT",
             headers: {
               "Content-Type": "application/json",
             },
