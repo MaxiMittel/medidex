@@ -9,14 +9,11 @@ export async function GET(
   const { reportId } = await params;
 
   if (!reportId) {
-    return NextResponse.json(
-      { error: "Missing report id." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Missing report id." }, { status: 400 });
   }
 
   try {
-    const headers = getMeerkatHeaders("application/pdf");
+    const headers = await getMeerkatHeaders("application/pdf");
     const pdfBuffer = await getReportPdf(Number(reportId), {
       headers,
       responseType: "arraybuffer",
