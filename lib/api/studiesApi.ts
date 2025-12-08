@@ -2,7 +2,16 @@ import { StudyDto , ReportDto, InterventionDto, ConditionDto, OutcomeDto , GetPe
 import { serializeParams } from "./helpers";
 import apiClient from "./apiClient";
 import { AxiosRequestConfig } from "axios";
-import { report } from "process";
+
+export interface CreateStudyPayload {
+  short_name: string;
+  status_of_study: string;
+  countries: string[];
+  central_submission_status: string;
+  duration: string;
+  number_of_participants: number;
+  comparison: string;
+}
 
 export const getStudies = (
   study_ids: number[],
@@ -161,3 +170,47 @@ export const getReportPdf = (
       throw error;
     });
 }
+
+export const getStudiesForReport = (
+  report_id: number,
+  params?: { date_from?: string | null; date_to?: string | null },
+  config?: AxiosRequestConfig
+): Promise<StudyDto[]> => {
+  const path = `/reports/${report_id}/studies`;
+
+  const requestConfig: AxiosRequestConfig = {
+    ...config,
+    params: params,
+    paramsSerializer: { serialize: serializeParams },
+  };
+
+  return apiClient
+    .get<StudyDto[]>(path, requestConfig)
+    .then((response) => response.data)
+    .catch((error) => {
+      console.error(
+        `Error fetching studies for report ${report_id}:`,
+        error.message || error
+      );
+      throw error;
+    });
+};
+
+export const createStudy = (
+  payload: CreateStudyPayload,
+  config?: AxiosRequestConfig
+): Promise<StudyDto> => {
+  return apiClient
+    .put<StudyDto>("/studies", payload, config)
+    .then((response) => response.data)
+    .catch((error) => {
+      console.error("Error creating study:", error);
+      if (error.response?.data?.detail) {
+        const detail = error.response.data.detail;
+        const message =
+          typeof detail === "string" ? detail : JSON.stringify(detail);
+        throw new Error(message);
+      }
+      throw error;
+    });
+};
