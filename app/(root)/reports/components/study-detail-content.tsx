@@ -153,20 +153,20 @@ export function StudyDetailContent({ reports, loadingMore, totalReports }: Study
       currentReport.batchHash,
       currentReport.reportIndex
     );
-    const assigned = assignedStudiesByReport[key] ?? [];
     const similar = similarStudiesByReport[key] ?? [];
+    const assigned = assignedStudiesByReport[key] ?? [];
 
     const seen = new Set<number>();
     const merged: RelevanceStudy[] = [];
 
-    assigned.forEach((study) => {
+    similar.forEach((study) => {
       if (!seen.has(study.CRGStudyID)) {
         seen.add(study.CRGStudyID);
         merged.push(study);
       }
     });
 
-    similar.forEach((study) => {
+    assigned.forEach((study) => {
       if (!seen.has(study.CRGStudyID)) {
         seen.add(study.CRGStudyID);
         merged.push(study);
