@@ -16,7 +16,7 @@ export async function DELETE(
   }
 
   try {
-    const headers = getMeerkatHeaders();
+    const headers = await getMeerkatHeaders();
     await deleteBatchByHash(batchHash, { headers });
     return NextResponse.json({ success: true });
   } catch (error) {

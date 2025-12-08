@@ -22,7 +22,7 @@ export async function GET(
   }
 
   try {
-    const headers = getMeerkatHeaders();
+    const headers = await getMeerkatHeaders();
     const id = Number(studyId);
 
     const [studyInfoArray, interventions, conditions, outcomes, design] =

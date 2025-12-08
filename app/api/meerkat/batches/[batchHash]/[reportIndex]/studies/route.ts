@@ -36,7 +36,7 @@ export async function PUT(
   }
 
   try {
-    const headers = getMeerkatHeaders();
+    const headers = await getMeerkatHeaders();
     await assignStudiesToReport(batchHash, Number(reportIndex), studyIds, {
       headers,
     });
@@ -68,7 +68,7 @@ export async function DELETE(
   }
 
   try {
-    const headers = getMeerkatHeaders();
+    const headers = await getMeerkatHeaders();
     await removeStudiesFromReport(batchHash, Number(reportIndex), { headers });
 
     return NextResponse.json({ success: true });
