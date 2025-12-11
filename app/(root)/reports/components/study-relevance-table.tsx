@@ -72,14 +72,9 @@ export function StudyRelevanceTable({
   currentReportCRGId
 }: StudyRelevanceTableProps) {
   const {
+    fetchStudyDetails,
     studyDetails,
     studyDetailsLoading,
-    fetchStudyDetails,
-    assignStudyToReport,
-  const {
-    studyDetails,
-    studyDetailsLoading,
-    fetchStudyDetails,
     assignStudyToReport,
     unassignStudyFromReport,
     fetchSimilarStudiesForReport,
