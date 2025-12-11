@@ -8,11 +8,13 @@ import {
   Link2,
   ChevronDown,
   Search,
+  Download,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface Report {
   reportIndex: number;
@@ -65,6 +67,9 @@ export function ReportsList({
   const [expandedReports, setExpandedReports] = useState<Set<number>>(
     new Set()
   );
+  const [downloadingReports, setDownloadingReports] = useState<Set<number>>(
+    new Set()
+  );
 
   const filteredReports = reports.filter((report) => {
     // Search filter
@@ -99,6 +104,49 @@ export function ReportsList({
       }
       return newSet;
     });
+  };
+
+  const handleDownloadReportPdf = async (
+    event: React.MouseEvent,
+    report: Report
+  ) => {
+    event.stopPropagation();
+
+    const reportId = report.CRGReportID;
+    setDownloadingReports((prev) => new Set(prev).add(reportId));
+
+    try {
+      // Use the existing API route (just like getBatches uses /api/meerkat/batches)
+      const response = await fetch(`/api/meerkat/reports/${reportId}/pdf`);
+
+      if (!response.ok) {
+        throw new Error("Failed to download PDF");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const safeTitle = report.Title.replace(/[^a-z0-9]/gi, "_").substring(0, 50);
+      link.download = `Report_${reportId}_${safeTitle}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success(`Downloaded report ${reportId}`);
+    } catch (error) {
+      toast.error(
+        `Failed to download report: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setDownloadingReports((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(reportId);
+        return newSet;
+      });
+    }
   };
 
   return (
@@ -274,6 +322,23 @@ export function ReportsList({
                             />
                           </button>
                         )}
+                        {/* Download Button */}
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                          onClick={(event) => handleDownloadReportPdf(event, report)}
+                          disabled={downloadingReports.has(report.CRGReportID)}
+                          aria-label={`Download report ${report.CRGReportID} PDF`}
+                        >
+                          {downloadingReports.has(report.CRGReportID) ? (
+                            <span className="animate-spin">
+                              <Download className="h-5 w-5" />
+                            </span>
+                          ) : (
+                            <Download className="h-5 w-5" />
+                          )}
+                        </Button>
                       </div>
                     </div>
 
