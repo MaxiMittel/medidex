@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { UserDto } from "../../../types/user/user.dto";
-import { PencilIcon, TrashIcon } from "lucide-react";
+import { PencilIcon, TrashIcon, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { UpdateUserDialog } from "./update-user-dialog";
 import { DeleteUserDialog } from "./delete-user-dialog";
+import { toast } from "sonner";
 
 interface Props {
   initialUsers: UserDto[];
@@ -18,6 +19,7 @@ export const UserTable: React.FC<Props> = (props) => {
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<UserDto | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [approvingUserId, setApprovingUserId] = useState<string | null>(null);
 
   const handleEditClick = (user: UserDto) => {
     setSelectedUser(user);
@@ -39,48 +41,110 @@ export const UserTable: React.FC<Props> = (props) => {
     setUsers((prev) => prev.filter((user) => user.id !== userId));
   };
 
+  const handleApproveUser = async (userId: string) => {
+    setApprovingUserId(userId);
+    try {
+      const response = await fetch(`/api/users/${userId}/approve`, {
+        method: "PATCH",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to approve user");
+      }
+
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === userId ? { ...u, isApproved: true } : u
+        )
+      );
+      toast.success("User approved successfully");
+    } catch (error) {
+      toast.error("Failed to approve user");
+      console.error(error);
+    } finally {
+      setApprovingUserId(null);
+    }
+  };
+
   return (
-    <>
-      <div className="grid grid-cols-12 p-2 pl-6 font-medium">
-        <div className="col-span-4 text-xs">Name</div>
-        <div className="col-span-4 text-xs">Email</div>
-        <div className="col-span-2 text-xs">Role</div>
-        <div className="col-span-2 text-xs text-right">Actions</div>
-      </div>
-      {users.map((user) => (
-        <div key={user.id} className="grid grid-cols-12 p-2 pl-6 mb-2 bg-secondary rounded-xl relative">
-          <div className="bg-primary rounded-full h-2/3 w-1 absolute left-2 top-1/2 -translate-y-1/2"></div>
-          <div className="col-span-4 text-sm flex items-center">
-            {user.name}
-          </div>
-          <div className="col-span-4 text-sm flex items-center">
-            {user.email}
-          </div>
-          <div className="col-span-2 text-sm flex items-center">
-            {user.roles.join(", ")}
-          </div>
-          <div className="col-span-2 text-sm flex items-center justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2 text-xs"
-              onClick={() => handleEditClick(user)}
-            >
-              <PencilIcon className="size-3" />
-              Edit
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="flex items-center gap-2 text-xs"
-              onClick={() => handleDeleteClick(user)}
-            >
-              <TrashIcon className="size-3" />
-              Delete
-            </Button>
-          </div>
-        </div>
-      ))}
+    <div className="border rounded-lg">
+      <table className="w-full">
+        <thead className="bg-gray-50 dark:bg-gray-800">
+          <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Name
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Email
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Role
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Status
+            </th>
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Actions
+            </th>
+          </tr>
+        </thead>
+        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+          {users.map((user) => (
+            <tr key={user.id}>
+              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                {user.name}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {user.email}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm">
+                {user.roles.join(", ")}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm">
+                {user.isApproved ? (
+                  <span className="inline-flex items-center gap-1 text-green-600">
+                    <CheckCircle className="h-4 w-4" />
+                    Approved
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-yellow-600">
+                    <XCircle className="h-4 w-4" />
+                    Pending
+                  </span>
+                )}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <div className="flex justify-end gap-2">
+                  {!user.isApproved && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleApproveUser(user.id)}
+                      disabled={approvingUserId === user.id}
+                    >
+                      {approvingUserId === user.id ? "Approving..." : "Approve"}
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleEditClick(user)}
+                  >
+                    <PencilIcon className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDeleteClick(user)}
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
       <UpdateUserDialog
         user={selectedUser}
         open={isUpdateDialogOpen}
@@ -93,6 +157,6 @@ export const UserTable: React.FC<Props> = (props) => {
         onOpenChange={setIsDeleteDialogOpen}
         onUserDeleted={handleUserDeleted}
       />
-    </>
+    </div>
   );
 };
