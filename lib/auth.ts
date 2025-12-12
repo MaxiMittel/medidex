@@ -35,21 +35,4 @@ export const auth = betterAuth({
       };
     }),
   ],
-  user: {
-    // Hook to auto-approve admins after user creation
-    afterCreate: async (user) => {
-      const dbUser = await prisma.user.findUnique({
-        where: { id: user.id },
-        select: { roles: true },
-      });
-
-      // Auto-approve if user has ADMIN role
-      if (dbUser?.roles.includes(Role.ADMIN)) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { isApproved: true },
-        });
-      }
-    },
-  },
 });
