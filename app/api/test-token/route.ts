@@ -7,6 +7,5 @@ export async function GET(request: NextRequest) {
   const token = await auth.api.getToken({
     headers: requestHeaders,
   });
-
   return NextResponse.json(token);
 }

@@ -17,17 +17,19 @@ export const auth = betterAuth({
     jwt(),
     nextCookies(),
     customSession(async ({ user, session }) => {
-      const roles = await prisma.user.findUnique({
+      const dbUser = await prisma.user.findUnique({
         where: {
           id: user.id,
         },
         select: {
           roles: true,
+          isApproved: true,
         },
       });
 
       return {
-        roles: roles?.roles as Role[],
+        roles: dbUser?.roles as Role[],
+        isApproved: dbUser?.isApproved ?? false,
         user,
         session,
       };

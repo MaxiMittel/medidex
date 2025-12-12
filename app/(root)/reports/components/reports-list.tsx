@@ -8,11 +8,13 @@ import {
   Link2,
   ChevronDown,
   Search,
+  Download,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface Report {
   reportIndex: number;
@@ -65,6 +67,7 @@ export function ReportsList({
   const [expandedReports, setExpandedReports] = useState<Set<number>>(
     new Set()
   );
+  const [downloadingPdf, setDownloadingPdf] = useState<Set<number>>(new Set());
 
   const filteredReports = reports.filter((report) => {
     // Search filter
@@ -99,6 +102,40 @@ export function ReportsList({
       }
       return newSet;
     });
+  };
+
+  const handleDownloadPdf = async (reportId: number, title: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setDownloadingPdf((prev) => new Set(prev).add(reportId));
+
+    try {
+      const response = await fetch(`/api/meerkat/reports/${reportId}/pdf`);
+      if (!response.ok) {
+        throw new Error("Failed to download PDF");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Report_${reportId}_${title.substring(0, 50).replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success(`Downloaded report ${reportId}`);
+    } catch (error) {
+      toast.error(
+        `Failed to download report ${reportId}: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setDownloadingPdf((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(reportId);
+        return newSet;
+      });
+    }
   };
 
   return (
@@ -202,12 +239,11 @@ export function ReportsList({
                   className={`rounded-lg border bg-card hover:border-primary/20 transition-all overflow-hidden ${
                     isSelected ? "border-primary" : ""
                   }`}
-                  onClick={() => onReportSelect?.(report)}
                 >
                   {/* Report Content */}
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0" onClick={() => onReportSelect?.(report)}>
                         <h3 className="text-sm font-semibold leading-snug mb-2.5 text-foreground">
                           {report.Title}
                         </h3>
@@ -240,22 +276,15 @@ export function ReportsList({
                         </div>
                       </div>
                       <div className="flex items-start gap-2 shrink-0">
-                        {report.Assigned && (
-                          <Badge
-                            variant="default"
-                            className="text-xs flex items-center gap-1.5 px-2 py-1 shrink-0"
-                          >
-                            <Link2 className="h-3 w-3" />
-                            {report.assignedStudyIds.length > 0 && 
-                             report.assignedStudyIds.every(id => studyNamesById[id]) ? (
-                              report.assignedStudyIds.map(id => studyNamesById[id]).join(", ")
-                            ) : (
-                              <span className="flex items-center gap-1">
-                                <span className="animate-pulse">Loading...</span>
-                              </span>
-                            )}
-                          </Badge>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={(e) => handleDownloadPdf(report.CRGReportID, report.Title, e)}
+                          disabled={downloadingPdf.has(report.CRGReportID)}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
                         {hasAbstract && (
                           <button
                             className="text-muted-foreground hover:text-foreground transition-colors"
