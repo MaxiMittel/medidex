@@ -15,6 +15,7 @@ export async function getUsers(): Promise<UserDto[]> {
     name: user.name,
     email: user.email,
     roles: user.roles as Role[],
+    isApproved: user.isApproved,
   }));
 }
 
@@ -33,6 +34,7 @@ export async function updateUser(
     name: user.name,
     email: user.email,
     roles: user.roles as Role[],
+    isApproved: user.isApproved,
   };
 }
 

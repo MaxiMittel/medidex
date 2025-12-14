@@ -8,7 +8,8 @@ export async function adminGuard(): Promise<boolean> {
     headers: await headers(),
   });
 
-  if (session?.roles.includes(Role.ADMIN)) {
+  // Check if user is approved AND has admin role
+  if (session?.roles.includes(Role.ADMIN) && (session as any)?.isApproved) {
     return true;
   }
 

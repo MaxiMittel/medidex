@@ -1,11 +1,11 @@
-import axios from 'axios';
+import axios from "axios";
 
-const API_BASE_URL = 'https://meerkat.sebis.cit.tum.de/api/';
+const API_BASE_URL = `${process.env.MEERKAT_API_URL}/api`;
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
@@ -13,7 +13,7 @@ export const apiClient = axios.create({
 // When FormData is detected, remove Content-Type so axios can set it automatically with boundary
 apiClient.interceptors.request.use((config) => {
   if (config.data instanceof FormData) {
-    delete config.headers['Content-Type'];
+    delete config.headers["Content-Type"];
   }
   return config;
 });

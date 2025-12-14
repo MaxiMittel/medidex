@@ -18,7 +18,22 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { toast } from "sonner";
+import { COUNTRY_OPTIONS } from "./constants";
+import { useEffect, useState } from "react";
 
 interface AddStudyDialogProps {
   currentBatchHash?: string;
@@ -31,6 +46,10 @@ export function AddStudyDialog({
   currentReportIndex,
   currentReportCRGId
 }: AddStudyDialogProps) {
+  const [durationValue, setDurationValue] = useState("");
+  const [durationUnit, setDurationUnit] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState("");
+  const [countryOpen, setCountryOpen] = useState(false);
   const {
     addStudyDialogOpen,
     setAddStudyDialogOpen,
@@ -40,6 +59,26 @@ export function AddStudyDialog({
     submitNewStudy,
     creatingStudy,
   } = useBatchReportsStore();
+  useEffect(() => {
+    if (addStudyDialogOpen) {
+      setSelectedCountry(newStudyForm.countries || "Unclear");
+      const parts = (newStudyForm.duration || "").split(" ");
+      if (parts.length === 2 && !Number.isNaN(Number(parts[0]))) {
+        setDurationValue(parts[0]);
+        setDurationUnit(parts[1]);
+      } else if (newStudyForm.duration?.toLowerCase() === "uncertain") {
+        setDurationValue("");
+        setDurationUnit("uncertain");
+      } else {
+        setDurationValue("");
+        setDurationUnit("");
+      }
+    } else {
+      setDurationValue("");
+      setDurationUnit("");
+      setSelectedCountry("");
+    }
+  }, [addStudyDialogOpen, newStudyForm.countries, newStudyForm.duration]);
 
   const handleAddStudySubmit = async (
     event: React.FormEvent<HTMLFormElement>
@@ -59,6 +98,23 @@ export function AddStudyDialog({
       toast.error(
         error instanceof Error ? error.message : "Failed to create study."
       );
+    }
+  };
+
+  const handleDurationChange = (value: string, unit: string) => {
+    if (unit === "uncertain") {
+      setDurationValue("");
+      setDurationUnit("uncertain");
+      updateNewStudyForm("duration", "Uncertain");
+      return;
+    }
+
+    setDurationValue(value);
+    setDurationUnit(unit);
+    if (value && unit) {
+      updateNewStudyForm("duration", `${value} ${unit}`);
+    } else {
+      updateNewStudyForm("duration", "");
     }
   };
 
@@ -127,25 +183,75 @@ export function AddStudyDialog({
           </div>
           <div className="space-y-2">
             <Label htmlFor="study-countries">Countries</Label>
-            <Input
-              id="study-countries"
-              placeholder="e.g. United States, Germany"
-              value={newStudyForm.countries}
-              onChange={(event) =>
-                updateNewStudyForm("countries", event.target.value)
-              }
-              required
-            />
+            <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={countryOpen}
+                  className="w-full justify-between"
+                >
+                  {selectedCountry || "Unclear"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[480px] max-w-screen-sm p-0 overflow-x-auto">
+                <Command className="min-w-[420px]">
+                  <CommandInput placeholder="Search country..." />
+                  <CommandList className="max-h-[300px] overflow-y-auto overflow-x-auto">
+                    <CommandEmpty>No country found.</CommandEmpty>
+                    <CommandGroup>
+                      {COUNTRY_OPTIONS.map((country) => (
+                        <CommandItem
+                          key={country}
+                          value={country}
+                          onSelect={(value) => {
+                            setSelectedCountry(value);
+                            updateNewStudyForm("countries", value);
+                            setCountryOpen(false);
+                          }}
+                        >
+                      {country}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="space-y-2">
             <Label htmlFor="study-duration">Duration</Label>
-            <Input
-              id="study-duration"
-              placeholder="e.g. 12 months"
-              value={newStudyForm.duration}
-              onChange={(event) => updateNewStudyForm("duration", event.target.value)}
-              required
-            />
+            <div className="grid grid-cols-[1fr,auto] gap-2">
+              <Input
+                id="study-duration"
+                placeholder="12"
+                type="number"
+                min="0"
+                value={durationValue}
+                onChange={(event) =>
+                  handleDurationChange(event.target.value, durationUnit)
+                }
+                disabled={durationUnit === "uncertain"}
+                required={durationUnit !== "uncertain"}
+              />
+              <Select
+                value={durationUnit}
+                onValueChange={(value) =>
+                  handleDurationChange(durationValue, value)
+                }
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="days">days</SelectItem>
+                  <SelectItem value="weeks">weeks</SelectItem>
+                  <SelectItem value="months">months</SelectItem>
+                  <SelectItem value="years">years</SelectItem>
+                  <SelectItem value="uncertain">Uncertain</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="study-participants">Number of participants</Label>
@@ -206,3 +312,4 @@ export function AddStudyDialog({
     </Dialog>
   );
 }
+
