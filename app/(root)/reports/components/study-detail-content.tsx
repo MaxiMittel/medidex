@@ -1,18 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { StudyRelevanceTable } from "./study-relevance-table";
 import { ReportsList } from "./reports-list";
-import {
-  PanelGroup,
-  Panel,
-  PanelResizeHandle,
-} from "react-resizable-panels";
+import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
 import {
   useBatchReportsStore,
   buildReportKey,
 } from "@/hooks/use-batch-reports-store";
 import type { RelevanceStudy } from "@/types/reports";
+import { sendReportEvent } from "@/lib/api/reportEventsApi";
 
 interface StudyDetailContentProps {
   reports: Array<{
@@ -34,7 +31,11 @@ interface StudyDetailContentProps {
   totalReports?: number;
 }
 
-export function StudyDetailContent({ reports, loadingMore, totalReports }: StudyDetailContentProps) {
+export function StudyDetailContent({
+  reports,
+  loadingMore,
+  totalReports,
+}: StudyDetailContentProps) {
   const {
     similarStudiesByReport,
     similarStudiesLoading,
@@ -46,6 +47,46 @@ export function StudyDetailContent({ reports, loadingMore, totalReports }: Study
   const [selectedReportIndex, setSelectedReportIndex] = useState<number | null>(
     null
   );
+
+  // Track last interaction timestamp for event tracking
+  const lastInteractionRef = useRef<string | null>(null);
+
+  // Update last interaction on any user activity
+  const updateLastInteraction = useCallback(() => {
+    lastInteractionRef.current = new Date().toISOString();
+  }, []);
+
+  // Set up interaction listeners
+  useEffect(() => {
+    const events = ["click", "scroll", "keydown", "mousemove"];
+    events.forEach((event) => {
+      window.addEventListener(event, updateLastInteraction, { passive: true });
+    });
+    return () => {
+      events.forEach((event) => {
+        window.removeEventListener(event, updateLastInteraction);
+      });
+    };
+  }, [updateLastInteraction]);
+
+  // Handle report selection with "start" event - ONLY for explicit user clicks
+  const handleReportSelect = useCallback(
+    (report: { reportIndex: number; CRGReportID: number }) => {
+      setSelectedReportIndex(report.reportIndex);
+      // Send "start" event when user explicitly clicks on a report
+      void sendReportEvent(
+        report.CRGReportID,
+        "start",
+        lastInteractionRef.current
+      );
+    },
+    []
+  );
+
+  // Get last interaction timestamp for "end" events
+  const getLastInteraction = useCallback(() => {
+    return lastInteractionRef.current;
+  }, []);
 
   // Build a map of study ID -> study name from similar studies
   const studyNamesById = useMemo(() => {
@@ -94,17 +135,19 @@ export function StudyDetailContent({ reports, loadingMore, totalReports }: Study
     fetchAssignedStudiesForReport,
   ]);
 
+  // Reset selection if the selected report is no longer in the list
   useEffect(() => {
     if (reports.length === 0) {
       setSelectedReportIndex(null);
       return;
     }
 
+    // Only reset if the currently selected report no longer exists
     if (
-      selectedReportIndex === null ||
+      selectedReportIndex !== null &&
       !reports.some((report) => report.reportIndex === selectedReportIndex)
     ) {
-      setSelectedReportIndex(reports[0].reportIndex);
+      setSelectedReportIndex(null);
     }
   }, [reports, selectedReportIndex]);
 
@@ -201,9 +244,7 @@ export function StudyDetailContent({ reports, loadingMore, totalReports }: Study
           <ReportsList
             reports={reports}
             selectedReportIndex={selectedReportIndex ?? undefined}
-            onReportSelect={(report) => {
-              setSelectedReportIndex(report.reportIndex);
-            }}
+            onReportSelect={handleReportSelect}
             loadingMore={loadingMore}
             totalReports={totalReports}
             studyNamesById={studyNamesById}
@@ -215,13 +256,20 @@ export function StudyDetailContent({ reports, loadingMore, totalReports }: Study
 
       <Panel defaultSize={60} minSize={35} className="min-w-0">
         <div className="h-full flex flex-col min-w-0 overflow-hidden p-4 md:px-8">
-          <StudyRelevanceTable
-            studies={currentRelevanceStudies}
-            loading={relevanceLoading}
-            currentBatchHash={currentReport?.batchHash}
-            currentReportIndex={currentReport?.reportIndex}
-            currentReportCRGId={currentReport?.CRGReportID}
-          />
+          {currentReport ? (
+            <StudyRelevanceTable
+              studies={currentRelevanceStudies}
+              loading={relevanceLoading}
+              currentBatchHash={currentReport.batchHash}
+              currentReportIndex={currentReport.reportIndex}
+              currentReportCRGId={currentReport.CRGReportID}
+              getLastInteraction={getLastInteraction}
+            />
+          ) : (
+            <div className="h-full flex items-center justify-center text-muted-foreground">
+              <p className="text-lg">Please select a report</p>
+            </div>
+          )}
         </div>
       </Panel>
     </PanelGroup>

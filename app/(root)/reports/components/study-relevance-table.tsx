@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import type { RelevanceStudy, StudyReportSummary } from "@/types/reports";
+import type { RelevanceStudy } from "@/types/reports";
 import {
   Sheet,
   SheetContent,
@@ -51,6 +51,7 @@ import { StudyDetails } from "./study-details";
 import { AddStudyDialog } from "./add-study-dialog";
 import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
 import { LoadMoreStudiesButton } from "./load-more-studies-button";
+import { sendReportEvent } from "@/lib/api/reportEventsApi";
 
 interface StudyRelevanceTableProps {
   studies: RelevanceStudy[];
@@ -61,6 +62,8 @@ interface StudyRelevanceTableProps {
   currentBatchHash?: string;
   currentReportIndex?: number;
   currentReportCRGId?: number;
+  // For event tracking
+  getLastInteraction?: () => string | null;
 }
 
 export function StudyRelevanceTable({
@@ -70,7 +73,8 @@ export function StudyRelevanceTable({
   onStudySelect,
   currentBatchHash,
   currentReportIndex,
-  currentReportCRGId
+  currentReportCRGId,
+  getLastInteraction,
 }: StudyRelevanceTableProps) {
   const {
     studyDetails,
@@ -154,6 +158,12 @@ export function StudyRelevanceTable({
             studyId
           );
           toast.success(`Study assigned to report`);
+
+          // Send "end" event when a study is assigned (checkbox checked)
+          if (currentReportCRGId) {
+            const lastInteraction = getLastInteraction?.() ?? null;
+            void sendReportEvent(currentReportCRGId, "end", lastInteraction);
+          }
         } else {
           await unassignStudyFromReport(
             currentBatchHash,
@@ -249,6 +259,12 @@ export function StudyRelevanceTable({
           ? `${studiesToProcess.length} studies assigned`
           : `${studiesToProcess.length} studies unassigned`
       );
+
+      // Send "end" event when studies are bulk assigned
+      if (selectAll && currentReportCRGId) {
+        const lastInteraction = getLastInteraction?.() ?? null;
+        void sendReportEvent(currentReportCRGId, "end", lastInteraction);
+      }
 
       const updatedAssigned = selectAll
         ? filteredStudies.map((s) => s.CRGStudyID)
