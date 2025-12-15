@@ -135,17 +135,19 @@ export function StudyDetailContent({
     fetchAssignedStudiesForReport,
   ]);
 
+  // Reset selection if the selected report is no longer in the list
   useEffect(() => {
     if (reports.length === 0) {
       setSelectedReportIndex(null);
       return;
     }
 
+    // Only reset if the currently selected report no longer exists
     if (
-      selectedReportIndex === null ||
+      selectedReportIndex !== null &&
       !reports.some((report) => report.reportIndex === selectedReportIndex)
     ) {
-      setSelectedReportIndex(reports[0].reportIndex);
+      setSelectedReportIndex(null);
     }
   }, [reports, selectedReportIndex]);
 
@@ -254,14 +256,20 @@ export function StudyDetailContent({
 
       <Panel defaultSize={60} minSize={35} className="min-w-0">
         <div className="h-full flex flex-col min-w-0 overflow-hidden p-4 md:px-8">
-          <StudyRelevanceTable
-            studies={currentRelevanceStudies}
-            loading={relevanceLoading}
-            currentBatchHash={currentReport?.batchHash}
-            currentReportIndex={currentReport?.reportIndex}
-            currentReportCRGId={currentReport?.CRGReportID}
-            getLastInteraction={getLastInteraction}
-          />
+          {currentReport ? (
+            <StudyRelevanceTable
+              studies={currentRelevanceStudies}
+              loading={relevanceLoading}
+              currentBatchHash={currentReport.batchHash}
+              currentReportIndex={currentReport.reportIndex}
+              currentReportCRGId={currentReport.CRGReportID}
+              getLastInteraction={getLastInteraction}
+            />
+          ) : (
+            <div className="h-full flex items-center justify-center text-muted-foreground">
+              <p className="text-lg">Please select a report</p>
+            </div>
+          )}
         </div>
       </Panel>
     </PanelGroup>

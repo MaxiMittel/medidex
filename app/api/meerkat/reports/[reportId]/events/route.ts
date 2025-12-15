@@ -3,7 +3,7 @@ import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
 export interface ReportEventPayload {
   timestamp: string;
-  type: "start" | "end";
+  event_type: "start" | "end";
   last_interaction: string | null;
 }
 
@@ -14,20 +14,14 @@ export async function POST(
   const { reportId } = await params;
 
   if (!reportId) {
-    return NextResponse.json(
-      { error: "Missing report id." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Missing report id." }, { status: 400 });
   }
 
   let body: ReportEventPayload;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json(
-      { error: "Invalid JSON body." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
   // Validate required fields
@@ -38,16 +32,19 @@ export async function POST(
     );
   }
 
-  if (!body.type || !["start", "end"].includes(body.type)) {
+  if (!body.event_type || !["start", "end"].includes(body.event_type)) {
     return NextResponse.json(
-      { error: "Missing or invalid required field: type (must be 'start' or 'end')" },
+      {
+        error:
+          "Missing or invalid required field: type (must be 'start' or 'end')",
+      },
       { status: 400 }
     );
   }
 
   try {
     const headers = await getMeerkatHeaders();
-    
+
     // Forward the event to the Meerkat API
     const meerkatApiUrl = process.env.MEERKAT_API_URL;
     const response = await fetch(
@@ -60,7 +57,7 @@ export async function POST(
         },
         body: JSON.stringify({
           timestamp: body.timestamp,
-          type: body.type,
+          event_type: body.event_type,
           last_interaction: body.last_interaction,
         }),
       }
