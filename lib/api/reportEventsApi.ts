@@ -2,7 +2,7 @@ export type ReportEventType = "start" | "end";
 
 export interface ReportEventPayload {
   timestamp: string;
-  type: ReportEventType;
+  event_type: ReportEventType;
   last_interaction: string | null;
 }
 
@@ -15,12 +15,12 @@ export interface ReportEventPayload {
  */
 export async function sendReportEvent(
   crgReportId: number,
-  type: ReportEventType,
+  event_type: ReportEventType,
   lastInteraction: string | null = null
 ): Promise<void> {
   const payload: ReportEventPayload = {
     timestamp: new Date().toISOString(),
-    type,
+    event_type,
     last_interaction: lastInteraction,
   };
 
@@ -34,10 +34,10 @@ export async function sendReportEvent(
     });
 
     if (!response.ok) {
-      console.error(`Failed to send ${type} event for report ${crgReportId}`);
+      console.error(`Failed to send ${event_type} event for report ${crgReportId}`);
     }
   } catch (error) {
     // Log but don't throw - event tracking should not break the main flow
-    console.error(`Error sending ${type} event for report ${crgReportId}:`, error);
+    console.error(`Error sending ${event_type} event for report ${crgReportId}:`, error);
   }
 }

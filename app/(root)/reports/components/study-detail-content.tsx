@@ -3,11 +3,7 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { StudyRelevanceTable } from "./study-relevance-table";
 import { ReportsList } from "./reports-list";
-import {
-  PanelGroup,
-  Panel,
-  PanelResizeHandle,
-} from "react-resizable-panels";
+import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
 import {
   useBatchReportsStore,
   buildReportKey,
@@ -35,7 +31,11 @@ interface StudyDetailContentProps {
   totalReports?: number;
 }
 
-export function StudyDetailContent({ reports, loadingMore, totalReports }: StudyDetailContentProps) {
+export function StudyDetailContent({
+  reports,
+  loadingMore,
+  totalReports,
+}: StudyDetailContentProps) {
   const {
     similarStudiesByReport,
     similarStudiesLoading,
@@ -69,18 +69,19 @@ export function StudyDetailContent({ reports, loadingMore, totalReports }: Study
     };
   }, [updateLastInteraction]);
 
-  // Handle report selection with "start" event
-  const handleReportSelect = useCallback((report: {
-    reportIndex: number;
-    CRGReportID: number;
-  }) => {
-    // Only send start event if selecting a different report
-    if (report.reportIndex !== selectedReportIndex) {
+  // Handle report selection with "start" event - ONLY for explicit user clicks
+  const handleReportSelect = useCallback(
+    (report: { reportIndex: number; CRGReportID: number }) => {
       setSelectedReportIndex(report.reportIndex);
-      // Send "start" event when clicking on a report
-      void sendReportEvent(report.CRGReportID, "start", lastInteractionRef.current);
-    }
-  }, [selectedReportIndex]);
+      // Send "start" event when user explicitly clicks on a report
+      void sendReportEvent(
+        report.CRGReportID,
+        "start",
+        lastInteractionRef.current
+      );
+    },
+    []
+  );
 
   // Get last interaction timestamp for "end" events
   const getLastInteraction = useCallback(() => {
