@@ -16,21 +16,33 @@ import { Clock } from "lucide-react";
 interface InactivityDialogProps {
   isTimerActive: boolean;
   inactivityTimeout?: number;
+  dialogTimeout?: number;
   onContinue: () => void;
   onStop: () => void;
 }
 
 const INACTIVITY_TIMEOUT_DEFAULT = 60000; // 1 minute
+const DIALOG_TIMEOUT_DEFAULT = 120000; // 2 minutes
 
 export function InactivityDialog({
   isTimerActive,
   inactivityTimeout = INACTIVITY_TIMEOUT_DEFAULT,
+  dialogTimeout = DIALOG_TIMEOUT_DEFAULT,
   onContinue,
   onStop,
 }: InactivityDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const dialogTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
+  const isContinuingRef = useRef(false);
+
+  const clearDialogTimer = useCallback(() => {
+    if (dialogTimerRef.current) {
+      clearTimeout(dialogTimerRef.current);
+      dialogTimerRef.current = null;
+    }
+  }, []);
 
   const resetInactivityTimer = useCallback(() => {
     lastActivityRef.current = Date.now();
@@ -46,12 +58,30 @@ export function InactivityDialog({
     }
   }, [isTimerActive, isOpen, inactivityTimeout]);
 
+  // Start dialog timeout when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      clearDialogTimer();
+      dialogTimerRef.current = setTimeout(() => {
+        setIsOpen(false);
+        onStop();
+      }, dialogTimeout);
+    } else {
+      clearDialogTimer();
+    }
+
+    return () => {
+      clearDialogTimer();
+    };
+  }, [isOpen, dialogTimeout, onStop, clearDialogTimer]);
+
   useEffect(() => {
     if (!isTimerActive) {
       if (inactivityTimerRef.current) {
         clearTimeout(inactivityTimerRef.current);
         inactivityTimerRef.current = null;
       }
+      clearDialogTimer();
       setIsOpen(false);
       return;
     }
@@ -77,21 +107,34 @@ export function InactivityDialog({
         clearTimeout(inactivityTimerRef.current);
       }
     };
-  }, [isTimerActive, isOpen, resetInactivityTimer]);
+  }, [isTimerActive, isOpen, resetInactivityTimer, clearDialogTimer]);
 
   const handleContinue = () => {
+    isContinuingRef.current = true;
+    clearDialogTimer();
     setIsOpen(false);
     onContinue();
-    resetInactivityTimer();
+
+    setTimeout(() => {
+      isContinuingRef.current = false;
+      resetInactivityTimer();
+    }, 0);
   };
 
   const handleStop = () => {
+    clearDialogTimer();
     setIsOpen(false);
     onStop();
   };
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open && !isContinuingRef.current) {
+      handleStop();
+    }
+  };
+
   return (
-    <AlertDialog open={isOpen} onOpenChange={(open) => !open && handleStop()}>
+    <AlertDialog open={isOpen} onOpenChange={handleOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <div className="flex items-center gap-2">
