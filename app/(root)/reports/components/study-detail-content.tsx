@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { StudyRelevanceTable } from "./study-relevance-table";
 import { ReportsList } from "./reports-list";
 import {
@@ -13,6 +13,7 @@ import {
   buildReportKey,
 } from "@/hooks/use-batch-reports-store";
 import type { RelevanceStudy } from "@/types/reports";
+import { sendReportEvent } from "@/lib/api/reportEventsApi";
 
 interface StudyDetailContentProps {
   reports: Array<{
@@ -46,6 +47,45 @@ export function StudyDetailContent({ reports, loadingMore, totalReports }: Study
   const [selectedReportIndex, setSelectedReportIndex] = useState<number | null>(
     null
   );
+
+  // Track last interaction timestamp for event tracking
+  const lastInteractionRef = useRef<string | null>(null);
+
+  // Update last interaction on any user activity
+  const updateLastInteraction = useCallback(() => {
+    lastInteractionRef.current = new Date().toISOString();
+  }, []);
+
+  // Set up interaction listeners
+  useEffect(() => {
+    const events = ["click", "scroll", "keydown", "mousemove"];
+    events.forEach((event) => {
+      window.addEventListener(event, updateLastInteraction, { passive: true });
+    });
+    return () => {
+      events.forEach((event) => {
+        window.removeEventListener(event, updateLastInteraction);
+      });
+    };
+  }, [updateLastInteraction]);
+
+  // Handle report selection with "start" event
+  const handleReportSelect = useCallback((report: {
+    reportIndex: number;
+    CRGReportID: number;
+  }) => {
+    // Only send start event if selecting a different report
+    if (report.reportIndex !== selectedReportIndex) {
+      setSelectedReportIndex(report.reportIndex);
+      // Send "start" event when clicking on a report
+      void sendReportEvent(report.CRGReportID, "start", lastInteractionRef.current);
+    }
+  }, [selectedReportIndex]);
+
+  // Get last interaction timestamp for "end" events
+  const getLastInteraction = useCallback(() => {
+    return lastInteractionRef.current;
+  }, []);
 
   // Build a map of study ID -> study name from similar studies
   const studyNamesById = useMemo(() => {
@@ -201,9 +241,7 @@ export function StudyDetailContent({ reports, loadingMore, totalReports }: Study
           <ReportsList
             reports={reports}
             selectedReportIndex={selectedReportIndex ?? undefined}
-            onReportSelect={(report) => {
-              setSelectedReportIndex(report.reportIndex);
-            }}
+            onReportSelect={handleReportSelect}
             loadingMore={loadingMore}
             totalReports={totalReports}
             studyNamesById={studyNamesById}
@@ -221,6 +259,7 @@ export function StudyDetailContent({ reports, loadingMore, totalReports }: Study
             currentBatchHash={currentReport?.batchHash}
             currentReportIndex={currentReport?.reportIndex}
             currentReportCRGId={currentReport?.CRGReportID}
+            getLastInteraction={getLastInteraction}
           />
         </div>
       </Panel>
