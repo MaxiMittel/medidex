@@ -10,6 +10,7 @@ import {
 } from "@/hooks/use-batch-reports-store";
 import type { RelevanceStudy } from "@/types/reports";
 import { sendReportEvent } from "@/lib/api/reportEventsApi";
+import { InactivityDialog } from "./inactivity-dialog";
 
 interface StudyDetailContentProps {
   reports: Array<{
@@ -158,6 +159,21 @@ export function StudyDetailContent({
     return reports.find((report) => report.reportIndex === selectedReportIndex);
   }, [reports, selectedReportIndex]);
 
+  const handleInactivityContinue = useCallback(() => {
+    updateLastInteraction();
+  }, [updateLastInteraction]);
+
+  const handleInactivityStop = useCallback(() => {
+    if (currentReport) {
+      void sendReportEvent(
+        currentReport.CRGReportID,
+        "end",
+        lastInteractionRef.current
+      );
+    }
+    setSelectedReportIndex(null);
+  }, [currentReport]);
+
   useEffect(() => {
     if (!currentReport) {
       return;
@@ -234,7 +250,13 @@ export function StudyDetailContent({
   }, [currentReport, similarStudiesLoading, assignedStudiesLoading]);
 
   return (
-    <PanelGroup direction="horizontal" className="h-full">
+    <>
+      <InactivityDialog
+        isTimerActive={selectedReportIndex !== null}
+        onContinue={handleInactivityContinue}
+        onStop={handleInactivityStop}
+      />
+      <PanelGroup direction="horizontal" className="h-full">
       <Panel
         defaultSize={40}
         minSize={25}
@@ -273,5 +295,6 @@ export function StudyDetailContent({
         </div>
       </Panel>
     </PanelGroup>
+    </>
   );
 }
