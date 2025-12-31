@@ -1,7 +1,6 @@
 "use client";
 import { SidebarIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { BatchSelector } from "@/components/sidebar/batch-selector";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -21,7 +20,8 @@ type BreadcrumbConfig = {
 
 // Map of pathname to breadcrumb configuration
 const breadcrumbMap: Record<string, BreadcrumbConfig[]> = {
-  "/": [{ label: "Search Studies" }],
+  "/": [{ label: "Batches" }],
+  "/reports": [{ label: "Batches", href: "/" }, { label: "Reports" }],
   "/login": [{ label: "Authentication", href: "#" }, { label: "Login" }],
   "/register": [{ label: "Authentication", href: "#" }, { label: "Register" }],
   "/studies": [{ label: "Studies", href: "#" }, { label: "All Studies" }],
@@ -75,7 +75,6 @@ export function SiteHeader() {
   const { toggleSidebar } = useSidebar();
   const pathname = usePathname();
   const breadcrumbs = getBreadcrumbs(pathname || "/");
-  const isReportsPage = pathname === "/reports";
 
   return (
     <header className="bg-background fixed left-0 right-0 top-0 z-50 flex w-full items-center border-b">
@@ -110,11 +109,6 @@ export function SiteHeader() {
             })}
           </BreadcrumbList>
         </Breadcrumb>
-        {isReportsPage && (
-          <div className="w-full sm:ml-auto sm:w-auto">
-            <BatchSelector />
-          </div>
-        )}
       </div>
     </header>
   );

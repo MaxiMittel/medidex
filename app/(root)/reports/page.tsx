@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useBatchReportsStore } from "../../../hooks/use-batch-reports-store";
 import { StudyDetailContent } from "./components/study-detail-content";
 
 export default function ReportsPage() {
+  const router = useRouter();
   const {
     batches,
     reportsByBatch,
@@ -14,6 +16,13 @@ export default function ReportsPage() {
     loadingMoreReports,
     error,
   } = useBatchReportsStore();
+
+  // Redirect to home page if no batch is selected and not loading
+  useEffect(() => {
+    if (!loading && !selectedBatchHash && batches.length > 0) {
+      router.replace("/");
+    }
+  }, [loading, selectedBatchHash, batches.length, router]);
 
   const reports = useMemo(() => {
     if (!selectedBatchHash) {
@@ -95,7 +104,7 @@ export default function ReportsPage() {
 
       {!selectedBatchHash && batches.length > 0 && !loading && (
         <div className="p-6 text-muted-foreground shrink-0">
-          Please select a batch to view its reports.
+          Redirecting to batch selection...
         </div>
       )}
     </div>

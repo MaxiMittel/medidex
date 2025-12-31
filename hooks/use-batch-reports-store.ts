@@ -40,6 +40,7 @@ export interface BatchReportsState {
   loadingReports: boolean;
   loadingMoreReports: boolean;
   error?: string;
+  setBatches: (batches: BatchDto[]) => void;
   fetchBatches: () => Promise<void>;
   fetchReportsForBatch: (batchHash: string) => Promise<void>;
   selectBatch: (batchHash: string) => void;
@@ -113,6 +114,12 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
   addStudyDialogOpen: false,
   newStudyForm: initialNewStudyForm,
   creatingStudy: false,
+  setBatches: (batches: BatchDto[]) => {
+    // Only set if store is empty to avoid overwriting fresh data
+    if (get().batches.length === 0) {
+      set({ batches });
+    }
+  },
   fetchBatches: async () => {
     set({ loading: true, error: undefined });
     try {
