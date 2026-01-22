@@ -321,7 +321,7 @@ export function ReportsList({
                             variant="destructive"
                             className="text-xs font-mono"
                           >
-                            {studyId}
+                            {studyNamesById[studyId] || studyId}
                           </Badge>
                         ))}
                       </div>
