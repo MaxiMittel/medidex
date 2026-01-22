@@ -12,7 +12,7 @@ from langgraph.graph import END, StateGraph
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-Decision = Literal["match", "not_match", "unsure"]
+Decision = Literal["match", "not_match", "unsure", "likely_match"]
 
 ENV_PATH = Path(__file__).with_name(".env")
 load_dotenv(ENV_PATH)
@@ -97,28 +97,51 @@ class StudyDecision(BaseModel):
 
 
 class EvaluateResponse(BaseModel):
-    matches: list[StudyDecision]
+    match: StudyDecision | None
     not_matches: list[StudyDecision]
     unsure: list[StudyDecision]
-    total: int
+    likely_matches: list[StudyDecision]
+    total_reviewed: int
 
 
 class EvalState(TypedDict):
     report: ReportDto
     studies: list[StudyDto]
     idx: int
+    likely_idx: int
+    likely_queue: list[str]
+    unsure_idx: int
+    unsure_queue: list[str]
     current: StudyDto | None
     decision: Decision | None
     reason: str | None
     evaluation_prompt: str | None
-    matches: list[dict]
+    match: dict | None
     not_matches: list[dict]
     unsure: list[dict]
+    likely_matches: list[dict]
+    rejected_likely: list[dict]
 
 DEFAULT_EVAL_PROMPT = (
-    "You are a clinical research assistant. Determine whether the study matches the "
-    "report's intent. Use the doctor's instructions as primary guidance. Respond ONLY "
-    "as JSON with keys: decision (match|not_match|unsure) and reason (short string)."
+    "You are a clinical research assistant. Determine whether the study is relevant to "
+    "the report's intent. Use the doctor's instructions as primary guidance. This is "
+    "the first pass: respond ONLY with one of not_match, unsure, or likely_match. "
+    "Never respond match in this pass. Respond ONLY as json with keys: decision "
+    "(not_match|unsure|likely_match) and reason (short string)."
+)
+
+DEFAULT_LIKELY_REVIEW_PROMPT = (
+    "You are reviewing studies previously marked as likely_match to decide if there is "
+    "a definitive match. Only choose match if you are highly confident and the study "
+    "clearly satisfies the report; otherwise respond unsure. Respond ONLY as json with "
+    "keys: decision (match|unsure) and reason (short string)."
+)
+
+DEFAULT_UNSURE_REVIEW_PROMPT = (
+    "You are reviewing unsure studies. Use the rejected likely_match list as historical "
+    "context. Only choose match if you are highly confident; otherwise respond unsure or "
+    "not_match. Respond ONLY as json with keys: decision (match|unsure|not_match) and "
+    "reason (short string)."
 )
 
 MODEL = ChatOpenAI(
@@ -171,6 +194,27 @@ MOCK_REPORT = ReportDto(
 MOCK_STUDIES = [
     StudyDto(
         StatusofStudy="Completed",
+        NumberParticipants="180",
+        TrialistContactDetails=None,
+        Countries="US",
+        CENTRALSubmissionStatus="Submitted",
+        Duration="9 months",
+        Notes=None,
+        UDef4=None,
+        CRGStudyID=2003,
+        DateEntered="2022-06-20",
+        Comparison="Vitamin D plus calcium vs placebo",
+        CENTRALStudyID=5003,
+        DateToCENTRAL="2022-07-15",
+        ISRCTN="ISRCTN99887766",
+        ShortName="Vitamin D and calcium in older adults",
+        DateEdited="2022-08-01",
+        UDef6=None,
+        Search_Tagged=False,
+        TrialRegistrationID="NCT09876543",
+    ),
+    StudyDto(
+        StatusofStudy="Completed",
         NumberParticipants="150",
         TrialistContactDetails=None,
         Countries="UK",
@@ -211,6 +255,27 @@ MOCK_STUDIES = [
         Search_Tagged=False,
         TrialRegistrationID="NCT01234567",
     ),
+    StudyDto(
+        StatusofStudy="Completed",
+        NumberParticipants="220",
+        TrialistContactDetails=None,
+        Countries="Canada",
+        CENTRALSubmissionStatus="Submitted",
+        Duration="10 months",
+        Notes=None,
+        UDef4=None,
+        CRGStudyID=2004,
+        DateEntered="2021-03-12",
+        Comparison="Resistance training vs usual care",
+        CENTRALStudyID=5004,
+        DateToCENTRAL="2021-04-02",
+        ISRCTN="ISRCTN44556677",
+        ShortName="Resistance training for fall prevention",
+        DateEdited="2021-04-20",
+        UDef6=None,
+        Search_Tagged=False,
+        TrialRegistrationID="NCT05554444",
+    ),
 ]
 
 
@@ -224,7 +289,40 @@ def build_user_payload(report: ReportDto, study: StudyDto) -> str:
     )
 
 
-def parse_llm_response(text: str) -> tuple[Decision, str]:
+def get_study_by_id(studies: list[StudyDto], study_id: str) -> StudyDto | None:
+    for study in studies:
+        if str(study.CRGStudyID) == study_id:
+            return study
+    return None
+
+
+def get_bucket_entry(bucket: list[dict], study_id: str) -> dict | None:
+    for item in bucket:
+        if str(item.get("study_id")) == study_id:
+            return item
+    return None
+
+
+def upsert_bucket(bucket: list[dict], entry: dict) -> list[dict]:
+    study_id = str(entry.get("study_id"))
+    updated: list[dict] = []
+    replaced = False
+    for item in bucket:
+        if str(item.get("study_id")) == study_id:
+            updated.append(entry)
+            replaced = True
+        else:
+            updated.append(item)
+    if not replaced:
+        updated.append(entry)
+    return updated
+
+
+def remove_from_bucket(bucket: list[dict], study_id: str) -> list[dict]:
+    return [item for item in bucket if str(item.get("study_id")) != study_id]
+
+
+def parse_initial_response(text: str) -> tuple[Decision, str]:
     try:
         payload = json.loads(text)
     except json.JSONDecodeError:
@@ -232,22 +330,107 @@ def parse_llm_response(text: str) -> tuple[Decision, str]:
 
     decision = payload.get("decision")
     reason = payload.get("reason")
-    if decision not in {"match", "not_match", "unsure"}:
+    if decision not in {"not_match", "unsure", "likely_match"}:
         return "unsure", f"Invalid decision: {decision!r}"
     if not isinstance(reason, str) or not reason.strip():
         return "unsure", "Missing reason in model response."
     return decision, reason.strip()
 
 
-def load_next(state: EvalState) -> dict:
+def parse_likely_review_response(text: str) -> tuple[Decision, str]:
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return "unsure", f"Non-JSON response: {text[:300]}"
+
+    decision = payload.get("decision")
+    reason = payload.get("reason")
+    if decision not in {"match", "unsure"}:
+        return "unsure", f"Invalid decision: {decision!r}"
+    if not isinstance(reason, str) or not reason.strip():
+        return "unsure", "Missing reason in model response."
+    return decision, reason.strip()
+
+
+def parse_unsure_review_response(text: str) -> tuple[Decision, str]:
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return "unsure", f"Non-JSON response: {text[:300]}"
+
+    decision = payload.get("decision")
+    reason = payload.get("reason")
+    if decision not in {"match", "unsure", "not_match"}:
+        return "unsure", f"Invalid decision: {decision!r}"
+    if not isinstance(reason, str) or not reason.strip():
+        return "unsure", "Missing reason in model response."
+    return decision, reason.strip()
+
+
+def build_likely_review_payload(
+    report: ReportDto,
+    study: StudyDto,
+    prior_reason: str | None,
+) -> str:
+    return json.dumps(
+        {
+            "report": report.model_dump(),
+            "study": study.model_dump(),
+            "prior_reason": prior_reason,
+        },
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+
+
+def build_unsure_review_payload(
+    report: ReportDto,
+    rejected_likely: list[dict],
+    current_study: StudyDto,
+    prior_reason: str | None,
+    studies: list[StudyDto],
+) -> str:
+    by_id = {str(study.CRGStudyID): study for study in studies}
+    rejected_payload: list[dict] = []
+    for item in rejected_likely:
+        study_id = str(item.get("study_id", ""))
+        study = by_id.get(study_id)
+        if study is None:
+            continue
+        rejected_payload.append(
+            {
+                "study": study.model_dump(),
+                "initial_reason": item.get("initial_reason"),
+                "review_reason": item.get("review_reason"),
+            }
+        )
+    return json.dumps(
+        {
+            "report": report.model_dump(),
+            "rejected_likely": rejected_payload,
+            "current": {
+                "study": current_study.model_dump(),
+                "prior_reason": prior_reason,
+            },
+        },
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+
+
+def load_next_initial(state: EvalState) -> dict:
     idx = state["idx"]
-    logger.info("load_next: idx=%s total=%s", idx, len(state["studies"]))
+    logger.info("load_next_initial: idx=%s total=%s", idx, len(state["studies"]))
     if idx >= len(state["studies"]):
-        logger.info("load_next: no_more_studies")
+        logger.info("load_next_initial: no_more_studies")
         return {"current": None}
 
     current = state["studies"][idx]
-    logger.info("load_next: study_id=%s short_name=%s", current.CRGStudyID, current.ShortName)
+    logger.info(
+        "load_next_initial: study_id=%s short_name=%s",
+        current.CRGStudyID,
+        current.ShortName,
+    )
     return {
         "current": current,
         "decision": None,
@@ -255,74 +438,350 @@ def load_next(state: EvalState) -> dict:
     }
 
 
-def route_has_study(state: EvalState) -> str:
-    next_step = "end" if state.get("current") is None else "classify"
-    logger.info("route_has_study: next=%s", next_step)
+def route_after_initial_load(state: EvalState) -> str:
+    next_step = "prepare_likely_review" if state.get("current") is None else "classify_initial"
+    logger.info("route_after_initial_load: next=%s", next_step)
     return next_step
 
 
-def classify(state: EvalState) -> dict:
+def classify_initial(state: EvalState) -> dict:
     current = state["current"]
     if current is None:
-        logger.info("classify: no_current_study")
+        logger.info("classify_initial: no_current_study")
         return {"decision": "unsure", "reason": "No study loaded."}
 
-    logger.info("classify: study_id=%s", current.CRGStudyID)
+    logger.info("classify_initial: study_id=%s", current.CRGStudyID)
     user_payload = build_user_payload(state["report"], current)
-    prompt = state.get("evaluation_prompt") or DEFAULT_EVAL_PROMPT
+    evaluation_prompt = state.get("evaluation_prompt")
+    prompt = DEFAULT_EVAL_PROMPT
     try:
-        response = MODEL.invoke(
-            [
-                SystemMessage(content=prompt),
-                HumanMessage(content=user_payload),
-            ]
-        )
+        messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
+        if evaluation_prompt:
+            messages.append(
+                SystemMessage(
+                    content=(
+                        "Doctor instructions (follow as primary guidance): "
+                        f"{evaluation_prompt}"
+                    )
+                )
+            )
+        messages.append(HumanMessage(content=user_payload))
+        response = MODEL.invoke(messages)
         content = response.content
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
-        decision, reason = parse_llm_response(text)
-        logger.info("classify: decision=%s", decision)
+        decision, reason = parse_initial_response(text)
+        logger.info("classify_initial: decision=%s", decision)
     except Exception as exc:
         decision, reason = "unsure", f"LLM call failed: {exc.__class__.__name__}"
-        logger.info("classify: error=%s", exc.__class__.__name__)
+        logger.info("classify_initial: error=%s", exc.__class__.__name__)
+        logger.info("classify_initial: reason=%s", str(exc))
     idx = state["idx"]
 
     study_id = str(current.CRGStudyID) if current else f"index-{idx}"
     result = {"study_id": study_id, "decision": decision, "reason": reason}
 
-    matches = list(state["matches"])
     not_matches = list(state["not_matches"])
     unsure = list(state["unsure"])
+    likely_matches = list(state["likely_matches"])
 
-    if decision == "match":
-        matches.append(result)
-    elif decision == "not_match":
+    if decision == "not_match":
         not_matches.append(result)
+    elif decision == "likely_match":
+        likely_matches.append(result)
     else:
         unsure.append(result)
 
     return {
         "decision": decision,
         "reason": reason,
-        "matches": matches,
         "not_matches": not_matches,
         "unsure": unsure,
+        "likely_matches": likely_matches,
         "idx": idx + 1,
+    }
+
+
+def prepare_likely_review(state: EvalState) -> dict:
+    queue = [str(item.get("study_id")) for item in state.get("likely_matches", []) if item.get("study_id")]
+    logger.info("prepare_likely_review: count=%s", len(queue))
+    return {
+        "likely_queue": queue,
+        "likely_idx": 0,
+        "current": None,
+        "decision": None,
+        "reason": None,
+    }
+
+
+def load_next_likely(state: EvalState) -> dict:
+    idx = state["likely_idx"]
+    queue = state.get("likely_queue", [])
+    logger.info("load_next_likely: idx=%s total=%s", idx, len(queue))
+    while idx < len(queue):
+        study_id = queue[idx]
+        current = get_study_by_id(state["studies"], study_id)
+        if current is not None:
+            logger.info(
+                "load_next_likely: study_id=%s short_name=%s",
+                current.CRGStudyID,
+                current.ShortName,
+            )
+            return {
+                "current": current,
+                "decision": None,
+                "reason": None,
+                "likely_idx": idx,
+            }
+        logger.info("load_next_likely: missing_study_id=%s", study_id)
+        idx += 1
+
+    logger.info("load_next_likely: no_more_likely")
+    return {"current": None, "likely_idx": idx}
+
+
+def route_after_likely_load(state: EvalState) -> str:
+    if state.get("match") is not None:
+        next_step = "end"
+    elif state.get("current") is None:
+        next_step = "prepare_unsure_review"
+    else:
+        next_step = "classify_likely"
+    logger.info("route_after_likely_load: next=%s", next_step)
+    return next_step
+
+
+def classify_likely(state: EvalState) -> dict:
+    current = state["current"]
+    if current is None:
+        logger.info("classify_likely: no_current_study")
+        return {"decision": "unsure", "reason": "No study loaded."}
+
+    study_id = str(current.CRGStudyID)
+    prior_entry = get_bucket_entry(state.get("likely_matches", []), study_id)
+    prior_reason = prior_entry.get("reason") if prior_entry else None
+
+    logger.info("classify_likely: study_id=%s", study_id)
+    payload = build_likely_review_payload(state["report"], current, prior_reason)
+    evaluation_prompt = state.get("evaluation_prompt")
+    prompt = DEFAULT_LIKELY_REVIEW_PROMPT
+    try:
+        messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
+        if evaluation_prompt:
+            messages.append(
+                SystemMessage(
+                    content=(
+                        "Doctor instructions (follow as primary guidance): "
+                        f"{evaluation_prompt}"
+                    )
+                )
+            )
+        messages.append(HumanMessage(content=payload))
+        response = MODEL.invoke(messages)
+        content = response.content
+        text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
+        decision, reason = parse_likely_review_response(text)
+        logger.info("classify_likely: decision=%s", decision)
+    except Exception as exc:
+        decision, reason = "unsure", f"LLM call failed: {exc.__class__.__name__}"
+        logger.info("classify_likely: error=%s", exc.__class__.__name__)
+        logger.info("classify_likely: reason=%s", str(exc))
+
+    match = state["match"]
+    likely_matches = list(state["likely_matches"])
+    not_matches = list(state["not_matches"])
+    unsure = list(state["unsure"])
+    rejected_likely = list(state.get("rejected_likely", []))
+
+    if decision == "match":
+        if match is None:
+            match = {"study_id": study_id, "decision": "match", "reason": reason}
+        likely_matches = remove_from_bucket(likely_matches, study_id)
+    else:
+        likely_matches = remove_from_bucket(likely_matches, study_id)
+        unsure = upsert_bucket(
+            unsure,
+            {"study_id": study_id, "decision": "unsure", "reason": reason},
+        )
+        rejected_likely.append(
+            {
+                "study_id": study_id,
+                "initial_reason": prior_reason,
+                "review_reason": reason,
+            }
+        )
+
+    return {
+        "decision": decision,
+        "reason": reason,
+        "match": match,
+        "not_matches": not_matches,
+        "unsure": unsure,
+        "likely_matches": likely_matches,
+        "rejected_likely": rejected_likely,
+        "likely_idx": state["likely_idx"] + 1,
+    }
+
+
+def prepare_unsure_review(state: EvalState) -> dict:
+    queue = [str(item.get("study_id")) for item in state.get("unsure", []) if item.get("study_id")]
+    logger.info("prepare_unsure_review: count=%s", len(queue))
+    return {
+        "unsure_queue": queue,
+        "unsure_idx": 0,
+        "current": None,
+        "decision": None,
+        "reason": None,
+    }
+
+
+def load_next_unsure(state: EvalState) -> dict:
+    idx = state["unsure_idx"]
+    queue = state.get("unsure_queue", [])
+    logger.info("load_next_unsure: idx=%s total=%s", idx, len(queue))
+    while idx < len(queue):
+        study_id = queue[idx]
+        current = get_study_by_id(state["studies"], study_id)
+        if current is not None:
+            logger.info(
+                "load_next_unsure: study_id=%s short_name=%s",
+                current.CRGStudyID,
+                current.ShortName,
+            )
+            return {
+                "current": current,
+                "decision": None,
+                "reason": None,
+                "unsure_idx": idx,
+            }
+        logger.info("load_next_unsure: missing_study_id=%s", study_id)
+        idx += 1
+
+    logger.info("load_next_unsure: no_more_unsure")
+    return {"current": None, "unsure_idx": idx}
+
+
+def route_after_unsure_load(state: EvalState) -> str:
+    if state.get("match") is not None:
+        next_step = "end"
+    elif state.get("current") is None:
+        next_step = "end"
+    else:
+        next_step = "classify_unsure"
+    logger.info("route_after_unsure_load: next=%s", next_step)
+    return next_step
+
+
+def classify_unsure(state: EvalState) -> dict:
+    current = state["current"]
+    if current is None:
+        logger.info("classify_unsure: no_current_study")
+        return {"decision": "unsure", "reason": "No study loaded."}
+
+    study_id = str(current.CRGStudyID)
+    prior_entry = get_bucket_entry(state.get("unsure", []), study_id)
+    prior_reason = prior_entry.get("reason") if prior_entry else None
+
+    logger.info("classify_unsure: study_id=%s", study_id)
+    payload = build_unsure_review_payload(
+        state["report"],
+        state.get("rejected_likely", []),
+        current,
+        prior_reason,
+        state["studies"],
+    )
+    evaluation_prompt = state.get("evaluation_prompt")
+    prompt = DEFAULT_UNSURE_REVIEW_PROMPT
+    try:
+        messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
+        if evaluation_prompt:
+            messages.append(
+                SystemMessage(
+                    content=(
+                        "Doctor instructions (follow as primary guidance): "
+                        f"{evaluation_prompt}"
+                    )
+                )
+            )
+        messages.append(HumanMessage(content=payload))
+        response = MODEL.invoke(messages)
+        content = response.content
+        text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
+        decision, reason = parse_unsure_review_response(text)
+        logger.info("classify_unsure: decision=%s", decision)
+    except Exception as exc:
+        decision, reason = "unsure", f"LLM call failed: {exc.__class__.__name__}"
+        logger.info("classify_unsure: error=%s", exc.__class__.__name__)
+        logger.info("classify_unsure: reason=%s", str(exc))
+
+    match = state["match"]
+    not_matches = list(state["not_matches"])
+    unsure = list(state["unsure"])
+
+    if decision == "match":
+        if match is None:
+            match = {"study_id": study_id, "decision": "match", "reason": reason}
+        unsure = remove_from_bucket(unsure, study_id)
+    elif decision == "not_match":
+        unsure = remove_from_bucket(unsure, study_id)
+        not_matches = upsert_bucket(
+            not_matches,
+            {"study_id": study_id, "decision": "not_match", "reason": reason},
+        )
+    else:
+        unsure = upsert_bucket(
+            unsure,
+            {"study_id": study_id, "decision": "unsure", "reason": reason},
+        )
+
+    return {
+        "decision": decision,
+        "reason": reason,
+        "match": match,
+        "not_matches": not_matches,
+        "unsure": unsure,
+        "unsure_idx": state["unsure_idx"] + 1,
     }
 
 
 def build_graph():
     logger.info("build_graph: init")
     graph = StateGraph(EvalState)
-    graph.add_node("load_next", load_next)
-    graph.add_node("classify", classify)
+    graph.add_node("load_next_initial", load_next_initial)
+    graph.add_node("classify_initial", classify_initial)
+    graph.add_node("prepare_likely_review", prepare_likely_review)
+    graph.add_node("load_next_likely", load_next_likely)
+    graph.add_node("classify_likely", classify_likely)
+    graph.add_node("prepare_unsure_review", prepare_unsure_review)
+    graph.add_node("load_next_unsure", load_next_unsure)
+    graph.add_node("classify_unsure", classify_unsure)
 
-    graph.set_entry_point("load_next")
+    graph.set_entry_point("load_next_initial")
     graph.add_conditional_edges(
-        "load_next",
-        route_has_study,
-        {"classify": "classify", "end": END},
+        "load_next_initial",
+        route_after_initial_load,
+        {"classify_initial": "classify_initial", "prepare_likely_review": "prepare_likely_review"},
     )
-    graph.add_edge("classify", "load_next")
+    graph.add_edge("classify_initial", "load_next_initial")
+
+    graph.add_edge("prepare_likely_review", "load_next_likely")
+    graph.add_conditional_edges(
+        "load_next_likely",
+        route_after_likely_load,
+        {
+            "classify_likely": "classify_likely",
+            "prepare_unsure_review": "prepare_unsure_review",
+            "end": END,
+        },
+    )
+    graph.add_edge("classify_likely", "load_next_likely")
+
+    graph.add_edge("prepare_unsure_review", "load_next_unsure")
+    graph.add_conditional_edges(
+        "load_next_unsure",
+        route_after_unsure_load,
+        {"classify_unsure": "classify_unsure", "end": END},
+    )
+    graph.add_edge("classify_unsure", "load_next_unsure")
     return graph.compile()
 
 
@@ -341,27 +800,40 @@ def run_evaluation(
         "report": report,
         "studies": studies,
         "idx": 0,
+        "likely_idx": 0,
+        "likely_queue": [],
+        "unsure_idx": 0,
+        "unsure_queue": [],
         "current": None,
         "decision": None,
         "reason": None,
         "evaluation_prompt": evaluation_prompt,
-        "matches": [],
+        "match": None,
         "not_matches": [],
         "unsure": [],
+        "likely_matches": [],
+        "rejected_likely": [],
     }
 
     final_state = GRAPH.invoke(initial_state)
     logger.info(
-        "run_evaluation: done matches=%s not_matches=%s unsure=%s",
-        len(final_state["matches"]),
+        "run_evaluation: done match=%s not_matches=%s unsure=%s likely_matches=%s",
+        "yes" if final_state["match"] else "no",
         len(final_state["not_matches"]),
         len(final_state["unsure"]),
+        len(final_state["likely_matches"]),
     )
     return EvaluateResponse(
-        matches=final_state["matches"],
+        match=final_state["match"],
         not_matches=final_state["not_matches"],
         unsure=final_state["unsure"],
-        total=len(studies),
+        likely_matches=final_state["likely_matches"],
+        total_reviewed=(
+            len(final_state["not_matches"])
+            + len(final_state["unsure"])
+            + len(final_state["likely_matches"])
+            + (1 if final_state["match"] else 0)
+        ),
     )
 
 
