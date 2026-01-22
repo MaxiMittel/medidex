@@ -1,0 +1,35 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	load_next_initial(load_next_initial)
+	classify_initial(classify_initial)
+	prepare_likely_review(prepare_likely_review)
+	select_very_likely(select_very_likely)
+	compare_very_likely(compare_very_likely)
+	prepare_unsure_review(prepare_unsure_review)
+	load_next_unsure(load_next_unsure)
+	classify_unsure(classify_unsure)
+	match_not_found_end(match_not_found_end)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> load_next_initial;
+	classify_initial --> load_next_initial;
+	classify_unsure --> load_next_unsure;
+	compare_very_likely -. &nbsp;match_found&nbsp; .-> __end__;
+	compare_very_likely -. &nbsp;no_match_after_compare&nbsp; .-> prepare_unsure_review;
+	load_next_initial -. &nbsp;has_study&nbsp; .-> classify_initial;
+	load_next_initial -. &nbsp;no_more_initial&nbsp; .-> prepare_likely_review;
+	load_next_unsure -. &nbsp;match_found&nbsp; .-> __end__;
+	load_next_unsure -. &nbsp;has_unsure&nbsp; .-> classify_unsure;
+	load_next_unsure -. &nbsp;match_not_found&nbsp; .-> match_not_found_end;
+	prepare_likely_review --> select_very_likely;
+	prepare_unsure_review --> load_next_unsure;
+	select_very_likely -. &nbsp;has_very_likely&nbsp; .-> compare_very_likely;
+	select_very_likely -. &nbsp;no_very_likely&nbsp; .-> prepare_unsure_review;
+	match_not_found_end --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
