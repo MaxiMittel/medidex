@@ -312,6 +312,20 @@ export function ReportsList({
                         {report.Abstract}
                       </p>
                     )}
+
+                    {report.Assigned && report.assignedStudyIds.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {report.assignedStudyIds.map(studyId => (
+                          <Badge 
+                            key={studyId}
+                            variant="destructive"
+                            className="text-xs font-mono"
+                          >
+                            {studyNamesById[studyId] || studyId}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Expanded Abstract */}

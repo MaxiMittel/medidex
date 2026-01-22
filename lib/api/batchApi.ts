@@ -16,7 +16,7 @@ export const getBatches = (config?: AxiosRequestConfig): Promise<BatchDto[]> => 
     });
 }
 
-//upload a new batch
+//upload new batch
 export const uploadBatch = (
   file: File,
   config?: AxiosRequestConfig
