@@ -144,11 +144,14 @@ export const getDesignForStudy = (
       });
 }
 
-export const getPersonsForStudy = (study_id: number): Promise<string[]> => {  
+export const getPersonsForStudy = (
+  study_id: number,
+  config?: AxiosRequestConfig
+): Promise<string[]> => {  
   const path = `/studies/${study_id}/persons`;
-  return apiClient.get<GetPersonsResponseDto>(path)
+  return apiClient.get<string[]>(path, config)
     .then(response => {
-      return response.data[study_id] || [];
+      return response.data || [];
     })
     .catch(error => {
       console.error(`Error fetching persons for study ${study_id}:`, error);

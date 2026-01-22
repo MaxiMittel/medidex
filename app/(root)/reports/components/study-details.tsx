@@ -7,6 +7,7 @@ import {
   Target, 
   Beaker,
   Info,
+  UserRound,
 } from "lucide-react";
 import {
   Accordion,
@@ -29,11 +30,13 @@ interface StudyDetailsProps {
     description: string;
   }>;
   design?: string[] | null;
+  persons?: string[] | null;
   loading?: boolean;
 }
 
-export function StudyDetails({ interventions, conditions, outcomes, design, loading = false }: StudyDetailsProps) {
+export function StudyDetails({ interventions, conditions, outcomes, design, persons, loading = false }: StudyDetailsProps) {
   const designArray = design || [];
+  const personsArray = persons || [];
 
   if (loading) {
     return (
@@ -158,6 +161,31 @@ export function StudyDetails({ interventions, conditions, outcomes, design, load
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-4">
                     No design information available
+                  </p>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Persons */}
+          <AccordionItem value="persons">
+            <AccordionTrigger className="text-sm font-medium hover:no-underline">
+              <div className="flex items-center gap-2">
+                <UserRound className="h-4 w-4" />
+                Persons ({personsArray.length})
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-2 pt-2">
+                {personsArray.length > 0 ? (
+                  personsArray.map((person, index) => (
+                    <div key={index} className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-sm">{person}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No persons information available
                   </p>
                 )}
               </div>

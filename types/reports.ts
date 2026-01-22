@@ -59,4 +59,5 @@ export interface StudyDetailData {
     description: string;
   }>;
   design: string[];
+  persons: string[];
 }
