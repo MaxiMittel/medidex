@@ -5,6 +5,7 @@ import {
   getConditionsForStudy,
   getOutcomesForStudy,
   getDesignForStudy,
+  getPersonsForStudy,
 } from "@/lib/api/studiesApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
@@ -25,13 +26,14 @@ export async function GET(
     const headers = await getMeerkatHeaders();
     const id = Number(studyId);
 
-    const [studyInfoArray, interventions, conditions, outcomes, design] =
+    const [studyInfoArray, interventions, conditions, outcomes, design, persons] =
       await Promise.all([
         getStudies([id], { headers }),
         getInterventionsForStudy(id, { headers }),
         getConditionsForStudy(id, { headers }),
         getOutcomesForStudy(id, { headers }),
         getDesignForStudy(id, { headers }),
+        getPersonsForStudy(id, { headers }),
       ]);
 
     const studyInfo = studyInfoArray[0];
@@ -49,6 +51,7 @@ export async function GET(
       conditions,
       outcomes,
       design,
+      persons,
     });
   } catch (error) {
     console.error(

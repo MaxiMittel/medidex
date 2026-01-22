@@ -458,12 +458,14 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
         conditions,
         outcomes,
         design,
+        persons,
       }: {
         studyInfo: StudyDto;
         interventions: InterventionDto[];
         conditions: ConditionDto[];
         outcomes: OutcomeDto[];
         design: string[];
+        persons: string[];
       } = await response.json();
 
       // Transform the data using actual API structure
@@ -482,6 +484,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
           description: outcome.Description,
         })),
         design,
+        persons,
       };
 
       set((state) => ({

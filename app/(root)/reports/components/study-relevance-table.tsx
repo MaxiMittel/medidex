@@ -844,6 +844,7 @@ export function StudyRelevanceTable({
                     }
                     outcomes={studyDetails[selectedStudy.CRGStudyID].outcomes}
                     design={studyDetails[selectedStudy.CRGStudyID].design}
+                    persons={studyDetails[selectedStudy.CRGStudyID].persons}
                     loading={false}
                   />
                 ) : (
@@ -852,6 +853,7 @@ export function StudyRelevanceTable({
                     conditions={[]}
                     outcomes={[]}
                     design={[]}
+                    persons={[]}
                     loading={
                       studyDetailsLoading[selectedStudy.CRGStudyID] ?? false
                     }
