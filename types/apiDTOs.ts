@@ -30,6 +30,7 @@ export interface ReportDetailDto {
   trial_id: string | null;
   vectors: VectorDto;
   assigned_studies: number[];
+  year: number | null;
 }
 
 export interface SimilarTagDto {
