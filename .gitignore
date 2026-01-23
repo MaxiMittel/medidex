@@ -43,3 +43,7 @@ next-env.d.ts
 /app/generated/prisma
 
 .venv
+
+/backend/.idea
+/backend.idea/*
+/backend/__pycache__/

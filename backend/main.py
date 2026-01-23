@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Literal, TypedDict
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
@@ -951,6 +952,15 @@ def build_graph():
 GRAPH = build_graph()
 
 app = FastAPI(title="Medidex AI Demo")
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def run_evaluation(
