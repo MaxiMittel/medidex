@@ -52,6 +52,10 @@ import { AddStudyDialog } from "./add-study-dialog";
 import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
 import { LoadMoreStudiesButton } from "./load-more-studies-button";
 import { sendReportEvent } from "@/lib/api/reportEventsApi";
+import { useGenAIEvaluation } from "@/hooks/use-genai-evaluation";
+import { AIEvaluationPrompt } from "./ai-evaluation-prompt";
+import { StudyAIBadge } from "./study-ai-badge";
+import { StudyAIReasonDialog } from "./study-ai-reason-dialog";
 
 interface StudyRelevanceTableProps {
   studies: RelevanceStudy[];
@@ -84,6 +88,7 @@ export function StudyRelevanceTable({
     unassignStudyFromReport,
     fetchSimilarStudiesForReport,
     fetchAssignedStudiesForReport,
+    reportsByBatch,
   } = useBatchReportsStore();
   const [linkedStudies, setLinkedStudies] = useState<Set<number>>(
     new Set(studies.filter((s) => s.Linked).map((s) => s.CRGStudyID))
@@ -100,11 +105,28 @@ export function StudyRelevanceTable({
   const [downloadingSingle, setDownloadingSingle] = useState<Set<number>>(
     new Set()
   );
+
+  // AI Evaluation state
+  const { evaluate, getStudyResult, loading: aiLoading, error: aiError } = useGenAIEvaluation();
+  const [evaluationPrompt, setEvaluationPrompt] = useState("");
+  const [reasonDialogOpen, setReasonDialogOpen] = useState(false);
+  const [selectedAIStudy, setSelectedAIStudy] = useState<{
+    studyId: number;
+    studyName: string;
+  } | null>(null);
+  const [hasEvaluated, setHasEvaluated] = useState(false);
+
   useEffect(() => {
     setLinkedStudies(
       new Set(studies.filter((s) => s.Linked).map((s) => s.CRGStudyID))
     );
   }, [studies]);
+
+  // Reset evaluation state when report changes
+  useEffect(() => {
+    setHasEvaluated(false);
+    setEvaluationPrompt("");
+  }, [currentBatchHash, currentReportIndex]);
 
   // Filter and sort studies
   const filteredStudies = useMemo(() => {
@@ -125,6 +147,43 @@ export function StudyRelevanceTable({
 
     return filtered.sort((a, b) => b.Relevance - a.Relevance);
   }, [studies, searchQuery]);
+
+  const handleAIEvaluation = async () => {
+    if (!currentBatchHash || currentReportIndex === undefined) {
+      toast.error("Missing batch or report context");
+      return;
+    }
+
+    const currentReport = reportsByBatch[currentBatchHash]?.[currentReportIndex];
+    if (!currentReport) {
+      toast.error("Report not found");
+      return;
+    }
+
+    try {
+      toast.info(`Evaluating ${filteredStudies.length} studies with AI...`);
+      await evaluate(
+        currentBatchHash,
+        currentReportIndex,
+        currentReport,
+        filteredStudies,
+        evaluationPrompt || undefined
+      );
+      setHasEvaluated(true);
+      toast.success("AI evaluation complete!");
+    } catch (error) {
+      toast.error(
+        `AI evaluation failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+  };
+
+  const handleAIBadgeClick = (studyId: number, studyName: string) => {
+    setSelectedAIStudy({ studyId, studyName });
+    setReasonDialogOpen(true);
+  };
 
   const handleLinkedChange = async (studyId: number, checked: boolean) => {
     const updatedAssigned = new Set(linkedStudies);
@@ -450,6 +509,15 @@ export function StudyRelevanceTable({
     <div className="h-full flex flex-col overflow-hidden">
       {/* Header - Sticky */}
       <div className="shrink-0 space-y-4 pb-4">
+        {/* AI Evaluation Prompt */}
+        {currentBatchHash !== undefined && currentReportIndex !== undefined && (
+          <AIEvaluationPrompt
+            value={evaluationPrompt}
+            onChange={setEvaluationPrompt}
+            disabled={aiLoading || hasEvaluated}
+          />
+        )}
+
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -462,11 +530,27 @@ export function StudyRelevanceTable({
           <div className="flex items-center gap-2">
             {currentBatchHash !== undefined &&
               currentReportIndex !== undefined && (
-                <AddStudyDialog
-                  currentBatchHash={currentBatchHash}
-                  currentReportIndex={currentReportIndex}
-                  currentReportCRGId={currentReportCRGId}
-                />
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-2"
+                    onClick={handleAIEvaluation}
+                    disabled={aiLoading || filteredStudies.length === 0 || hasEvaluated}
+                  >
+                    {aiLoading ? (
+                      <Spinner className="h-4 w-4" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
+                    AI Match
+                  </Button>
+                  <AddStudyDialog
+                    currentBatchHash={currentBatchHash}
+                    currentReportIndex={currentReportIndex}
+                    currentReportCRGId={currentReportCRGId}
+                  />
+                </>
               )}
           </div>
         </div>
@@ -621,6 +705,27 @@ export function StudyRelevanceTable({
                             >
                               {relevancePercentage}%
                             </Badge>
+                            {/* AI Classification Badge */}
+                            {currentBatchHash !== undefined &&
+                              currentReportIndex !== undefined &&
+                              (() => {
+                                const aiResult = getStudyResult(
+                                  currentBatchHash,
+                                  currentReportIndex,
+                                  study.CRGStudyID
+                                );
+                                return aiResult ? (
+                                  <StudyAIBadge
+                                    classification={aiResult.classification}
+                                    onClick={() =>
+                                      handleAIBadgeClick(
+                                        study.CRGStudyID,
+                                        study.ShortName
+                                      )
+                                    }
+                                  />
+                                ) : null;
+                              })()}
                           </div>
 
                           {/* Bottom row: Participants, Duration, Comparison */}
@@ -937,6 +1042,29 @@ export function StudyRelevanceTable({
           )}
         </SheetContent>
       </Sheet>
+
+      {/* AI Reason Dialog */}
+      {selectedAIStudy && currentBatchHash !== undefined && currentReportIndex !== undefined && (
+        <StudyAIReasonDialog
+          open={reasonDialogOpen}
+          onOpenChange={setReasonDialogOpen}
+          studyName={selectedAIStudy.studyName}
+          classification={
+            getStudyResult(
+              currentBatchHash,
+              currentReportIndex,
+              selectedAIStudy.studyId
+            )?.classification || "unsure"
+          }
+          reason={
+            getStudyResult(
+              currentBatchHash,
+              currentReportIndex,
+              selectedAIStudy.studyId
+            )?.reason || "No reason available"
+          }
+        />
+      )}
     </div>
   );
 }
