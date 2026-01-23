@@ -16,10 +16,10 @@ Create `backend/.env` with:
 OPENAI_API_KEY="your-api-key"
 ```
 
-Then run:
+Then run from the repo root:
 
 ```bash
-uvicorn main:app --reload --port 8001
+uvicorn backend.main:app --reload --port 8001
 ```
 
 ## Example
@@ -28,4 +28,18 @@ uvicorn main:app --reload --port 8001
 curl "http://localhost:8001/evaluate/mock?evaluation_prompt=Prefer%20randomized%20trials%20in%20older%20adults"
 ```
 
-For a real request, POST `/evaluate` using the `ReportDto` and `StudyDto` shapes. See the mock objects in `backend/main.py`.
+For a real request, POST `/evaluate` using the `ReportDto` and `StudyDto` shapes. See the mock objects in `backend/mock_data.py`.
+
+## Module Map
+
+- `backend/main.py`: FastAPI entrypoint and routes.
+- `backend/schemas.py`: Pydantic DTOs and `EvalState`.
+- `backend/prompts.py`: Default LLM prompt templates.
+- `backend/llm.py`: LLM client initialization (loads env via config import).
+- `backend/llm_payloads.py`: JSON payload builders for LLM calls.
+- `backend/parsers.py`: LLM response parsers/validators.
+- `backend/evaluation_utils.py`: Bucket + lookup helpers.
+- `backend/evaluation_graph.py`: LangGraph workflow nodes + graph construction.
+- `backend/evaluator.py`: Evaluation orchestrator (builds state + runs graph).
+- `backend/streaming.py`: SSE stream event summarizer.
+- `backend/mock_data.py`: Mock report/studies used by mock endpoints.
