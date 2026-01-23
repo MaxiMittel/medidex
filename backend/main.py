@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Literal, TypedDict
 
 from fastapi import FastAPI
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
@@ -134,21 +136,21 @@ DEFAULT_EVAL_PROMPT = (
     "the report's intent. Use the doctor's instructions as primary guidance. This is "
     "the first pass: respond ONLY with one of not_match, unsure, or likely_match. "
     "Never respond match in this pass. Respond ONLY as json with keys: decision "
-    "(not_match|unsure|likely_match) and reason (short string)."
+    "(not_match|unsure|likely_match) and reason."
 )
 
 DEFAULT_LIKELY_GROUP_PROMPT = (
     "You are reviewing studies previously marked as likely_match. Select up to two "
     "studies to mark as very_likely for a final comparison. If none are strong, "
     "return an empty list. Respond ONLY as json with keys: very_likely_ids (array of "
-    "study_id strings) and reason (short string)."
+    "study_id strings) and reason."
 )
 
 DEFAULT_LIKELY_COMPARE_PROMPT = (
     "You are comparing the very_likely studies to decide if any is a definitive match. "
     "Choose at most one match if you are highly confident; otherwise respond unsure. "
     "Respond ONLY as json with keys: decision (match|unsure), study_id (required if "
-    "match), and reason (short string)."
+    "match), and reason."
 )
 
 DEFAULT_UNSURE_REVIEW_PROMPT = (
@@ -575,23 +577,13 @@ def classify_initial(state: EvalState) -> dict:
         unsure.append(result)
 
     return {
+        "study_id": study_id,
         "decision": decision,
         "reason": reason,
         "not_matches": not_matches,
         "unsure": unsure,
         "likely_matches": likely_matches,
         "idx": idx + 1,
-    }
-
-
-def prepare_likely_review(state: EvalState) -> dict:
-    count = len(state.get("likely_matches", []))
-    logger.info("prepare_likely_review: count=%s", count)
-    return {
-        "current": None,
-        "decision": None,
-        "reason": None,
-        "very_likely": [],
     }
 
 
@@ -910,7 +902,6 @@ def build_graph():
     graph = StateGraph(EvalState)
     graph.add_node("load_next_initial", load_next_initial)
     graph.add_node("classify_initial", classify_initial)
-    graph.add_node("prepare_likely_review", prepare_likely_review)
     graph.add_node("select_very_likely", select_very_likely)
     graph.add_node("compare_very_likely", compare_very_likely)
     graph.add_node("prepare_unsure_review", prepare_unsure_review)
@@ -922,11 +913,10 @@ def build_graph():
     graph.add_conditional_edges(
         "load_next_initial",
         route_after_initial_load,
-        {"has_study": "classify_initial", "no_more_initial": "prepare_likely_review"},
+        {"has_study": "classify_initial", "no_more_initial": "select_very_likely"},
     )
     graph.add_edge("classify_initial", "load_next_initial")
 
-    graph.add_edge("prepare_likely_review", "select_very_likely")
     graph.add_conditional_edges(
         "select_very_likely",
         route_after_very_likely_selection,
@@ -963,13 +953,12 @@ app.add_middleware(
 )
 
 
-def run_evaluation(
+def build_initial_state(
     report: ReportDto,
     studies: list[StudyDto],
     evaluation_prompt: str | None,
-) -> EvaluateResponse:
-    logger.info("run_evaluation: reports=%s studies=%s", report.CRGReportID, len(studies))
-    initial_state: EvalState = {
+) -> EvalState:
+    return {
         "report": report,
         "studies": studies,
         "idx": 0,
@@ -986,6 +975,108 @@ def run_evaluation(
         "very_likely": [],
         "rejected_likely": [],
     }
+
+
+def summarize_stream_event(event: dict) -> dict:
+    if not isinstance(event, dict) or not event:
+        return {"event": "unknown", "message": "Empty stream event."}
+
+    node, update = next(iter(event.items()))
+    update = update or {}
+    summary: dict[str, object] = {"event": "node", "node": node}
+
+    def extract_study_info(value: object) -> dict:
+        if isinstance(value, StudyDto):
+            return {"study_id": value.CRGStudyID, "short_name": value.ShortName}
+        if isinstance(value, dict):
+            return {
+                "study_id": value.get("CRGStudyID"),
+                "short_name": value.get("ShortName"),
+            }
+        return {}
+
+    if node in {"load_next_initial", "load_next_unsure"}:
+        info = extract_study_info(update.get("current"))
+        if info.get("study_id") is None:
+            summary["message"] = "No more studies."
+        else:
+            summary["message"] = f"Loaded study with ID {info.get('study_id')} ({info.get('short_name')})."
+            summary["details"] = info
+    elif node == "classify_initial":
+        decision = update.get("decision")
+        reason = update.get("reason")
+        idx = update.get("idx")
+        study_id = update.get("study_id")
+        if study_id:
+            summary["message"] = f"Initial classification for Study ID {study_id}: {decision}. {reason}"
+        else:
+            summary["message"] = f"Initial classification: {decision}. {reason}"
+        summary["details"] = {
+            "study_id": study_id,
+            "decision": update.get("decision"),
+            "reason": reason,
+            "idx": idx,
+        }
+    elif node == "select_very_likely":
+        very_likely = update.get("very_likely", []) or []
+        selected_ids = [
+            item.get("study_id") for item in very_likely if isinstance(item, dict)
+        ]
+        reason = update.get("reason")
+        summary["message"] = "Selected very_likely candidates."
+        summary["details"] = {
+            "very_likely_ids": selected_ids,
+            "reason": reason,
+        }
+        if selected_ids:
+            summary["message"] = (
+                f"Selected very_likely candidates: {', '.join(selected_ids)}. {reason}"
+            )
+        else:
+            summary["message"] = f"No very_likely candidates selected. {reason}"
+    elif node == "compare_very_likely":
+        match = update.get("match")
+        decision = update.get("decision")
+        reason = update.get("reason")
+        match_id = match.get("study_id") if isinstance(match, dict) else None
+        summary["message"] = "Compared very_likely candidates."
+        summary["details"] = {
+            "decision": decision,
+            "match_study_id": match_id,
+            "reason": reason,
+        }
+        if decision == "match" and match_id:
+            summary["message"] = f"Match found: {match_id}. {reason}"
+        else:
+            summary["message"] = f"No match from very_likely. {reason}"
+    elif node == "prepare_unsure_review":
+        queue = update.get("unsure_queue", []) or []
+        summary["message"] = f"Prepared unsure review queue ({len(queue)} studies)."
+        summary["details"] = {"count": len(queue)}
+    elif node == "classify_unsure":
+        decision = update.get("decision")
+        reason = update.get("reason")
+        summary["message"] = f"Unsure re-evaluation: {decision}. {reason}"
+        summary["details"] = {
+            "decision": decision,
+            "reason": reason,
+        }
+    elif node == "match_not_found_end":
+        summary["message"] = "No match found after all reviews."
+    else:
+        summary["message"] = "Node completed."
+        summary["details"] = update
+
+    return summary
+
+
+def run_evaluation(
+    report: ReportDto,
+    studies: list[StudyDto],
+    evaluation_prompt: str | None,
+) -> EvaluateResponse:
+    logger.info("run_evaluation: reports=%s studies=%s", report.CRGReportID, len(studies))
+    initial_state = build_initial_state(report, studies, evaluation_prompt)
 
     final_state = GRAPH.invoke(initial_state)
     logger.info(
@@ -1015,6 +1106,36 @@ def run_evaluation(
 def evaluate(req: EvaluateRequest) -> EvaluateResponse:
     logger.info("evaluate: studies=%s has_prompt=%s", len(req.studies), bool(req.evaluation_prompt))
     return run_evaluation(req.report, req.studies, req.evaluation_prompt)
+
+
+@app.post("/evaluate/stream")
+def evaluate_stream(req: EvaluateRequest) -> StreamingResponse:
+    logger.info("evaluate_stream: studies=%s has_prompt=%s", len(req.studies), bool(req.evaluation_prompt))
+    initial_state = build_initial_state(req.report, req.studies, req.evaluation_prompt)
+
+    def event_stream():
+        for event in GRAPH.stream(initial_state, stream_mode="updates"):
+            summary = summarize_stream_event(event)
+            payload = jsonable_encoder(summary)
+            yield f"data: {json.dumps(payload, ensure_ascii=True)}\n\n"
+        yield "data: {\"event\":\"complete\"}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@app.get("/evaluate/stream/mock")
+def evaluate_stream_mock(evaluation_prompt: str | None = None) -> StreamingResponse:
+    logger.info("evaluate_stream_mock: has_prompt=%s", bool(evaluation_prompt))
+    initial_state = build_initial_state(MOCK_REPORT, MOCK_STUDIES, evaluation_prompt)
+
+    def event_stream():
+        for event in GRAPH.stream(initial_state, stream_mode="updates"):
+            summary = summarize_stream_event(event)
+            payload = jsonable_encoder(summary)
+            yield f"data: {json.dumps(payload, ensure_ascii=True)}\n\n"
+        yield "data: {\"event\":\"complete\"}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @app.get("/evaluate/mock", response_model=EvaluateResponse)
