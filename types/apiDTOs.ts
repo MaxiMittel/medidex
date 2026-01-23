@@ -144,3 +144,31 @@ export interface OutcomeDto {
 }
 
 export type GetPersonsResponseDto = Record<string, string[]>;
+
+// GenAI Backend DTOs
+export interface EvaluateRequest {
+  report: ReportDto;
+  studies: StudyDto[];
+  evaluation_prompt?: string | null;
+}
+
+export interface StudyDecision {
+  study_id: string;
+  decision: "match" | "not_match" | "unsure" | "likely_match";
+  reason: string;
+}
+
+export interface VeryLikelyDecision {
+  study_id: string;
+  prior_reason: string | null;
+  group_reason: string | null;
+}
+
+export interface EvaluateResponse {
+  match: StudyDecision | null;
+  not_matches: StudyDecision[];
+  unsure: StudyDecision[];
+  likely_matches: StudyDecision[];
+  very_likely: VeryLikelyDecision[];
+  total_reviewed: number;
+}

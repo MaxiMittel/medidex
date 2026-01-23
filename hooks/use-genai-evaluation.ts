@@ -1,0 +1,195 @@
+import { useState, useCallback } from "react";
+import { evaluateStudies } from "@/lib/api/genaiApi";
+import type { EvaluateResponse, StudyDecision } from "@/types/apiDTOs";
+
+export type AIClassification = "match" | "likely_match" | "unsure" | "not_match" | "very_likely";
+
+export interface StudyAIResult {
+  studyId: number;
+  classification: AIClassification;
+  reason: string;
+}
+
+interface EvaluationState {
+  results: Map<string, Map<number, StudyAIResult>>; // reportKey -> studyId -> result
+  loading: boolean;
+  error: string | null;
+}
+
+export const useGenAIEvaluation = () => {
+  const [state, setState] = useState<EvaluationState>({
+    results: new Map(),
+    loading: false,
+    error: null,
+  });
+
+  const getReportKey = (batchHash: string, reportIndex: number) => 
+    `${batchHash}-${reportIndex}`;
+
+  const evaluate = useCallback(
+    async (
+      batchHash: string,
+      reportIndex: number,
+      report: any, // ReportDetailDto
+      studies: any[], // RelevanceStudy[]
+      evaluationPrompt?: string
+    ) => {
+      setState((prev) => ({ ...prev, loading: true, error: null }));
+
+      try {
+        // Transform studies to backend format
+        const studiesDto = studies.map((study) => ({
+          CRGStudyID: study.CRGStudyID,
+          ShortName: study.ShortName || "",
+          StatusofStudy: study.StatusofStudy || null,
+          NumberParticipants: study.NumberParticipants?.toString() || null,
+          Duration: study.Duration || null,
+          Comparison: study.Comparison || null,
+          Countries: study.Countries || null,
+          Notes: study.Notes || null,
+          TrialistContactDetails: study.TrialistContactDetails || null,
+          CENTRALSubmissionStatus: study.CENTRALSubmissionStatus || null,
+          UDef4: study.UDef4 || null,
+          DateEntered: study.DateEntered || null,
+          DateEdited: study.DateEdited || null,
+          CENTRALStudyID: 0, // Default value, not available in RelevanceStudy
+          DateToCENTRAL: null,
+          ISRCTN: study.ISRCTN || null,
+          UDef6: null,
+          Search_Tagged: false,
+          TrialRegistrationID: study.TrialRegistrationID || null,
+        }));
+
+        // Transform report to backend format
+        const reportDto = {
+          CENTRALReportID: null,
+          CRGReportID: report.crgreportid,
+          Title: report.title,
+          Notes: null,
+          ReportNumber: reportIndex + 1,
+          OriginalTitle: null,
+          Authors: report.authors.join("; "),
+          Journal: null,
+          Year: report.year || null,
+          Volume: null,
+          Issue: null,
+          Pages: null,
+          Language: null,
+          Abstract: report.abstract || null,
+          CENTRALSubmissionStatus: null,
+          CopyStatus: null,
+          DatetoCENTRAL: null,
+          Dateentered: null,
+          DateEdited: null,
+          Editors: null,
+          Publisher: null,
+          City: null,
+          DupString: "none",
+          TypeofReportID: null,
+          PublicationTypeID: 1,
+          Edition: null,
+          Medium: null,
+          StudyDesign: null,
+          DOI: null,
+          UDef3: null,
+          ISBN: null,
+          UDef5: null,
+          PMID: null,
+          TrialRegistrationID: report.trial_id || null,
+          UDef9: null,
+          UDef10: null,
+          UDef8: null,
+          PDFLinks: null,
+        };
+
+        const response = await evaluateStudies({
+          report: reportDto,
+          studies: studiesDto,
+          evaluation_prompt: evaluationPrompt || null,
+        });
+
+        // Transform response to study results
+        const studyResults = new Map<number, StudyAIResult>();
+
+        const addResults = (decisions: StudyDecision[], classification: AIClassification) => {
+          decisions.forEach((decision) => {
+            const studyId = parseInt(decision.study_id);
+            studyResults.set(studyId, {
+              studyId,
+              classification,
+              reason: decision.reason,
+            });
+          });
+        };
+
+        if (response.match) {
+          const studyId = parseInt(response.match.study_id);
+          studyResults.set(studyId, {
+            studyId,
+            classification: "match",
+            reason: response.match.reason,
+          });
+        }
+
+        addResults(response.likely_matches, "likely_match");
+        addResults(response.unsure, "unsure");
+        addResults(response.not_matches, "not_match");
+
+        // Add very_likely if present
+        response.very_likely?.forEach((vl) => {
+          const studyId = parseInt(vl.study_id);
+          studyResults.set(studyId, {
+            studyId,
+            classification: "very_likely",
+            reason: vl.group_reason || vl.prior_reason || "Marked as very likely candidate",
+          });
+        });
+
+        const reportKey = getReportKey(batchHash, reportIndex);
+        setState((prev) => ({
+          ...prev,
+          results: new Map(prev.results).set(reportKey, studyResults),
+          loading: false,
+          error: null,
+        }));
+
+        return response;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Failed to evaluate studies";
+        setState((prev) => ({ ...prev, loading: false, error: errorMessage }));
+        throw error;
+      }
+    },
+    []
+  );
+
+  const getStudyResult = useCallback(
+    (batchHash: string, reportIndex: number, studyId: number): StudyAIResult | null => {
+      const reportKey = getReportKey(batchHash, reportIndex);
+      const reportResults = state.results.get(reportKey);
+      return reportResults?.get(studyId) || null;
+    },
+    [state.results]
+  );
+
+  const clearResults = useCallback((batchHash?: string, reportIndex?: number) => {
+    if (batchHash !== undefined && reportIndex !== undefined) {
+      const reportKey = getReportKey(batchHash, reportIndex);
+      setState((prev) => {
+        const newResults = new Map(prev.results);
+        newResults.delete(reportKey);
+        return { ...prev, results: newResults };
+      });
+    } else {
+      setState((prev) => ({ ...prev, results: new Map() }));
+    }
+  }, []);
+
+  return {
+    evaluate,
+    getStudyResult,
+    clearResults,
+    loading: state.loading,
+    error: state.error,
+  };
+};
