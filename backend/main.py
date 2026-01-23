@@ -1007,6 +1007,7 @@ def build_graph():
     graph.add_node("prepare_unsure_review", prepare_unsure_review)
     graph.add_node("load_next_unsure", load_next_unsure)
     graph.add_node("classify_unsure", classify_unsure)
+    graph.add_node("match_not_found_end", match_not_found_end)
     graph.add_node("summarize_evaluation", summarize_evaluation)
 
     graph.set_entry_point("load_next_initial")
@@ -1034,11 +1035,12 @@ def build_graph():
         route_after_unsure_load,
         {
             "has_unsure": "classify_unsure",
-            "match_not_found": "summarize_evaluation",
+            "match_not_found": "match_not_found_end",
             "match_found": "summarize_evaluation",
         },
     )
     graph.add_edge("classify_unsure", "load_next_unsure")
+    graph.add_edge("match_not_found_end", "summarize_evaluation")
     graph.add_edge("summarize_evaluation", END)
     return graph.compile()
 

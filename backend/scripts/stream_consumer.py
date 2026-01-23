@@ -21,6 +21,11 @@ def parse_args() -> argparse.Namespace:
         help="Use the backend mock report/studies as the request payload.",
     )
     parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Print full JSON events instead of only the message field.",
+    )
+    parser.add_argument(
         "--payload",
         help="Path to JSON payload file for the request body (optional).",
     )
@@ -72,7 +77,10 @@ def main() -> None:
                 content = line.removeprefix("data:").strip()
                 try:
                     event = json.loads(content)
-                    if isinstance(event, dict) and "message" in event:
+                    if args.full:
+                        print(json.dumps(event, indent=2, ensure_ascii=False))
+                        print()
+                    elif isinstance(event, dict) and "message" in event:
                         print(event["message"])
                         print()
                     else:
