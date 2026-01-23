@@ -111,6 +111,8 @@ class EvaluateResponse(BaseModel):
     unsure: list[StudyDecision]
     likely_matches: list[StudyDecision]
     very_likely: list[VeryLikelyDecision]
+    evaluation_has_match: bool | None = None
+    evaluation_summary: str | None = None
     total_reviewed: int
 
 
@@ -130,6 +132,7 @@ class EvalState(TypedDict):
     likely_matches: list[dict]
     very_likely: list[dict]
     rejected_likely: list[dict]
+    evaluation_summary: dict | None
 
 DEFAULT_EVAL_PROMPT = (
     "You are a clinical research assistant. Determine whether the study is relevant to "
@@ -157,7 +160,14 @@ DEFAULT_UNSURE_REVIEW_PROMPT = (
     "You are reviewing unsure studies. Use the rejected likely_match list as historical "
     "context. Only choose match if you are highly confident; otherwise respond unsure or "
     "not_match. Respond ONLY as json with keys: decision (match|unsure|not_match) and "
-    "reason (short string)."
+    "reason"
+)
+
+DEFAULT_SUMMARY_PROMPT = (
+    "You are summarizing the evaluation results for the report. Use the report details "
+    "and prior decisions. If there is a match, explain why it matches and explicitly "
+    "state why the other studies are not matched. If there is no match, explain why no "
+    "study matches. Respond ONLY as json with keys: has_match (boolean) and summary."
 )
 
 MODEL = ChatOpenAI(
@@ -394,6 +404,21 @@ def parse_unsure_review_response(text: str) -> tuple[Decision, str]:
     return decision, reason.strip()
 
 
+def parse_summary_response(text: str) -> tuple[bool | None, str]:
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return None, f"Non-JSON response: {text[:300]}"
+
+    has_match = payload.get("has_match")
+    summary = payload.get("summary")
+    if not isinstance(has_match, bool):
+        return None, "Missing or invalid has_match in model response."
+    if not isinstance(summary, str) or not summary.strip():
+        return has_match, "Missing summary in model response."
+    return has_match, summary.strip()
+
+
 def parse_likely_compare_response(text: str, candidate_ids: set[str]) -> tuple[Decision, str, str | None]:
     try:
         payload = json.loads(text)
@@ -501,6 +526,38 @@ def build_unsure_review_payload(
         ensure_ascii=True,
         separators=(",", ":"),
     )
+
+
+def build_summary_payload(
+    report: ReportDto,
+    studies: list[StudyDto],
+    match: dict | None,
+    not_matches: list[dict],
+    unsure: list[dict],
+    likely_matches: list[dict],
+    very_likely: list[dict],
+) -> str:
+    by_id = {str(study.CRGStudyID): study for study in studies}
+
+    def attach_study(item: dict) -> dict:
+        study_id = str(item.get("study_id", ""))
+        study = by_id.get(study_id)
+        return {
+            "study_id": study_id,
+            "study": study.model_dump() if study else None,
+            "decision": item.get("decision"),
+            "reason": item.get("reason"),
+        }
+
+    payload = {
+        "report": report.model_dump(),
+        "match": attach_study(match) if match else None,
+        "not_matches": [attach_study(item) for item in not_matches],
+        "unsure": [attach_study(item) for item in unsure],
+        "likely_matches": [attach_study(item) for item in likely_matches],
+        "very_likely": very_likely,
+    }
+    return json.dumps(payload, ensure_ascii=True, separators=(",", ":"))
 
 
 def load_next_initial(state: EvalState) -> dict:
@@ -897,6 +954,49 @@ def match_not_found_end(state: EvalState) -> dict:
     return {}
 
 
+def summarize_evaluation(state: EvalState) -> dict:
+    payload = build_summary_payload(
+        state["report"],
+        state["studies"],
+        state.get("match"),
+        state.get("not_matches", []),
+        state.get("unsure", []),
+        state.get("likely_matches", []),
+        state.get("very_likely", []),
+    )
+    evaluation_prompt = state.get("evaluation_prompt")
+    prompt = DEFAULT_SUMMARY_PROMPT
+
+    try:
+        messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
+        if evaluation_prompt:
+            messages.append(
+                SystemMessage(
+                    content=(
+                        "Doctor instructions (follow as primary guidance): "
+                        f"{evaluation_prompt}"
+                    )
+                )
+            )
+        messages.append(HumanMessage(content=payload))
+        response = MODEL.invoke(messages)
+        content = response.content
+        text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
+        has_match, summary = parse_summary_response(text)
+        logger.info("summarize_evaluation: has_match=%s", has_match)
+    except Exception as exc:
+        has_match, summary = None, f"LLM call failed: {exc.__class__.__name__}"
+        logger.info("summarize_evaluation: error=%s", exc.__class__.__name__)
+        logger.info("summarize_evaluation: reason=%s", str(exc))
+
+    return {
+        "evaluation_summary": {
+            "has_match": has_match,
+            "summary": summary,
+        }
+    }
+
+
 def build_graph():
     logger.info("build_graph: init")
     graph = StateGraph(EvalState)
@@ -907,7 +1007,7 @@ def build_graph():
     graph.add_node("prepare_unsure_review", prepare_unsure_review)
     graph.add_node("load_next_unsure", load_next_unsure)
     graph.add_node("classify_unsure", classify_unsure)
-    graph.add_node("match_not_found_end", match_not_found_end)
+    graph.add_node("summarize_evaluation", summarize_evaluation)
 
     graph.set_entry_point("load_next_initial")
     graph.add_conditional_edges(
@@ -925,17 +1025,21 @@ def build_graph():
     graph.add_conditional_edges(
         "compare_very_likely",
         route_after_very_likely_compare,
-        {"match_found": END, "no_match_after_compare": "prepare_unsure_review"},
+        {"match_found": "summarize_evaluation", "no_match_after_compare": "prepare_unsure_review"},
     )
 
     graph.add_edge("prepare_unsure_review", "load_next_unsure")
     graph.add_conditional_edges(
         "load_next_unsure",
         route_after_unsure_load,
-        {"has_unsure": "classify_unsure", "match_not_found": "match_not_found_end", "match_found": END},
+        {
+            "has_unsure": "classify_unsure",
+            "match_not_found": "summarize_evaluation",
+            "match_found": "summarize_evaluation",
+        },
     )
     graph.add_edge("classify_unsure", "load_next_unsure")
-    graph.add_edge("match_not_found_end", END)
+    graph.add_edge("summarize_evaluation", END)
     return graph.compile()
 
 
@@ -974,6 +1078,7 @@ def build_initial_state(
         "likely_matches": [],
         "very_likely": [],
         "rejected_likely": [],
+        "evaluation_summary": None,
     }
 
 
@@ -1061,6 +1166,17 @@ def summarize_stream_event(event: dict) -> dict:
             "decision": decision,
             "reason": reason,
         }
+    elif node == "summarize_evaluation":
+        evaluation_summary = update.get("evaluation_summary", {}) if isinstance(update, dict) else {}
+        has_match = evaluation_summary.get("has_match")
+        summary_text = evaluation_summary.get("summary")
+        if has_match is True:
+            summary["message"] = f"Summary (match): {summary_text}"
+        elif has_match is False:
+            summary["message"] = f"Summary (no match): {summary_text}"
+        else:
+            summary["message"] = f"Summary: {summary_text}"
+        summary["details"] = evaluation_summary
     elif node == "match_not_found_end":
         summary["message"] = "No match found after all reviews."
     else:
@@ -1092,6 +1208,12 @@ def run_evaluation(
         unsure=final_state["unsure"],
         likely_matches=final_state["likely_matches"],
         very_likely=final_state["very_likely"],
+        evaluation_has_match=(
+            final_state.get("evaluation_summary", {}) or {}
+        ).get("has_match"),
+        evaluation_summary=(
+            final_state.get("evaluation_summary", {}) or {}
+        ).get("summary"),
         total_reviewed=(
             len(final_state["not_matches"])
             + len(final_state["unsure"])
