@@ -5,7 +5,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import type { RelevanceStudy } from "@/types/reports";
 import {
@@ -44,6 +43,7 @@ import {
   X,
   Sparkles,
   Download,
+  CheckCircle2,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { StudyOverview } from "./study-overview";
@@ -56,6 +56,7 @@ import { useGenAIEvaluation } from "@/hooks/use-genai-evaluation";
 import { AIEvaluationPrompt } from "./ai-evaluation-prompt";
 import { StudyAIBadge } from "./study-ai-badge";
 import { StudyAIReasonDialog } from "./study-ai-reason-dialog";
+import { Separator } from "../../../../components/ui/separator";
 
 interface StudyRelevanceTableProps {
   studies: RelevanceStudy[];
@@ -173,8 +174,7 @@ export function StudyRelevanceTable({
       toast.success("AI evaluation complete!");
     } catch (error) {
       toast.error(
-        `AI evaluation failed: ${
-          error instanceof Error ? error.message : "Unknown error"
+        `AI evaluation failed: ${error instanceof Error ? error.message : "Unknown error"
         }`
       );
     }
@@ -259,8 +259,7 @@ export function StudyRelevanceTable({
         });
 
         toast.error(
-          `Failed to ${checked ? "assign" : "unassign"} study: ${
-            error instanceof Error ? error.message : "Unknown error"
+          `Failed to ${checked ? "assign" : "unassign"} study: ${error instanceof Error ? error.message : "Unknown error"
           }`
         );
       }
@@ -301,15 +300,15 @@ export function StudyRelevanceTable({
       const promises = studiesToProcess.map((study) =>
         selectAll
           ? assignStudyToReport(
-              currentBatchHash,
-              currentReportIndex,
-              study.CRGStudyID
-            )
+            currentBatchHash,
+            currentReportIndex,
+            study.CRGStudyID
+          )
           : unassignStudyFromReport(
-              currentBatchHash,
-              currentReportIndex,
-              study.CRGStudyID
-            )
+            currentBatchHash,
+            currentReportIndex,
+            study.CRGStudyID
+          )
       );
 
       await Promise.all(promises);
@@ -328,8 +327,8 @@ export function StudyRelevanceTable({
       const updatedAssigned = selectAll
         ? filteredStudies.map((s) => s.CRGStudyID)
         : filteredStudies
-            .filter((s) => !linkedStudies.has(s.CRGStudyID))
-            .map((s) => s.CRGStudyID);
+          .filter((s) => !linkedStudies.has(s.CRGStudyID))
+          .map((s) => s.CRGStudyID);
 
       await Promise.all(
         [
@@ -354,8 +353,7 @@ export function StudyRelevanceTable({
         new Set(studies.filter((s) => s.Linked).map((s) => s.CRGStudyID))
       );
       toast.error(
-        `Failed to ${selectAll ? "assign" : "unassign"} studies: ${
-          error instanceof Error ? error.message : "Unknown error"
+        `Failed to ${selectAll ? "assign" : "unassign"} studies: ${error instanceof Error ? error.message : "Unknown error"
         }`
       );
     }
@@ -370,10 +368,17 @@ export function StudyRelevanceTable({
   );
 
   const getRelevanceColor = (relevance: number) => {
-    if (relevance >= 0.9) return "bg-green-500";
+    if (relevance >= 0.9) return "bg-emerald-500";
     if (relevance >= 0.7) return "bg-blue-500";
-    if (relevance >= 0.5) return "bg-yellow-500";
+    if (relevance >= 0.5) return "bg-amber-500";
     return "bg-orange-500";
+  };
+
+  const getRelevanceBadgeStyle = (relevance: number) => {
+    if (relevance >= 0.9) return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400";
+    if (relevance >= 0.7) return "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400";
+    if (relevance >= 0.5) return "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400";
+    return "bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-400";
   };
 
   const handleStudyClick = (study: RelevanceStudy) => {
@@ -391,8 +396,8 @@ export function StudyRelevanceTable({
       numberParticipants === null || numberParticipants === undefined
         ? "-"
         : typeof numberParticipants === "number"
-        ? numberParticipants.toString()
-        : numberParticipants;
+          ? numberParticipants.toString()
+          : numberParticipants;
 
     // Get additional details from studyDetails if available
     const details = studyDetails[study.CRGStudyID];
@@ -446,8 +451,7 @@ export function StudyRelevanceTable({
         } catch (error) {
           failureCount++;
           toast.error(
-            `Failed to download report ${report.CRGReportID}: ${
-              error instanceof Error ? error.message : "Unknown error"
+            `Failed to download report ${report.CRGReportID}: ${error instanceof Error ? error.message : "Unknown error"
             }`
           );
         }
@@ -457,8 +461,7 @@ export function StudyRelevanceTable({
 
       if (successCount > 0) {
         toast.success(
-          `Downloaded ${successCount} PDF${successCount > 1 ? "s" : ""}${
-            failureCount > 0 ? ` (${failureCount} failed)` : ""
+          `Downloaded ${successCount} PDF${successCount > 1 ? "s" : ""}${failureCount > 0 ? ` (${failureCount} failed)` : ""
           }`
         );
       }
@@ -492,8 +495,7 @@ export function StudyRelevanceTable({
       toast.success(`Downloaded report ${report.CRGReportID}`);
     } catch (error) {
       toast.error(
-        `Failed to download report ${report.CRGReportID}: ${
-          error instanceof Error ? error.message : "Unknown error"
+        `Failed to download report ${report.CRGReportID}: ${error instanceof Error ? error.message : "Unknown error"
         }`
       );
     } finally {
@@ -519,10 +521,12 @@ export function StudyRelevanceTable({
         )}
 
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <h2 className="text-xl font-semibold">Relevant Studies</h2>
-            <Badge variant="secondary">
+          <div className="flex items-center gap-3">
+            <div className="p-1.5 rounded-md bg-primary/10">
+              <Sparkles className="h-4 w-4 text-primary" />
+            </div>
+            <h2 className="text-lg font-semibold">Relevant Studies</h2>
+            <Badge variant="secondary" className="text-xs font-normal">
               {filteredStudies.length}
               {searchQuery && ` of ${studies.length}`}
             </Badge>
@@ -580,15 +584,19 @@ export function StudyRelevanceTable({
       {/* Scrollable Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {loading && filteredStudies.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <Sparkles className="h-8 w-8 mx-auto mb-3 animate-pulse" />
-            <p className="font-medium">Loading relevant studies...</p>
+          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+            <div className="p-3 rounded-full bg-primary/10 mb-4">
+              <Sparkles className="h-6 w-6 text-primary animate-pulse" />
+            </div>
+            <p className="text-sm font-medium">Loading relevant studies...</p>
           </div>
         ) : filteredStudies.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p className="font-medium">No studies found</p>
-            <p className="text-sm mt-1">
+          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+            <div className="p-3 rounded-full bg-muted mb-4">
+              <FileText className="h-6 w-6 opacity-50" />
+            </div>
+            <p className="text-sm font-medium">No studies found</p>
+            <p className="text-xs mt-1">
               {searchQuery
                 ? "Try adjusting your search query"
                 : "No relevant studies available"}
@@ -616,12 +624,12 @@ export function StudyRelevanceTable({
                     className="border-none"
                   >
                     <AccordionTrigger className="hover:no-underline p-0 [&>svg]:hidden group">
-                      <div className="p-4 mb-2 bg-secondary/50 hover:bg-secondary rounded-xl relative w-full transition-all duration-200 border border-transparent hover:border-primary/20 group-hover:shadow-sm">
+                      <div className="p-4 mb-2 bg-card hover:bg-muted/50 rounded-lg relative w-full transition-all duration-200 border border-border/60 hover:border-border group-hover:shadow-sm">
                         {/* Left indicator bar with relevance color */}
                         <div
                           className={`${getRelevanceColor(
                             study.Relevance
-                          )} rounded-full h-full w-1 absolute left-0 top-0 bottom-0 transition-all`}
+                          )} rounded-l-lg h-full w-1 absolute left-0 top-0 bottom-0 transition-all`}
                         ></div>
 
                         <div className="flex flex-col gap-3 pl-4">
@@ -687,21 +695,20 @@ export function StudyRelevanceTable({
                                 Details
                               </Button>
                               <ChevronDown
-                                className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
-                                  isOpen ? "rotate-180" : ""
-                                }`}
+                                className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-180" : ""
+                                  }`}
                               />
                             </div>
                           </div>
 
                           {/* Relevance */}
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
-                              Relevance:
+                            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                              Relevance
                             </span>
                             <Badge
                               variant="secondary"
-                              className="font-semibold text-sm px-2.5 py-0.5"
+                              className={`font-semibold text-xs px-2 py-0.5 ${getRelevanceBadgeStyle(study.Relevance)}`}
                             >
                               {relevancePercentage}%
                             </Badge>
@@ -729,71 +736,68 @@ export function StudyRelevanceTable({
                           </div>
 
                           {/* Bottom row: Participants, Duration, Comparison */}
-                          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 text-sm">
+                          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs">
                             {/* NumberParticipants */}
                             <div className="flex items-center gap-1.5 text-muted-foreground">
-                              <Users className="h-4 w-4 shrink-0" />
-                              <span className="font-medium">Participants:</span>
+                              <div className="p-0.5 rounded bg-blue-50 dark:bg-blue-950/30">
+                                <Users className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                              </div>
                               <span>
                                 {typeof study.NumberParticipants === "number"
                                   ? study.NumberParticipants.toLocaleString()
-                                  : study.NumberParticipants || "-"}
+                                  : study.NumberParticipants || "-"} participants
                               </span>
                             </div>
 
                             {/* Duration */}
                             <div className="flex items-center gap-1.5 text-muted-foreground">
-                              {study.Duration ? (
-                                <>
-                                  <Calendar className="h-4 w-4 shrink-0" />
-                                  <span className="font-medium">Duration:</span>
-                                  <span>{study.Duration}</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Calendar className="h-4 w-4 shrink-0 opacity-30" />
-                                  <span className="font-medium">Duration:</span>
-                                  <span className="text-muted-foreground/50">
-                                    -
-                                  </span>
-                                </>
-                              )}
+                              <div className={`p-0.5 rounded ${study.Duration ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-muted"}`}>
+                                <Calendar className={`h-3 w-3 ${study.Duration ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/50"}`} />
+                              </div>
+                              <span className={study.Duration ? "" : "text-muted-foreground/50"}>
+                                {study.Duration || "No duration"}
+                              </span>
                             </div>
 
                             {/* Comparison */}
-                            <div className="flex items-start gap-1.5 text-muted-foreground flex-1 min-w-0">
-                              <span className="font-medium shrink-0">
-                                Comparison:
-                              </span>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="truncate">
-                                      {study.Comparison || "-"}
-                                    </span>
-                                  </TooltipTrigger>
-                                  {study.Comparison && (
+                            {study.Comparison && (
+                              <div className="flex items-center gap-1.5 text-muted-foreground flex-1 min-w-0">
+                                <div className="p-0.5 rounded bg-violet-50 dark:bg-violet-950/30 shrink-0">
+                                  <CheckCircle2 className="h-3 w-3 text-violet-600 dark:text-violet-400" />
+                                </div>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="truncate">
+                                        {study.Comparison}
+                                      </span>
+                                    </TooltipTrigger>
                                     <TooltipContent className="max-w-xs">
                                       <p>{study.Comparison}</p>
                                     </TooltipContent>
-                                  )}
-                                </Tooltip>
-                              </TooltipProvider>
-                            </div>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
                     </AccordionTrigger>
 
                     {/* Expanded content - Reports table */}
-                    <AccordionContent className="pt-0 pb-4 px-6">
-                      <div className="mt-3 border rounded-lg overflow-hidden bg-card">
-                        <div className="bg-muted/30 px-4 py-3 border-b flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-muted-foreground" />
+                    <AccordionContent className="pt-0 pb-3 px-5">
+                      <div className="mt-2 border border-border/60 rounded-lg overflow-hidden bg-card">
+                        <div className="bg-muted/40 px-4 py-2.5 border-b border-border/60 flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <div className="p-1 rounded bg-slate-100 dark:bg-slate-800/50">
+                              <FileText className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400" />
+                            </div>
                             <span className="text-sm font-medium">
-                              Associated Reports ({reportCount})
+                              Associated Reports
                             </span>
+                            <Badge variant="secondary" className="text-xs font-normal h-5">
+                              {reportCount}
+                            </Badge>
                           </div>
                           {reportCount > 0 && (
                             <Button
@@ -928,15 +932,17 @@ export function StudyRelevanceTable({
       >
         <SheetContent
           side="right"
-          className="w-full sm:max-w-2xl overflow-y-auto"
+          className="w-full sm:max-w-2xl overflow-y-auto pb-8"
         >
           {selectedStudy && (
             <>
-              <SheetHeader>
+              <SheetHeader className="border-b border-border/60">
                 <SheetTitle>{selectedStudy.ShortName}</SheetTitle>
               </SheetHeader>
               <div className="mt-6 space-y-6">
                 <StudyOverview study={getStudyForSheet(selectedStudy)} />
+
+                <Separator />
 
                 {/* Study Details Section */}
                 {studyDetails[selectedStudy.CRGStudyID] ? (
@@ -965,12 +971,19 @@ export function StudyRelevanceTable({
                   />
                 )}
 
+                <Separator />
+
                 {/* Reports Section with Download */}
-                <div className="space-y-4">
+                <div className="space-y-4 px-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      Reports ({selectedStudy.reports.length})
+                    <h3 className="text-base font-semibold flex items-center gap-2.5">
+                      <div className="p-1.5 rounded-md bg-muted">
+                        <FileText className="h-4 w-4" />
+                      </div>
+                      Reports
+                      <Badge variant="secondary" className="text-xs font-normal">
+                        {selectedStudy.reports.length}
+                      </Badge>
                     </h3>
                     {selectedStudy.reports.length > 0 && (
                       <Button
@@ -995,20 +1008,22 @@ export function StudyRelevanceTable({
                       selectedStudy.reports.map((report, idx) => (
                         <div
                           key={report.CRGReportID || idx}
-                          className="p-3 rounded-lg border bg-card"
+                          className="p-3.5 rounded-md border border-border/60 bg-muted/30 hover:bg-muted/50 transition-colors"
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1">
-                              <p className="text-sm font-medium">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium leading-snug">
                                 {report.Title}
                               </p>
-                              <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-3 mt-2">
                                 {report.CENTRALReportID && (
-                                  <span>
-                                    CENTRAL ID: {report.CENTRALReportID}
-                                  </span>
+                                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">
+                                    CENTRAL: {report.CENTRALReportID}
+                                  </code>
                                 )}
-                                <span>CRG ID: {report.CRGReportID}</span>
+                                <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">
+                                  CRG: {report.CRGReportID}
+                                </code>
                               </div>
                             </div>
                             <Button
@@ -1023,7 +1038,7 @@ export function StudyRelevanceTable({
                               disabled={downloadingSingle.has(
                                 report.CRGReportID
                               )}
-                              className="h-8 w-8 p-0 flex items-center justify-center"
+                              className="h-8 w-8 p-0 flex items-center justify-center shrink-0"
                             >
                               <Download className="h-4 w-4" />
                             </Button>
@@ -1031,9 +1046,10 @@ export function StudyRelevanceTable({
                         </div>
                       ))
                     ) : (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        No reports available
-                      </p>
+                      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                        <FileText className="h-8 w-8 mb-2 opacity-30" />
+                        <p className="text-sm">No reports available</p>
+                      </div>
                     )}
                   </div>
                 </div>
