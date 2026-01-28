@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from . import config  # noqa: F401
+import config  # noqa: F401
 from langchain_openai import ChatOpenAI
 
 MODEL = ChatOpenAI(

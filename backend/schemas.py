@@ -7,6 +7,17 @@ from pydantic import BaseModel
 Decision = Literal["match", "not_match", "unsure", "likely_match"]
 
 
+class ReportPdfDto(BaseModel):
+    """Report data when uploaded as PDF."""
+    CENTRALReportID: int | None
+    CRGReportID: int
+    Title: str
+    Year: int | None
+    Authors: str | None
+    City: str | None
+    PDFContent: str  # Base64-encoded PDF string
+
+
 class ReportDto(BaseModel):
     CENTRALReportID: int | None
     CRGReportID: int
@@ -116,3 +127,25 @@ class EvalState(TypedDict):
     very_likely: list[dict]
     rejected_likely: list[dict]
     evaluation_summary: dict | None
+
+
+class EvalStatePdf(TypedDict):
+    """State for PDF-based evaluation (same as EvalState but with ReportPdfDto)."""
+    report: ReportPdfDto
+    studies: list[StudyDto]
+    idx: int
+    unsure_idx: int
+    unsure_queue: list[str]
+    current: StudyDto | None
+    decision: Decision | None
+    reason: str | None
+    evaluation_prompt: str | None
+    match: dict | None
+    not_matches: list[dict]
+    unsure: list[dict]
+    likely_matches: list[dict]
+    very_likely: list[dict]
+    rejected_likely: list[dict]
+    evaluation_summary: dict | None
+    pdf_file_id: str | None  # OpenAI file ID for uploaded PDF (optimization)
+

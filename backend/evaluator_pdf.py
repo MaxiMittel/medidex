@@ -1,15 +1,31 @@
+"""PDF-based evaluator functions."""
 from __future__ import annotations
 
 from config import logger
-from evaluation_graph import GRAPH
-from schemas import EvaluateResponse, EvalState, ReportDto, StudyDto
+from evaluation_graph_pdf import GRAPH_PDF
+from pdf_utils import upload_pdf_to_openai
+from schemas import EvaluateResponse, EvalStatePdf, ReportPdfDto, StudyDto
 
 
-def build_initial_state(
-    report: ReportDto,
+def build_initial_state_pdf(
+    report: ReportPdfDto,
     studies: list[StudyDto],
     evaluation_prompt: str | None,
-) -> EvalState:
+) -> EvalStatePdf:
+    """Build initial state for PDF-based evaluation.
+    
+    Uploads PDF to OpenAI once and stores file_id for reuse across all study comparisons.
+    """
+    # Upload PDF to OpenAI and get file ID (optimization to avoid re-uploading)
+    pdf_file_id = upload_pdf_to_openai(
+        report.PDFContent,
+        filename=f"report_{report.CRGReportID}.pdf"
+    )
+    if pdf_file_id:
+        logger.info("build_initial_state_pdf: uploaded PDF file_id=%s", pdf_file_id)
+    else:
+        logger.warning("build_initial_state_pdf: PDF upload failed, will use inline base64")
+    
     return {
         "report": report,
         "studies": studies,
@@ -27,20 +43,22 @@ def build_initial_state(
         "very_likely": [],
         "rejected_likely": [],
         "evaluation_summary": None,
+        "pdf_file_id": pdf_file_id,
     }
 
 
-def run_evaluation(
-    report: ReportDto,
+def run_evaluation_pdf(
+    report: ReportPdfDto,
     studies: list[StudyDto],
     evaluation_prompt: str | None,
 ) -> EvaluateResponse:
-    logger.info("run_evaluation: reports=%s studies=%s", report.CRGReportID, len(studies))
-    initial_state = build_initial_state(report, studies, evaluation_prompt)
+    """Run PDF-based evaluation through the full multi-pass graph."""
+    logger.info("run_evaluation_pdf: report=%s studies=%s", report.CRGReportID, len(studies))
+    initial_state = build_initial_state_pdf(report, studies, evaluation_prompt)
 
-    final_state = GRAPH.invoke(initial_state)
+    final_state = GRAPH_PDF.invoke(initial_state)
     logger.info(
-        "run_evaluation: done match=%s not_matches=%s unsure=%s likely_matches=%s",
+        "run_evaluation_pdf: done match=%s not_matches=%s unsure=%s likely_matches=%s",
         "yes" if final_state["match"] else "no",
         len(final_state["not_matches"]),
         len(final_state["unsure"]),

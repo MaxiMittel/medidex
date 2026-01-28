@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .schemas import StudyDto
+from schemas import StudyDto
 
 
 def summarize_stream_event(event: dict) -> dict:

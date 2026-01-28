@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from .schemas import ReportDto, StudyDto
+from schemas import ReportDto, ReportPdfDto, StudyDto
 
 
 def build_user_payload(report: ReportDto, study: StudyDto) -> str:
@@ -147,3 +147,52 @@ def build_summary_payload(
         "very_likely": very_likely,
     }
     return json.dumps(payload, ensure_ascii=True, separators=(",", ":"))
+
+
+def build_user_payload_pdf(
+    report_pdf: ReportPdfDto, 
+    study: StudyDto, 
+    pdf_file_id: str | None = None
+) -> list[dict]:
+    """Build content blocks for PDF report + study evaluation (OpenAI format).
+    
+    Uses OpenAI file reference if pdf_file_id is provided (optimization),
+    otherwise falls back to inline base64 encoding.
+    
+    Args:
+        report_pdf: PDF report data with base64 content
+        study: Study to compare against
+        pdf_file_id: Optional OpenAI file ID for the uploaded PDF
+    """
+    # Use file reference if available (efficient), otherwise inline base64
+    if pdf_file_id:
+        pdf_block = {
+            "type": "file",
+            "file_id": pdf_file_id
+        }
+    else:
+        pdf_block = {
+            "type": "file",
+            "base64": report_pdf.PDFContent,
+            "mime_type": "application/pdf",
+            "filename": f"report_{report_pdf.CRGReportID}.pdf"
+        }
+    
+    return [
+        pdf_block,
+        {
+            "type": "text",
+            "text": json.dumps({
+                "report_metadata": {
+                    "CRGReportID": report_pdf.CRGReportID,
+                    "CENTRALReportID": report_pdf.CENTRALReportID,
+                    "Title": report_pdf.Title,
+                    "Year": report_pdf.Year,
+                    "Authors": report_pdf.Authors,
+                    "City": report_pdf.City
+                },
+                "study": study.model_dump()
+            })
+        }
+    ]
+
