@@ -25,7 +25,7 @@ uvicorn backend.main:app --reload --port 8001
 ## Example
 
 ```bash
-curl "http://localhost:8001/evaluate/mock?evaluation_prompt=Prefer%20randomized%20trials%20in%20older%20adults"
+curl "http://localhost:8001/evaluate/mock"
 ```
 
 For a real request, POST `/evaluate` using the `ReportDto` and `StudyDto` shapes. See the mock objects in `backend/mock_data.py`.
