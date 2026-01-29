@@ -5,6 +5,24 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import type { RelevanceStudy } from "@/types/reports";
 import {
@@ -53,7 +71,8 @@ import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
 import { LoadMoreStudiesButton } from "./load-more-studies-button";
 import { sendReportEvent } from "@/lib/api/reportEventsApi";
 import { useGenAIEvaluation } from "@/hooks/use-genai-evaluation";
-import { AIEvaluationPrompt } from "./ai-evaluation-prompt";
+import type { AIModel } from "@/hooks/use-genai-evaluation";
+import type { PromptOverrides } from "@/types/apiDTOs";
 import { StudyAIBadge } from "./study-ai-badge";
 import { StudyAIReasonDialog } from "./study-ai-reason-dialog";
 import { Separator } from "../../../../components/ui/separator";
@@ -70,6 +89,16 @@ interface StudyRelevanceTableProps {
   // For event tracking
   getLastInteraction?: () => string | null;
 }
+
+const MODEL_OPTIONS: AIModel[] = ["gpt-5.2", "gpt-5", "gpt-5-mini", "gpt-4.1"];
+const TEMPERATURE_RANGE = { min: 0, max: 2, step: 0.05 };
+const EMPTY_PROMPT_OVERRIDES: PromptOverrides = {
+  initial_eval_prompt: "",
+  likely_group_prompt: "",
+  likely_compare_prompt: "",
+  unsure_review_prompt: "",
+  summary_prompt: "",
+};
 
 export function StudyRelevanceTable({
   studies,
@@ -109,13 +138,17 @@ export function StudyRelevanceTable({
 
   // AI Evaluation state
   const { evaluate, getStudyResult, loading: aiLoading, error: aiError } = useGenAIEvaluation();
-  const [evaluationPrompt, setEvaluationPrompt] = useState("");
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [aiModel, setAiModel] = useState<AIModel>("gpt-5-mini");
+  const [aiTemperature, setAiTemperature] = useState(0.1);
+  const [promptOverrides, setPromptOverrides] = useState<PromptOverrides>(
+    EMPTY_PROMPT_OVERRIDES
+  );
   const [reasonDialogOpen, setReasonDialogOpen] = useState(false);
   const [selectedAIStudy, setSelectedAIStudy] = useState<{
     studyId: number;
     studyName: string;
   } | null>(null);
-  const [hasEvaluated, setHasEvaluated] = useState(false);
 
   useEffect(() => {
     setLinkedStudies(
@@ -125,8 +158,8 @@ export function StudyRelevanceTable({
 
   // Reset evaluation state when report changes
   useEffect(() => {
-    setHasEvaluated(false);
-    setEvaluationPrompt("");
+    setPromptOverrides(EMPTY_PROMPT_OVERRIDES);
+    setAiDialogOpen(false);
   }, [currentBatchHash, currentReportIndex]);
 
   // Filter and sort studies
@@ -149,16 +182,20 @@ export function StudyRelevanceTable({
     return filtered.sort((a, b) => b.Relevance - a.Relevance);
   }, [studies, searchQuery]);
 
-  const handleAIEvaluation = async () => {
+  const handleAIEvaluation = async (options: {
+    model?: AIModel;
+    temperature?: number;
+    promptOverrides?: PromptOverrides;
+  }) => {
     if (!currentBatchHash || currentReportIndex === undefined) {
       toast.error("Missing batch or report context");
-      return;
+      return false;
     }
 
     const currentReport = reportsByBatch[currentBatchHash]?.[currentReportIndex];
     if (!currentReport) {
       toast.error("Report not found");
-      return;
+      return false;
     }
 
     try {
@@ -168,21 +205,57 @@ export function StudyRelevanceTable({
         currentReportIndex,
         currentReport,
         filteredStudies,
-        evaluationPrompt || undefined
+        options
       );
-      setHasEvaluated(true);
       toast.success("AI evaluation complete!");
+      return true;
     } catch (error) {
       toast.error(
         `AI evaluation failed: ${error instanceof Error ? error.message : "Unknown error"
         }`
       );
+      return false;
     }
   };
 
   const handleAIBadgeClick = (studyId: number, studyName: string) => {
     setSelectedAIStudy({ studyId, studyName });
     setReasonDialogOpen(true);
+  };
+
+  const updatePromptOverride = (
+    key: keyof PromptOverrides,
+    value: string
+  ) => {
+    setPromptOverrides((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const buildPromptOverridesPayload = () => {
+    const cleaned: PromptOverrides = {
+      initial_eval_prompt: promptOverrides.initial_eval_prompt?.trim() || undefined,
+      likely_group_prompt:
+        promptOverrides.likely_group_prompt?.trim() || undefined,
+      likely_compare_prompt:
+        promptOverrides.likely_compare_prompt?.trim() || undefined,
+      unsure_review_prompt:
+        promptOverrides.unsure_review_prompt?.trim() || undefined,
+      summary_prompt: promptOverrides.summary_prompt?.trim() || undefined,
+    };
+    const hasOverrides = Object.values(cleaned).some((value) => value);
+    return hasOverrides ? cleaned : undefined;
+  };
+
+  const handleTemperatureInput = (value: string) => {
+    const parsed = Number.parseFloat(value);
+    if (Number.isNaN(parsed)) {
+      setAiTemperature(TEMPERATURE_RANGE.min);
+      return;
+    }
+    const clamped = Math.min(
+      TEMPERATURE_RANGE.max,
+      Math.max(TEMPERATURE_RANGE.min, parsed)
+    );
+    setAiTemperature(Number(clamped.toFixed(2)));
   };
 
   const handleLinkedChange = async (studyId: number, checked: boolean) => {
@@ -509,17 +582,171 @@ export function StudyRelevanceTable({
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
+      <Dialog open={aiDialogOpen} onOpenChange={setAiDialogOpen}>
+        <DialogContent className="sm:max-w-[720px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>AI Match Settings</DialogTitle>
+            <DialogDescription>
+              Configure the model, temperature, and optional prompt overrides
+              before running evaluation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="ai-model">Model</Label>
+                <Select value={aiModel} onValueChange={(value) => setAiModel(value as AIModel)}>
+                  <SelectTrigger id="ai-model">
+                    <SelectValue placeholder="Select model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MODEL_OPTIONS.map((model) => (
+                      <SelectItem key={model} value={model}>
+                        {model}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ai-temperature">Temperature</Label>
+                <div className="flex items-center gap-3">
+                  <Slider
+                    id="ai-temperature"
+                    min={TEMPERATURE_RANGE.min}
+                    max={TEMPERATURE_RANGE.max}
+                    step={TEMPERATURE_RANGE.step}
+                    value={[aiTemperature]}
+                    onValueChange={(value) => setAiTemperature(value[0] ?? 0)}
+                  />
+                  <Input
+                    type="number"
+                    min={TEMPERATURE_RANGE.min}
+                    max={TEMPERATURE_RANGE.max}
+                    step={TEMPERATURE_RANGE.step}
+                    value={aiTemperature}
+                    onChange={(event) => handleTemperatureInput(event.target.value)}
+                    className="w-24"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Range {TEMPERATURE_RANGE.min} - {TEMPERATURE_RANGE.max}.
+                </p>
+              </div>
+            </div>
+
+            <Accordion type="single" collapsible>
+              <AccordionItem value="prompt-overrides" className="border-b-0">
+                <AccordionTrigger className="text-sm">
+                  Custom prompt overrides (advanced)
+                </AccordionTrigger>
+                <AccordionContent className="space-y-4 pt-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="override-eval-prompt">
+                      Initial evaluation prompt
+                    </Label>
+                    <Textarea
+                      id="override-eval-prompt"
+                      value={promptOverrides.initial_eval_prompt || ""}
+                      onChange={(event) =>
+                        updatePromptOverride("initial_eval_prompt", event.target.value)
+                      }
+                      placeholder="Leave blank to use DEFAULT_EVAL_PROMPT."
+                      rows={4}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="override-likely-group-prompt">
+                      Likely group prompt
+                    </Label>
+                    <Textarea
+                      id="override-likely-group-prompt"
+                      value={promptOverrides.likely_group_prompt || ""}
+                      onChange={(event) =>
+                        updatePromptOverride(
+                          "likely_group_prompt",
+                          event.target.value
+                        )
+                      }
+                      placeholder="Leave blank to use DEFAULT_LIKELY_GROUP_PROMPT."
+                      rows={4}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="override-likely-compare-prompt">
+                      Likely compare prompt
+                    </Label>
+                    <Textarea
+                      id="override-likely-compare-prompt"
+                      value={promptOverrides.likely_compare_prompt || ""}
+                      onChange={(event) =>
+                        updatePromptOverride(
+                          "likely_compare_prompt",
+                          event.target.value
+                        )
+                      }
+                      placeholder="Leave blank to use DEFAULT_LIKELY_COMPARE_PROMPT."
+                      rows={4}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="override-unsure-review-prompt">
+                      Unsure review prompt
+                    </Label>
+                    <Textarea
+                      id="override-unsure-review-prompt"
+                      value={promptOverrides.unsure_review_prompt || ""}
+                      onChange={(event) =>
+                        updatePromptOverride(
+                          "unsure_review_prompt",
+                          event.target.value
+                        )
+                      }
+                      placeholder="Leave blank to use DEFAULT_UNSURE_REVIEW_PROMPT."
+                      rows={4}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="override-summary-prompt">
+                      Summary prompt
+                    </Label>
+                    <Textarea
+                      id="override-summary-prompt"
+                      value={promptOverrides.summary_prompt || ""}
+                      onChange={(event) =>
+                        updatePromptOverride("summary_prompt", event.target.value)
+                      }
+                      placeholder="Leave blank to use DEFAULT_SUMMARY_PROMPT."
+                      rows={4}
+                    />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAiDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                setAiDialogOpen(false);
+                await handleAIEvaluation({
+                  model: aiModel,
+                  temperature: aiTemperature,
+                  promptOverrides: buildPromptOverridesPayload(),
+                });
+              }}
+              disabled={aiLoading || filteredStudies.length === 0}
+            >
+              {aiLoading ? <Spinner className="h-4 w-4" /> : "Run"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Header - Sticky */}
       <div className="shrink-0 space-y-4 pb-4">
-        {/* AI Evaluation Prompt */}
-        {currentBatchHash !== undefined && currentReportIndex !== undefined && (
-          <AIEvaluationPrompt
-            value={evaluationPrompt}
-            onChange={setEvaluationPrompt}
-            disabled={aiLoading || hasEvaluated}
-          />
-        )}
-
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-1.5 rounded-md bg-primary/10">
@@ -539,8 +766,8 @@ export function StudyRelevanceTable({
                     size="sm"
                     variant="outline"
                     className="h-8 gap-2"
-                    onClick={handleAIEvaluation}
-                    disabled={aiLoading || filteredStudies.length === 0 || hasEvaluated}
+                    onClick={() => setAiDialogOpen(true)}
+                    disabled={aiLoading || filteredStudies.length === 0}
                   >
                     {aiLoading ? (
                       <Spinner className="h-4 w-4" />

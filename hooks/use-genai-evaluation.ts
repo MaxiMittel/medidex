@@ -1,8 +1,9 @@
 import { useState, useCallback } from "react";
 import { evaluateStudies } from "@/lib/api/genaiApi";
-import type { EvaluateResponse, StudyDecision } from "@/types/apiDTOs";
+import type { EvaluateResponse, PromptOverrides, StudyDecision } from "@/types/apiDTOs";
 
 export type AIClassification = "match" | "likely_match" | "unsure" | "not_match" | "very_likely";
+export type AIModel = "gpt-5.2" | "gpt-5" | "gpt-5-mini" | "gpt-4.1";
 
 export interface StudyAIResult {
   studyId: number;
@@ -14,6 +15,12 @@ interface EvaluationState {
   results: Map<string, Map<number, StudyAIResult>>; // reportKey -> studyId -> result
   loading: boolean;
   error: string | null;
+}
+
+interface EvaluationOptions {
+  model?: AIModel;
+  temperature?: number;
+  promptOverrides?: PromptOverrides;
 }
 
 export const useGenAIEvaluation = () => {
@@ -32,7 +39,7 @@ export const useGenAIEvaluation = () => {
       reportIndex: number,
       report: any, // ReportDetailDto
       studies: any[], // RelevanceStudy[]
-      evaluationPrompt?: string
+      options: EvaluationOptions = {}
     ) => {
       setState((prev) => ({ ...prev, loading: true, error: null }));
 
@@ -105,7 +112,9 @@ export const useGenAIEvaluation = () => {
         const response = await evaluateStudies({
           report: reportDto,
           studies: studiesDto,
-          evaluation_prompt: evaluationPrompt || null,
+          model: options.model || null,
+          temperature: options.temperature ?? null,
+          prompt_overrides: options.promptOverrides || null,
         });
 
         // Transform response to study results
