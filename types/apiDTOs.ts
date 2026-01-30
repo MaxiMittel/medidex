@@ -172,3 +172,43 @@ export interface EvaluateResponse {
   very_likely: VeryLikelyDecision[];
   total_reviewed: number;
 }
+
+export type StreamEventNode =
+  | "load_next_initial"
+  | "classify_initial"
+  | "select_very_likely"
+  | "compare_very_likely"
+  | "prepare_unsure_review"
+  | "load_next_unsure"
+  | "classify_unsure"
+  | "match_not_found_end"
+  | "summarize_evaluation";
+
+export type StreamEventType = "node" | "complete" | "error" | "unknown";
+
+export interface StreamEventDetails {
+  study_id?: string | number;
+  short_name?: string;
+  decision?: "match" | "likely_match" | "unsure" | "not_match";
+  reason?: string;
+  idx?: number;
+  very_likely_ids?: string[];
+  match_study_id?: string;
+  count?: number;
+  has_match?: boolean;
+  summary?: string;
+}
+
+export interface StreamEvent {
+  event: StreamEventType;
+  node?: StreamEventNode;
+  message?: string;
+  details?: StreamEventDetails;
+  timestamp: number;
+}
+
+export interface StreamCallbacks {
+  onEvent: (event: StreamEvent) => void;
+  onComplete: () => void;
+  onError: (error: Error) => void;
+}

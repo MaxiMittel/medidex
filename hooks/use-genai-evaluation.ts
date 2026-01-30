@@ -1,6 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { evaluateStudies } from "@/lib/api/genaiApi";
-import type { EvaluateResponse, StudyDecision } from "@/types/apiDTOs";
+import { evaluateStudiesStream } from "@/lib/api/genaiStreamApi";
+import type { EvaluateResponse, StudyDecision, StreamEvent } from "@/types/apiDTOs";
 
 export type AIClassification = "match" | "likely_match" | "unsure" | "not_match" | "very_likely";
 
@@ -11,9 +12,14 @@ export interface StudyAIResult {
 }
 
 interface EvaluationState {
-  results: Map<string, Map<number, StudyAIResult>>; // reportKey -> studyId -> result
+  results: Map<string, Map<number, StudyAIResult>>;
   loading: boolean;
   error: string | null;
+  isStreaming: boolean;
+  streamMessages: StreamEvent[];
+  currentMessage: string | null;
+  processedStudies: number;
+  totalStudies: number;
 }
 
 export const useGenAIEvaluation = () => {
@@ -21,7 +27,14 @@ export const useGenAIEvaluation = () => {
     results: new Map(),
     loading: false,
     error: null,
+    isStreaming: false,
+    streamMessages: [],
+    currentMessage: null,
+    processedStudies: 0,
+    totalStudies: 0,
   });
+
+  const streamCleanupRef = useRef<(() => void) | null>(null);
 
   const getReportKey = (batchHash: string, reportIndex: number) => 
     `${batchHash}-${reportIndex}`;
@@ -163,6 +176,228 @@ export const useGenAIEvaluation = () => {
     []
   );
 
+  const evaluateStream = useCallback(
+    (
+      batchHash: string,
+      reportIndex: number,
+      report: any,
+      studies: any[],
+      evaluationPrompt?: string
+    ) => {
+      if (streamCleanupRef.current) {
+        streamCleanupRef.current();
+      }
+
+      setState((prev) => ({
+        ...prev,
+        loading: true,
+        isStreaming: true,
+        error: null,
+        streamMessages: [],
+        currentMessage: null,
+        processedStudies: 0,
+        totalStudies: studies.length,
+      }));
+
+      const reportKey = getReportKey(batchHash, reportIndex);
+      const studyResults = new Map<number, StudyAIResult>();
+      let processedCount = 0;
+
+      const studiesDto = studies.map((study) => ({
+        CRGStudyID: study.CRGStudyID,
+        ShortName: study.ShortName || "",
+        StatusofStudy: study.StatusofStudy || null,
+        NumberParticipants: study.NumberParticipants?.toString() || null,
+        Duration: study.Duration || null,
+        Comparison: study.Comparison || null,
+        Countries: study.Countries || null,
+        Notes: study.Notes || null,
+        TrialistContactDetails: study.TrialistContactDetails || null,
+        CENTRALSubmissionStatus: study.CENTRALSubmissionStatus || null,
+        UDef4: study.UDef4 || null,
+        DateEntered: study.DateEntered || null,
+        DateEdited: study.DateEdited || null,
+        CENTRALStudyID: 0,
+        DateToCENTRAL: null,
+        ISRCTN: study.ISRCTN || null,
+        UDef6: null,
+        Search_Tagged: false,
+        TrialRegistrationID: study.TrialRegistrationID || null,
+      }));
+
+      const reportDto = {
+        CENTRALReportID: null,
+        CRGReportID: report.crgreportid,
+        Title: report.title,
+        Notes: null,
+        ReportNumber: reportIndex + 1,
+        OriginalTitle: null,
+        Authors: report.authors.join("; "),
+        Journal: null,
+        Year: report.year || null,
+        Volume: null,
+        Issue: null,
+        Pages: null,
+        Language: null,
+        Abstract: report.abstract || null,
+        CENTRALSubmissionStatus: null,
+        CopyStatus: null,
+        DatetoCENTRAL: null,
+        Dateentered: null,
+        DateEdited: null,
+        Editors: null,
+        Publisher: null,
+        City: null,
+        DupString: "none",
+        TypeofReportID: null,
+        PublicationTypeID: 1,
+        Edition: null,
+        Medium: null,
+        StudyDesign: null,
+        DOI: null,
+        UDef3: null,
+        ISBN: null,
+        UDef5: null,
+        PMID: null,
+        TrialRegistrationID: report.trial_id || null,
+        UDef9: null,
+        UDef10: null,
+        UDef8: null,
+        PDFLinks: null,
+      };
+
+      const cleanup = evaluateStudiesStream(
+        {
+          report: reportDto,
+          studies: studiesDto,
+          evaluation_prompt: evaluationPrompt || null,
+        },
+        {
+          onEvent: (event: StreamEvent) => {
+            setState((prev) => ({
+              ...prev,
+              currentMessage: event.message || null,
+              streamMessages: [...prev.streamMessages, event],
+            }));
+
+            if (
+              (event.node === "classify_initial" || event.node === "classify_unsure") &&
+              event.details?.study_id &&
+              event.details?.decision
+            ) {
+              const studyId = typeof event.details.study_id === "string" 
+                ? parseInt(event.details.study_id) 
+                : event.details.study_id;
+              
+              const classification = event.details.decision as AIClassification;
+              const reason = event.details.reason || "No reason provided";
+
+              studyResults.set(studyId, {
+                studyId,
+                classification,
+                reason,
+              });
+
+              setState((prev) => {
+                const newResults = new Map(prev.results);
+                const newStudyResults = new Map(studyResults);
+                newResults.set(reportKey, newStudyResults);
+                return {
+                  ...prev,
+                  results: newResults,
+                };
+              });
+            }
+
+            if (event.node === "select_very_likely" && event.details?.very_likely_ids) {
+              event.details.very_likely_ids.forEach((id) => {
+                const studyId = typeof id === "string" ? parseInt(id) : id;
+                const existing = studyResults.get(studyId);
+                if (existing) {
+                  studyResults.set(studyId, {
+                    ...existing,
+                    classification: "very_likely",
+                  });
+                }
+              });
+
+              setState((prev) => {
+                const newResults = new Map(prev.results);
+                const newStudyResults = new Map(studyResults);
+                newResults.set(reportKey, newStudyResults);
+                return {
+                  ...prev,
+                  results: newResults,
+                };
+              });
+            }
+
+            if (event.node === "compare_very_likely" && event.details?.match_study_id) {
+              const studyId = typeof event.details.match_study_id === "string"
+                ? parseInt(event.details.match_study_id)
+                : event.details.match_study_id;
+              
+              const existing = studyResults.get(studyId);
+              if (existing) {
+                studyResults.set(studyId, {
+                  ...existing,
+                  classification: "match",
+                  reason: event.details.reason || existing.reason,
+                });
+              }
+
+              setState((prev) => {
+                const newResults = new Map(prev.results);
+                const newStudyResults = new Map(studyResults);
+                newResults.set(reportKey, newStudyResults);
+                return {
+                  ...prev,
+                  results: newResults,
+                };
+              });
+            }
+          },
+          onComplete: () => {
+            setState((prev) => ({
+              ...prev,
+              loading: false,
+              isStreaming: false,
+              currentMessage: null,
+            }));
+            streamCleanupRef.current = null;
+          },
+          onError: (error: Error) => {
+            setState((prev) => ({
+              ...prev,
+              loading: false,
+              isStreaming: false,
+              currentMessage: null,
+              error: error.message,
+            }));
+            streamCleanupRef.current = null;
+          },
+        }
+      );
+
+      streamCleanupRef.current = cleanup;
+      return cleanup;
+    },
+    []
+  );
+
+  const cancelStream = useCallback(() => {
+    if (streamCleanupRef.current) {
+      streamCleanupRef.current();
+      streamCleanupRef.current = null;
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        isStreaming: false,
+        currentMessage: null,
+      }));
+    }
+  }, []);
+
   const getStudyResult = useCallback(
     (batchHash: string, reportIndex: number, studyId: number): StudyAIResult | null => {
       const reportKey = getReportKey(batchHash, reportIndex);
@@ -187,9 +422,14 @@ export const useGenAIEvaluation = () => {
 
   return {
     evaluate,
+    evaluateStream,
+    cancelStream,
     getStudyResult,
     clearResults,
     loading: state.loading,
     error: state.error,
+    isStreaming: state.isStreaming,
+    streamMessages: state.streamMessages,
+    currentMessage: state.currentMessage,
   };
 };

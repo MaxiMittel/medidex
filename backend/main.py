@@ -7,12 +7,12 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from .config import logger
-from .evaluator import build_initial_state, run_evaluation
-from .evaluation_graph import GRAPH
-from .mock_data import MOCK_REPORT, MOCK_STUDIES
-from .schemas import EvaluateRequest, EvaluateResponse
-from .streaming import summarize_stream_event
+from config import logger
+from evaluator import build_initial_state, run_evaluation
+from evaluation_graph import GRAPH
+from mock_data import MOCK_REPORT, MOCK_STUDIES
+from schemas import EvaluateRequest, EvaluateResponse
+from streaming import summarize_stream_event
 
 app = FastAPI(title="Medidex AI Demo")
 
@@ -40,6 +40,8 @@ def evaluate_stream(req: EvaluateRequest) -> StreamingResponse:
     def event_stream():
         for event in GRAPH.stream(initial_state, stream_mode="updates"):
             summary = summarize_stream_event(event)
+            if summary is None:
+                continue
             payload = jsonable_encoder(summary)
             yield f"data: {json.dumps(payload, ensure_ascii=True)}\n\n"
         yield "data: {\"event\":\"complete\"}\n\n"

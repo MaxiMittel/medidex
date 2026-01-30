@@ -56,6 +56,8 @@ import { useGenAIEvaluation } from "@/hooks/use-genai-evaluation";
 import { AIEvaluationPrompt } from "./ai-evaluation-prompt";
 import { StudyAIBadge } from "./study-ai-badge";
 import { StudyAIReasonDialog } from "./study-ai-reason-dialog";
+import { AiEvaluationProgress } from "./ai-evaluation-progress";
+import { AiEvaluationHistoryDialog } from "./ai-evaluation-history-dialog";
 import { Separator } from "../../../../components/ui/separator";
 
 interface StudyRelevanceTableProps {
@@ -108,9 +110,19 @@ export function StudyRelevanceTable({
   );
 
   // AI Evaluation state
-  const { evaluate, getStudyResult, loading: aiLoading, error: aiError } = useGenAIEvaluation();
+  const { 
+    evaluate,
+    evaluateStream,
+    getStudyResult, 
+    loading: aiLoading, 
+    error: aiError,
+    isStreaming,
+    streamMessages,
+    currentMessage,
+  } = useGenAIEvaluation();
   const [evaluationPrompt, setEvaluationPrompt] = useState("");
   const [reasonDialogOpen, setReasonDialogOpen] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedAIStudy, setSelectedAIStudy] = useState<{
     studyId: number;
     studyName: string;
@@ -163,7 +175,7 @@ export function StudyRelevanceTable({
 
     try {
       toast.info(`Evaluating ${filteredStudies.length} studies with AI...`);
-      await evaluate(
+      evaluateStream(
         currentBatchHash,
         currentReportIndex,
         currentReport,
@@ -171,7 +183,6 @@ export function StudyRelevanceTable({
         evaluationPrompt || undefined
       );
       setHasEvaluated(true);
-      toast.success("AI evaluation complete!");
     } catch (error) {
       toast.error(
         `AI evaluation failed: ${error instanceof Error ? error.message : "Unknown error"
@@ -520,6 +531,11 @@ export function StudyRelevanceTable({
           />
         )}
 
+        <AiEvaluationProgress
+          currentMessage={currentMessage}
+          isStreaming={isStreaming}
+        />
+
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-1.5 rounded-md bg-primary/10">
@@ -549,6 +565,16 @@ export function StudyRelevanceTable({
                     )}
                     AI Match
                   </Button>
+                  {hasEvaluated && streamMessages.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 gap-2"
+                      onClick={() => setHistoryDialogOpen(true)}
+                    >
+                      Show Step History
+                    </Button>
+                  )}
                   <AddStudyDialog
                     currentBatchHash={currentBatchHash}
                     currentReportIndex={currentReportIndex}
@@ -1081,6 +1107,12 @@ export function StudyRelevanceTable({
           }
         />
       )}
+
+      <AiEvaluationHistoryDialog
+        open={historyDialogOpen}
+        onOpenChange={setHistoryDialogOpen}
+        streamMessages={streamMessages}
+      />
     </div>
   );
 }

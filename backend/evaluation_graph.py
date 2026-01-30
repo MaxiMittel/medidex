@@ -5,36 +5,36 @@ import json
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
 
-from .config import logger
-from .evaluation_utils import (
+from config import logger
+from evaluation_utils import (
     get_bucket_entry,
     get_study_by_id,
     remove_from_bucket,
     upsert_bucket,
 )
-from .llm import MODEL
-from .llm_payloads import (
+from llm import MODEL
+from llm_payloads import (
     build_likely_compare_payload,
     build_likely_group_payload,
     build_summary_payload,
     build_unsure_review_payload,
     build_user_payload,
 )
-from .parsers import (
+from parsers import (
     parse_initial_response,
     parse_likely_compare_response,
     parse_likely_group_response,
     parse_summary_response,
     parse_unsure_review_response,
 )
-from .prompts import (
+from prompts import (
     DEFAULT_EVAL_PROMPT,
     DEFAULT_LIKELY_COMPARE_PROMPT,
     DEFAULT_LIKELY_GROUP_PROMPT,
     DEFAULT_SUMMARY_PROMPT,
     DEFAULT_UNSURE_REVIEW_PROMPT,
 )
-from .schemas import EvalState
+from schemas import EvalState
 
 
 def load_next_initial(state: EvalState) -> dict:

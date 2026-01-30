@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from .config import logger
-from .evaluation_graph import GRAPH
-from .schemas import EvaluateResponse, EvalState, ReportDto, StudyDto
+from config import logger
+from evaluation_graph import GRAPH
+from schemas import EvaluateResponse, EvalState, ReportDto, StudyDto
 
 
 def build_initial_state(

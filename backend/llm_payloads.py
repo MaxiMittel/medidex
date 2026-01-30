@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from .schemas import ReportDto, StudyDto
+from schemas import ReportDto, StudyDto
 
 
 def build_user_payload(report: ReportDto, study: StudyDto) -> str:
