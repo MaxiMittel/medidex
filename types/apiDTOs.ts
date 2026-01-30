@@ -149,7 +149,17 @@ export type GetPersonsResponseDto = Record<string, string[]>;
 export interface EvaluateRequest {
   report: ReportDto;
   studies: StudyDto[];
-  evaluation_prompt?: string | null;
+  model?: "gpt-5.2" | "gpt-5" | "gpt-5-mini" | "gpt-4.1" | null;
+  temperature?: number | null;
+  prompt_overrides?: PromptOverrides | null;
+}
+
+export interface PromptOverrides {
+  initial_eval_prompt?: string | null;
+  likely_group_prompt?: string | null;
+  likely_compare_prompt?: string | null;
+  unsure_review_prompt?: string | null;
+  summary_prompt?: string | null;
 }
 
 export interface StudyDecision {

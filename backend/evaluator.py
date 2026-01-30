@@ -2,14 +2,18 @@ from __future__ import annotations
 
 from config import logger
 from evaluation_graph import GRAPH
+from llm import build_llm
 from schemas import EvaluateResponse, EvalState, ReportDto, StudyDto
 
 
 def build_initial_state(
     report: ReportDto,
     studies: list[StudyDto],
-    evaluation_prompt: str | None,
+    prompt_overrides: dict[str, str | None] | None,
+    model: str | None,
+    temperature: float | None,
 ) -> EvalState:
+    llm = build_llm(model=model, temperature=temperature)
     return {
         "report": report,
         "studies": studies,
@@ -19,7 +23,8 @@ def build_initial_state(
         "current": None,
         "decision": None,
         "reason": None,
-        "evaluation_prompt": evaluation_prompt,
+        "prompt_overrides": prompt_overrides,
+        "llm": llm,
         "match": None,
         "not_matches": [],
         "unsure": [],
@@ -33,10 +38,18 @@ def build_initial_state(
 def run_evaluation(
     report: ReportDto,
     studies: list[StudyDto],
-    evaluation_prompt: str | None,
+    prompt_overrides: dict[str, str | None] | None,
+    model: str | None,
+    temperature: float | None,
 ) -> EvaluateResponse:
     logger.info("run_evaluation: reports=%s studies=%s", report.CRGReportID, len(studies))
-    initial_state = build_initial_state(report, studies, evaluation_prompt)
+    initial_state = build_initial_state(
+        report,
+        studies,
+        prompt_overrides,
+        model,
+        temperature,
+    )
 
     final_state = GRAPH.invoke(initial_state)
     logger.info(

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import Any, Literal, TypedDict
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 Decision = Literal["match", "not_match", "unsure", "likely_match"]
+ModelName = Literal["gpt-5.2", "gpt-5", "gpt-5-mini", "gpt-4.1"]
 
 
 class ReportDto(BaseModel):
@@ -70,10 +71,20 @@ class StudyDto(BaseModel):
     TrialRegistrationID: str | None
 
 
+class PromptOverrides(BaseModel):
+    initial_eval_prompt: str | None = None
+    likely_group_prompt: str | None = None
+    likely_compare_prompt: str | None = None
+    unsure_review_prompt: str | None = None
+    summary_prompt: str | None = None
+
+
 class EvaluateRequest(BaseModel):
     report: ReportDto
     studies: list[StudyDto]
-    evaluation_prompt: str | None = None
+    model: ModelName | None = None
+    temperature: float | None = Field(default=None, ge=0, le=2)
+    prompt_overrides: PromptOverrides | None = None
 
 
 class StudyDecision(BaseModel):
@@ -108,7 +119,8 @@ class EvalState(TypedDict):
     current: StudyDto | None
     decision: Decision | None
     reason: str | None
-    evaluation_prompt: str | None
+    prompt_overrides: dict[str, str | None] | None
+    llm: Any | None
     match: dict | None
     not_matches: list[dict]
     unsure: list[dict]

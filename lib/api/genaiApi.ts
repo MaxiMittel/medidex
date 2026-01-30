@@ -13,7 +13,7 @@ const genaiClient = axios.create({
 /**
  * Evaluates a report against a list of studies using AI to find matches.
  * 
- * @param request - Contains the report, studies to evaluate, and optional evaluation prompt
+ * @param request - Contains the report, studies to evaluate, and optional AI settings
  * @returns Evaluation response with matched, likely matches, unsure, and not matched studies
  */
 export const evaluateStudies = async (
