@@ -123,12 +123,14 @@ export function StudyRelevanceTable({
     currentMessage,
   } = useGenAIEvaluation();
   const [evaluationPrompt, setEvaluationPrompt] = useState("");
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [reasonDialogOpen, setReasonDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedAIStudy, setSelectedAIStudy] = useState<{
     studyId: number;
     studyName: string;
   } | null>(null);
+  const [hasEvaluated, setHasEvaluated] = useState(false);
 
   useEffect(() => {
     setLinkedStudies(
@@ -186,6 +188,7 @@ export function StudyRelevanceTable({
         filteredStudies,
         options
       );
+      setHasEvaluated(true);
       toast.success("AI evaluation complete!");
       return true;
     } catch (error) {
@@ -606,6 +609,14 @@ export function StudyRelevanceTable({
           )}
         </div>
       </div>
+
+      {/* AI Evaluation Progress */}
+      {isStreaming && (
+        <AiEvaluationProgress
+          currentMessage={currentMessage}
+          isStreaming={isStreaming}
+        />
+      )}
 
       {/* Scrollable Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
