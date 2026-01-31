@@ -7,12 +7,12 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from config import logger
-from evaluator import build_initial_state, run_evaluation
-from evaluation_graph import GRAPH
-from mock_data import MOCK_REPORT, MOCK_STUDIES
-from schemas import EvaluateRequest, EvaluateResponse
-from streaming import summarize_stream_event
+from .config import logger
+from .evaluator import build_initial_state, run_evaluation
+from .evaluation_graph import GRAPH
+from .mock_data import MOCK_REPORT, MOCK_STUDIES
+from .schemas import EvaluateRequest, EvaluateResponse
+from .streaming import summarize_stream_event
 
 app = FastAPI(title="Medidex AI Demo")
 

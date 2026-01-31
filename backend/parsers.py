@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from schemas import Decision
+from .schemas import Decision
 
 
 def parse_initial_response(text: str) -> tuple[Decision, str]:

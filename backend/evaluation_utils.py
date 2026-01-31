@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from schemas import StudyDto
+from .schemas import StudyDto
 
 
 def get_study_by_id(studies: list[StudyDto], study_id: str) -> StudyDto | None:

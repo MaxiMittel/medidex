@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from schemas import StudyDto
+from .schemas import StudyDto
 
 
 # Global state tracker to remember current study across nodes
