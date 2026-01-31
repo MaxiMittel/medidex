@@ -61,9 +61,10 @@ export function AiEvaluationHistoryDialog({
                     <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
                       Details
                     </summary>
-                    <pre className="mt-2 p-2 bg-muted rounded overflow-x-auto">
+                    <pre className="mt-2 p-2 bg-muted rounded overflow-x-auto whitespace-pre-wrap break-words max-w-full">
                       {JSON.stringify(event.details, null, 2)}
                     </pre>
+
                   </details>
                 )}
               </div>

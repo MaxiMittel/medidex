@@ -191,7 +191,8 @@ export const useGenAIEvaluation = () => {
       reportIndex: number,
       report: any,
       studies: any[],
-      evaluationPrompt?: string
+      evaluationPrompt?: string,
+      onStreamComplete?: () => void
     ) => {
       if (streamCleanupRef.current) {
         streamCleanupRef.current();
@@ -374,6 +375,7 @@ export const useGenAIEvaluation = () => {
               currentMessage: null,
             }));
             streamCleanupRef.current = null;
+            onStreamComplete?.();
           },
           onError: (error: Error) => {
             setState((prev) => ({

@@ -186,10 +186,13 @@ export function StudyRelevanceTable({
         currentReportIndex,
         currentReport,
         filteredStudies,
-        options
+        options,
+        () => {
+          setHasEvaluated(true);
+          toast.success("AI evaluation complete!");
+        }
       );
-      setHasEvaluated(true);
-      toast.success("AI evaluation complete!");
+      
       return true;
     } catch (error) {
       toast.error(
@@ -761,12 +764,13 @@ export function StudyRelevanceTable({
                                 return aiResult ? (
                                   <StudyAIBadge
                                     classification={aiResult.classification}
-                                    onClick={() =>
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       handleAIBadgeClick(
                                         study.CRGStudyID,
                                         study.ShortName
-                                      )
-                                    }
+                                      );
+                                    }}
                                   />
                                 ) : null;
                               })()}
