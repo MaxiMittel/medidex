@@ -181,6 +181,7 @@ export function StudyRelevanceTable({
 
     try {
       toast.info(`Evaluating ${filteredStudies.length} studies with AI...`);
+      setHasEvaluated(true);
       evaluateStream(
         currentBatchHash,
         currentReportIndex,
@@ -188,7 +189,6 @@ export function StudyRelevanceTable({
         filteredStudies,
         options,
         () => {
-          setHasEvaluated(true);
           toast.success("AI evaluation complete!");
         }
       );

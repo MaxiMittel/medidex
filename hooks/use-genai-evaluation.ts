@@ -191,7 +191,11 @@ export const useGenAIEvaluation = () => {
       reportIndex: number,
       report: any,
       studies: any[],
-      evaluationPrompt?: string,
+      options: {
+        model?: AIModel;
+        temperature?: number;
+        promptOverrides?: PromptOverrides;
+      },
       onStreamComplete?: () => void
     ) => {
       if (streamCleanupRef.current) {
@@ -280,7 +284,9 @@ export const useGenAIEvaluation = () => {
         {
           report: reportDto,
           studies: studiesDto,
-          evaluation_prompt: evaluationPrompt || null,
+          model: options.model || null,
+          temperature: options.temperature ?? null,
+          prompt_overrides: options.promptOverrides || null,
         },
         {
           onEvent: (event: StreamEvent) => {
