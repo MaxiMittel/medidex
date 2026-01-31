@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import config  # noqa: F401
+from . import config  # noqa: F401
 from langchain_openai import ChatOpenAI
 
 DEFAULT_MODEL = "gpt-5"
