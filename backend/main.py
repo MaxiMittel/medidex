@@ -64,6 +64,8 @@ def evaluate_stream(req: EvaluateRequest) -> StreamingResponse:
     def event_stream():
         for event in GRAPH.stream(initial_state, stream_mode="updates"):
             summary = summarize_stream_event(event)
+            if summary is None:
+                continue
             payload = jsonable_encoder(summary)
             yield f"data: {json.dumps(payload, ensure_ascii=True)}\n\n"
         yield "data: {\"event\":\"complete\"}\n\n"

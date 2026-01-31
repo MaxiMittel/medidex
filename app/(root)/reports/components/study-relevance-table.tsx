@@ -58,6 +58,8 @@ import type { AIModel } from "@/hooks/use-genai-evaluation";
 import type { PromptOverrides } from "@/types/apiDTOs";
 import { StudyAIBadge } from "./study-ai-badge";
 import { StudyAIReasonDialog } from "./study-ai-reason-dialog";
+import { AiEvaluationProgress } from "./ai-evaluation-progress";
+import { AiEvaluationHistoryDialog } from "./ai-evaluation-history-dialog";
 import { Separator } from "../../../../components/ui/separator";
 
 interface StudyRelevanceTableProps {
@@ -110,13 +112,25 @@ export function StudyRelevanceTable({
   );
 
   // AI Evaluation state
-  const { evaluate, getStudyResult, loading: aiLoading } = useGenAIEvaluation();
+  const { 
+    evaluate,
+    evaluateStream,
+    getStudyResult, 
+    loading: aiLoading, 
+    error: aiError,
+    isStreaming,
+    streamMessages,
+    currentMessage,
+  } = useGenAIEvaluation();
+  const [evaluationPrompt, setEvaluationPrompt] = useState("");
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [reasonDialogOpen, setReasonDialogOpen] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedAIStudy, setSelectedAIStudy] = useState<{
     studyId: number;
     studyName: string;
   } | null>(null);
+  const [hasEvaluated, setHasEvaluated] = useState(false);
 
   useEffect(() => {
     setLinkedStudies(
@@ -167,14 +181,18 @@ export function StudyRelevanceTable({
 
     try {
       toast.info(`Evaluating ${filteredStudies.length} studies with AI...`);
-      await evaluate(
+      setHasEvaluated(true);
+      evaluateStream(
         currentBatchHash,
         currentReportIndex,
         currentReport,
         filteredStudies,
-        options
+        options,
+        () => {
+          toast.success("AI evaluation complete!");
+        }
       );
-      toast.success("AI evaluation complete!");
+      
       return true;
     } catch (error) {
       toast.error(
@@ -553,6 +571,16 @@ export function StudyRelevanceTable({
                     )}
                     AI Match
                   </Button>
+                  {hasEvaluated && streamMessages.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 gap-2"
+                      onClick={() => setHistoryDialogOpen(true)}
+                    >
+                      Show Step History
+                    </Button>
+                  )}
                   <AddStudyDialog
                     currentBatchHash={currentBatchHash}
                     currentReportIndex={currentReportIndex}
@@ -584,6 +612,14 @@ export function StudyRelevanceTable({
           )}
         </div>
       </div>
+
+      {/* AI Evaluation Progress */}
+      {isStreaming && (
+        <AiEvaluationProgress
+          currentMessage={currentMessage}
+          isStreaming={isStreaming}
+        />
+      )}
 
       {/* Scrollable Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
@@ -728,12 +764,13 @@ export function StudyRelevanceTable({
                                 return aiResult ? (
                                   <StudyAIBadge
                                     classification={aiResult.classification}
-                                    onClick={() =>
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       handleAIBadgeClick(
                                         study.CRGStudyID,
                                         study.ShortName
-                                      )
-                                    }
+                                      );
+                                    }}
                                   />
                                 ) : null;
                               })()}
@@ -1085,6 +1122,12 @@ export function StudyRelevanceTable({
           }
         />
       )}
+
+      <AiEvaluationHistoryDialog
+        open={historyDialogOpen}
+        onOpenChange={setHistoryDialogOpen}
+        streamMessages={streamMessages}
+      />
     </div>
   );
 }
