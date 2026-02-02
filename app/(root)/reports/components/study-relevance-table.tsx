@@ -165,7 +165,7 @@ export function StudyRelevanceTable({
 
   const handleAIEvaluation = async (options: {
     model?: AIModel;
-    temperature?: number;
+    includePdf?: boolean;
     promptOverrides?: PromptOverrides;
   }) => {
     if (!currentBatchHash || currentReportIndex === undefined) {

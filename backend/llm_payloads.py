@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from schemas import ReportDto, ReportPdfDto, StudyDto
+from schemas import ReportDto, StudyDto
 
 
 def build_user_payload(report: ReportDto, study: StudyDto) -> str:
@@ -149,50 +149,58 @@ def build_summary_payload(
     return json.dumps(payload, ensure_ascii=True, separators=(",", ":"))
 
 
-def build_user_payload_pdf(
-    report_pdf: ReportPdfDto, 
-    study: StudyDto, 
-    pdf_file_id: str | None = None
+def build_content_blocks_with_study_pdfs(
+    text_payload: str,
+    attachments: list[dict],
 ) -> list[dict]:
-    """Build content blocks for PDF report + study evaluation (OpenAI format).
-    
-    Uses OpenAI file reference if pdf_file_id is provided (optimization),
-    otherwise falls back to inline base64 encoding.
-    
-    Args:
-        report_pdf: PDF report data with base64 content
-        study: Study to compare against
-        pdf_file_id: Optional OpenAI file ID for the uploaded PDF
-    """
-    # Use file reference if available (efficient), otherwise inline base64
-    if pdf_file_id:
-        pdf_block = {
-            "type": "file",
-            "file_id": pdf_file_id
-        }
-    else:
-        pdf_block = {
-            "type": "file",
-            "base64": report_pdf.PDFContent,
-            "mime_type": "application/pdf",
-            "filename": f"report_{report_pdf.CRGReportID}.pdf"
-        }
-    
-    return [
-        pdf_block,
-        {
-            "type": "text",
-            "text": json.dumps({
-                "report_metadata": {
-                    "CRGReportID": report_pdf.CRGReportID,
-                    "CENTRALReportID": report_pdf.CENTRALReportID,
-                    "Title": report_pdf.Title,
-                    "Year": report_pdf.Year,
-                    "Authors": report_pdf.Authors,
-                    "City": report_pdf.City
-                },
-                "study": study.model_dump()
-            })
-        }
-    ]
+    """Build content blocks with study-associated report PDFs.
 
+    Expects attachments with study_id, report_id, title, file_id/base64.
+    If no attachments are provided, returns a single text block.
+    """
+    if not attachments:
+        return [{"type": "text", "text": text_payload}]
+
+    pdf_blocks: list[dict] = []
+    attachment_meta: list[dict] = []
+    for item in attachments:
+        file_id = item.get("file_id")
+        pdf_base64 = item.get("base64")
+        if not file_id and not pdf_base64:
+            continue
+        report_id = item.get("report_id")
+        study_id = item.get("study_id")
+        title = item.get("title")
+        if file_id:
+            pdf_blocks.append({"type": "file", "file_id": file_id})
+        else:
+            pdf_blocks.append(
+                {
+                    "type": "file",
+                    "base64": pdf_base64,
+                    "mime_type": "application/pdf",
+                    "filename": f"study_{study_id}_report_{report_id}.pdf",
+                }
+            )
+        attachment_meta.append(
+            {
+                "attachment_index": len(pdf_blocks) - 1,
+                "study_id": study_id,
+                "report_id": report_id,
+                "title": title,
+            }
+        )
+
+    if not pdf_blocks:
+        return [{"type": "text", "text": text_payload}]
+
+    try:
+        payload_obj = json.loads(text_payload)
+        payload_obj["pdf_attachments"] = attachment_meta
+        text_payload = json.dumps(payload_obj, ensure_ascii=True, separators=(",", ":"))
+    except json.JSONDecodeError:
+        text_payload = (
+            f"{text_payload}\n\nPDF_ATTACHMENTS={json.dumps(attachment_meta, ensure_ascii=True)}"
+        )
+
+    return [*pdf_blocks, {"type": "text", "text": text_payload}]

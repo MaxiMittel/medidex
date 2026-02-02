@@ -2,21 +2,10 @@ from __future__ import annotations
 
 from typing import Any, Literal, TypedDict
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 Decision = Literal["match", "not_match", "unsure", "likely_match"]
 ModelName = Literal["gpt-5.2", "gpt-5", "gpt-5-mini", "gpt-4.1"]
-
-
-class ReportPdfDto(BaseModel):
-    """Report data when uploaded as PDF."""
-    CENTRALReportID: int | None
-    CRGReportID: int
-    Title: str
-    Year: int | None
-    Authors: str | None
-    City: str | None
-    PDFContent: str  # Base64-encoded PDF string
 
 
 class ReportDto(BaseModel):
@@ -94,7 +83,7 @@ class EvaluateRequest(BaseModel):
     report: ReportDto
     studies: list[StudyDto]
     model: ModelName | None = None
-    temperature: float | None = Field(default=None, ge=0, le=2)
+    include_pdf: bool | None = False
     prompt_overrides: PromptOverrides | None = None
 
 
@@ -130,6 +119,7 @@ class EvalState(TypedDict):
     current: StudyDto | None
     decision: Decision | None
     reason: str | None
+    include_pdf: bool
     prompt_overrides: dict[str, str | None] | None
     llm: Any | None
     match: dict | None
@@ -139,25 +129,4 @@ class EvalState(TypedDict):
     very_likely: list[dict]
     rejected_likely: list[dict]
     evaluation_summary: dict | None
-
-
-class EvalStatePdf(TypedDict):
-    """State for PDF-based evaluation (same as EvalState but with ReportPdfDto)."""
-    report: ReportPdfDto
-    studies: list[StudyDto]
-    idx: int
-    unsure_idx: int
-    unsure_queue: list[str]
-    current: StudyDto | None
-    decision: Decision | None
-    reason: str | None
-    evaluation_prompt: str | None
-    match: dict | None
-    not_matches: list[dict]
-    unsure: list[dict]
-    likely_matches: list[dict]
-    very_likely: list[dict]
-    rejected_likely: list[dict]
-    evaluation_summary: dict | None
-    pdf_file_id: str | None  # OpenAI file ID for uploaded PDF (optimization)
-
+    study_report_pdfs: dict[str, list[dict]]

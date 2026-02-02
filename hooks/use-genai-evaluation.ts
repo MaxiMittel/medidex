@@ -25,7 +25,7 @@ interface EvaluationState {
 
 interface EvaluationOptions {
   model?: AIModel;
-  temperature?: number;
+  includePdf?: boolean;
   promptOverrides?: PromptOverrides;
 }
 
@@ -126,7 +126,7 @@ export const useGenAIEvaluation = () => {
           report: reportDto,
           studies: studiesDto,
           model: options.model || null,
-          temperature: options.temperature ?? null,
+          include_pdf: options.includePdf ?? null,
           prompt_overrides: options.promptOverrides || null,
         });
 
@@ -193,7 +193,7 @@ export const useGenAIEvaluation = () => {
       studies: any[],
       options: {
         model?: AIModel;
-        temperature?: number;
+        includePdf?: boolean;
         promptOverrides?: PromptOverrides;
       },
       onStreamComplete?: () => void
@@ -285,7 +285,7 @@ export const useGenAIEvaluation = () => {
           report: reportDto,
           studies: studiesDto,
           model: options.model || null,
-          temperature: options.temperature ?? null,
+          include_pdf: options.includePdf ?? null,
           prompt_overrides: options.promptOverrides || null,
         },
         {

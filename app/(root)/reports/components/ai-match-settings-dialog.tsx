@@ -10,10 +10,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -32,7 +31,6 @@ import type { AIModel } from "@/hooks/use-genai-evaluation";
 import type { PromptOverrides } from "@/types/apiDTOs";
 
 const MODEL_OPTIONS: AIModel[] = ["gpt-5.2", "gpt-5", "gpt-5-mini", "gpt-4.1"];
-const TEMPERATURE_RANGE = { min: 0, max: 2, step: 0.05 };
 const EMPTY_PROMPT_OVERRIDES: PromptOverrides = {
   initial_eval_prompt: "",
   likely_group_prompt: "",
@@ -46,7 +44,7 @@ interface AIMatchSettingsDialogProps {
   onOpenChange: (open: boolean) => void;
   onEvaluate: (options: {
     model?: AIModel;
-    temperature?: number;
+    includePdf?: boolean;
     promptOverrides?: PromptOverrides;
   }) => Promise<boolean>;
   isRunning: boolean;
@@ -61,7 +59,7 @@ export function AIMatchSettingsDialog({
   disableRun,
 }: AIMatchSettingsDialogProps) {
   const [model, setModel] = useState<AIModel>("gpt-5-mini");
-  const [temperature, setTemperature] = useState(0.1);
+  const [includePdf, setIncludePdf] = useState(false);
   const [promptOverrides, setPromptOverrides] = useState<PromptOverrides>(
     EMPTY_PROMPT_OVERRIDES
   );
@@ -89,24 +87,11 @@ export function AIMatchSettingsDialog({
     return hasOverrides ? cleaned : undefined;
   };
 
-  const handleTemperatureInput = (value: string) => {
-    const parsed = Number.parseFloat(value);
-    if (Number.isNaN(parsed)) {
-      setTemperature(TEMPERATURE_RANGE.min);
-      return;
-    }
-    const clamped = Math.min(
-      TEMPERATURE_RANGE.max,
-      Math.max(TEMPERATURE_RANGE.min, parsed)
-    );
-    setTemperature(Number(clamped.toFixed(2)));
-  };
-
   const handleRun = async () => {
     onOpenChange(false);
     await onEvaluate({
       model,
-      temperature,
+      includePdf,
       promptOverrides: buildPromptOverridesPayload(),
     });
   };
@@ -117,8 +102,8 @@ export function AIMatchSettingsDialog({
         <DialogHeader>
           <DialogTitle>AI Match Settings</DialogTitle>
           <DialogDescription>
-            Configure the model, temperature, and optional prompt overrides
-            before running evaluation.
+            Configure the model, study-report PDF inclusion, and optional prompt
+            overrides before running evaluation.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-6">
@@ -139,29 +124,17 @@ export function AIMatchSettingsDialog({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ai-temperature">Temperature</Label>
-              <div className="flex items-center gap-3">
-                <Slider
-                  id="ai-temperature"
-                  min={TEMPERATURE_RANGE.min}
-                  max={TEMPERATURE_RANGE.max}
-                  step={TEMPERATURE_RANGE.step}
-                  value={[temperature]}
-                  onValueChange={(value) => setTemperature(value[0] ?? 0)}
+              <Label htmlFor="ai-include-pdf">Include study report PDFs</Label>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="ai-include-pdf"
+                  checked={includePdf}
+                  onCheckedChange={(checked) => setIncludePdf(Boolean(checked))}
                 />
-                <Input
-                  type="number"
-                  min={TEMPERATURE_RANGE.min}
-                  max={TEMPERATURE_RANGE.max}
-                  step={TEMPERATURE_RANGE.step}
-                  value={temperature}
-                  onChange={(event) => handleTemperatureInput(event.target.value)}
-                  className="w-24"
-                />
+                <span className="text-sm text-muted-foreground">
+                  Attach PDFs from reports associated with each study.
+                </span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Range {TEMPERATURE_RANGE.min} - {TEMPERATURE_RANGE.max}.
-              </p>
             </div>
           </div>
 

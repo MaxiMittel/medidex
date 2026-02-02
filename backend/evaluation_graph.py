@@ -14,6 +14,7 @@ from evaluation_utils import (
 )
 from llm import MODEL
 from llm_payloads import (
+    build_content_blocks_with_study_pdfs,
     build_likely_compare_payload,
     build_likely_group_payload,
     build_summary_payload,
@@ -49,6 +50,32 @@ def get_prompt(state: EvalState, key: str, default: str) -> str:
         if isinstance(override, str) and override.strip():
             return override
     return default
+
+
+def build_human_content(state: EvalState, payload: str, study_ids: list[str]):
+    if not state.get("include_pdf"):
+        return payload
+    attachments: list[dict] = []
+    study_report_pdfs = state.get("study_report_pdfs") or {}
+    for study_id in study_ids:
+        attachments.extend(study_report_pdfs.get(study_id, []))
+    if not attachments:
+        return payload
+    seen: set[tuple[str, int]] = set()
+    deduped: list[dict] = []
+    for item in attachments:
+        report_id = item.get("report_id")
+        study_id = item.get("study_id")
+        if report_id is None or study_id is None:
+            continue
+        key = (str(study_id), int(report_id))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+    if not deduped:
+        return payload
+    return build_content_blocks_with_study_pdfs(payload, deduped)
 
 
 def load_next_initial(state: EvalState) -> dict:
@@ -92,7 +119,8 @@ def classify_initial(state: EvalState) -> dict:
     logger.info("classify_initial: prompt_used=%s", prompt[:60])
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
-        messages.append(HumanMessage(content=user_payload))
+        study_ids = [str(current.CRGStudyID)]
+        messages.append(HumanMessage(content=build_human_content(state, user_payload, study_ids)))
         response = get_llm(state).invoke(messages)
         content = response.content
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
@@ -146,7 +174,8 @@ def select_very_likely(state: EvalState) -> dict:
     prompt = get_prompt(state, "likely_group_prompt", DEFAULT_LIKELY_GROUP_PROMPT)
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
-        messages.append(HumanMessage(content=payload))
+        study_ids = [str(item.get("study_id")) for item in candidates if item.get("study_id")]
+        messages.append(HumanMessage(content=build_human_content(state, payload, study_ids)))
         response = get_llm(state).invoke(messages)
         content = response.content
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
@@ -227,7 +256,8 @@ def compare_very_likely(state: EvalState) -> dict:
     prompt = get_prompt(state, "likely_compare_prompt", DEFAULT_LIKELY_COMPARE_PROMPT)
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
-        messages.append(HumanMessage(content=payload))
+        study_ids = [str(item.get("study_id")) for item in candidates if item.get("study_id")]
+        messages.append(HumanMessage(content=build_human_content(state, payload, study_ids)))
         response = get_llm(state).invoke(messages)
         content = response.content
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
@@ -371,7 +401,8 @@ def classify_unsure(state: EvalState) -> dict:
     prompt = get_prompt(state, "unsure_review_prompt", DEFAULT_UNSURE_REVIEW_PROMPT)
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
-        messages.append(HumanMessage(content=payload))
+        study_ids = [str(current.CRGStudyID)]
+        messages.append(HumanMessage(content=build_human_content(state, payload, study_ids)))
         response = get_llm(state).invoke(messages)
         content = response.content
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
@@ -433,7 +464,16 @@ def summarize_evaluation(state: EvalState) -> dict:
 
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
-        messages.append(HumanMessage(content=payload))
+        study_ids: list[str] = []
+        match = state.get("match")
+        if match and match.get("study_id"):
+            study_ids.append(str(match.get("study_id")))
+        for bucket_key in ("not_matches", "unsure", "likely_matches", "very_likely"):
+            for item in state.get(bucket_key, []):
+                study_id = item.get("study_id")
+                if study_id:
+                    study_ids.append(str(study_id))
+        messages.append(HumanMessage(content=build_human_content(state, payload, study_ids)))
         response = get_llm(state).invoke(messages)
         content = response.content
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)

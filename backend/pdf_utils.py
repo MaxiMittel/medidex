@@ -6,6 +6,8 @@ from typing import Optional
 
 from openai import OpenAI
 
+_REPORT_FILE_CACHE: dict[int, str] = {}
+
 
 def encode_pdf_to_base64(pdf_bytes: bytes) -> str:
     """
@@ -21,7 +23,15 @@ def encode_pdf_to_base64(pdf_bytes: bytes) -> str:
     Returns:
         Base64 encoded string
     """
-    return base64.b64encode(pdf_bytes).decode('utf-8')
+    return base64.b64encode(bytes(pdf_bytes)).decode("utf-8")
+
+
+def get_cached_report_file_id(report_id: int) -> Optional[str]:
+    return _REPORT_FILE_CACHE.get(report_id)
+
+
+def cache_report_file_id(report_id: int, file_id: str) -> None:
+    _REPORT_FILE_CACHE[report_id] = file_id
 
 
 def upload_pdf_to_openai(pdf_base64: str, filename: str = "report.pdf") -> Optional[str]:
@@ -53,3 +63,15 @@ def upload_pdf_to_openai(pdf_base64: str, filename: str = "report.pdf") -> Optio
         from config import logger
         logger.error(f"Failed to upload PDF to OpenAI: {e}")
         return None
+
+
+def upload_pdf_to_openai_cached(
+    report_id: int, pdf_base64: str, filename: str = "report.pdf"
+) -> Optional[str]:
+    cached = get_cached_report_file_id(report_id)
+    if cached:
+        return cached
+    file_id = upload_pdf_to_openai(pdf_base64, filename=filename)
+    if file_id:
+        cache_report_file_id(report_id, file_id)
+    return file_id

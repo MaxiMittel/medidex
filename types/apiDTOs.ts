@@ -150,7 +150,7 @@ export interface EvaluateRequest {
   report: ReportDto;
   studies: StudyDto[];
   model?: "gpt-5.2" | "gpt-5" | "gpt-5-mini" | "gpt-4.1" | null;
-  temperature?: number | null;
+  include_pdf?: boolean | null;
   prompt_overrides?: PromptOverrides | null;
 }
 
