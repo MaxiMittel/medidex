@@ -1,113 +1,48 @@
-"use client";
+import { getBatches, getReportData } from "@/lib/api/batchApi";
+import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
+import { ReportsPageClient } from "./reports-page-client";
+import type { ReportDetailDto } from "@/types/apiDTOs";
 
-import { useMemo, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useBatchReportsStore } from "../../../hooks/use-batch-reports-store";
-import { StudyDetailContent } from "./components/study-detail-content";
+interface ReportsPageProps {
+  searchParams: Promise<{ batch?: string }>;
+}
 
-export default function ReportsPage() {
-  const router = useRouter();
-  const {
-    batches,
-    reportsByBatch,
-    selectedBatchHash,
-    loading,
-    loadingReports,
-    loadingMoreReports,
-    error,
-  } = useBatchReportsStore();
+export default async function ReportsPage({ searchParams }: ReportsPageProps) {
+  const { batch: selectedBatchHash } = await searchParams;
 
-  // Redirect to home page if no batch is selected and not loading
-  useEffect(() => {
-    if (!loading && !selectedBatchHash && batches.length > 0) {
-      router.replace("/");
+  // Fetch batches on the server
+  const headers = await getMeerkatHeaders();
+  const batches = await getBatches({ headers });
+
+  // If a batch is selected, fetch initial reports for it
+  let initialReports: ReportDetailDto[] = [];
+
+  if (selectedBatchHash) {
+    const selectedBatch = batches.find((b) => b.batch_hash === selectedBatchHash);
+
+    if (selectedBatch && selectedBatch.number_reports && selectedBatch.number_reports > 0) {
+      const INITIAL_BATCH_SIZE = 10;
+      const initialBatchSize = Math.min(INITIAL_BATCH_SIZE, selectedBatch.number_reports);
+
+      // Fetch initial reports in parallel
+      const reportPromises = Array.from({ length: initialBatchSize }, (_, index) =>
+        getReportData(selectedBatchHash, index, { headers })
+      );
+
+      try {
+        initialReports = await Promise.all(reportPromises);
+      } catch (error) {
+        console.error("Error fetching initial reports:", error);
+        // Continue with empty reports - client will handle the error state
+      }
     }
-  }, [loading, selectedBatchHash, batches.length, router]);
-
-  const reports = useMemo(() => {
-    if (!selectedBatchHash) {
-      return [];
-    }
-    const batchReports = reportsByBatch[selectedBatchHash] || [];
-    return batchReports.map((report, index) => {
-      const assignedStudies = report.assigned_studies ?? [];
-      return {
-        reportIndex: index,
-        batchHash: selectedBatchHash,
-        assignedStudyIds: assignedStudies,
-        CENTRALReportID: report.trial_id
-          ? Number(report.trial_id) || null
-          : null,
-        CRGReportID: report.crgreportid,
-        Title: report.title,
-        Abstract: report.abstract ?? undefined,
-        Year: report.year ?? undefined,
-        Authors: report.authors ? report.authors.join(", ") : undefined,
-        Assigned: assignedStudies.length > 0,
-        AssignedTo: assignedStudies.join(", "),
-      };
-    });
-  }, [reportsByBatch, selectedBatchHash]);
-
-  const selectedBatch = useMemo(() => {
-    return batches.find((b) => b.batch_hash === selectedBatchHash);
-  }, [batches, selectedBatchHash]);
+  }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {loading && (
-        <p className="text-muted-foreground text-sm mt-2 shrink-0">
-          Loading batches from Meerkat API...
-        </p>
-      )}
-
-      {error && (
-        <div className="p-4 text-sm text-red-500 border-b bg-red-50 shrink-0">
-          {error}
-        </div>
-      )}
-
-      {loadingReports && (
-        <div className="p-4 text-sm text-muted-foreground border-b shrink-0">
-          Loading reports for {selectedBatch?.batch_description}...
-        </div>
-      )}
-
-      {loadingMoreReports && !loadingReports && (
-        <div className="p-4 text-sm text-muted-foreground border-b bg-blue-50 shrink-0">
-          Loading additional reports in background...
-        </div>
-      )}
-
-      {!loading && batches.length === 0 && !error && (
-        <div className="p-6 text-muted-foreground shrink-0">
-          No batches available. Upload a batch to get started.
-        </div>
-      )}
-
-      {!loadingReports && selectedBatchHash && reports.length > 0 ? (
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <StudyDetailContent
-            reports={reports}
-            loadingMore={loadingMoreReports}
-            totalReports={selectedBatch?.number_reports}
-          />
-        </div>
-      ) : (
-        !loadingReports &&
-        selectedBatchHash &&
-        reports.length === 0 && (
-          <div className="p-6 text-muted-foreground shrink-0">
-            No reports found in this batch.
-          </div>
-        )
-      )}
-
-      {!selectedBatchHash && batches.length > 0 && !loading && (
-        <div className="p-6 text-muted-foreground shrink-0">
-          Redirecting to batch selection...
-        </div>
-      )}
-    </div>
+    <ReportsPageClient
+      initialBatches={batches}
+      initialReports={initialReports}
+      selectedBatchHash={selectedBatchHash ?? null}
+    />
   );
 }
