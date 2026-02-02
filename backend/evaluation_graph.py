@@ -37,6 +37,20 @@ from prompts import (
 from schemas import EvalState
 
 
+def get_llm(state: EvalState):
+    llm = state.get("llm")
+    return llm if llm is not None else MODEL
+
+
+def get_prompt(state: EvalState, key: str, default: str) -> str:
+    overrides = state.get("prompt_overrides") or {}
+    if isinstance(overrides, dict):
+        override = overrides.get(key)
+        if isinstance(override, str) and override.strip():
+            return override
+    return default
+
+
 def load_next_initial(state: EvalState) -> dict:
     """Load the next study for the initial pass, or mark completion."""
     idx = state["idx"]
@@ -74,21 +88,12 @@ def classify_initial(state: EvalState) -> dict:
 
     logger.info("classify_initial: study_id=%s", current.CRGStudyID)
     user_payload = build_user_payload(state["report"], current)
-    evaluation_prompt = state.get("evaluation_prompt")
-    prompt = DEFAULT_EVAL_PROMPT
+    prompt = get_prompt(state, "initial_eval_prompt", DEFAULT_EVAL_PROMPT)
+    logger.info("classify_initial: prompt_used=%s", prompt[:60])
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
-        if evaluation_prompt:
-            messages.append(
-                SystemMessage(
-                    content=(
-                        "Doctor instructions (follow as primary guidance): "
-                        f"{evaluation_prompt}"
-                    )
-                )
-            )
         messages.append(HumanMessage(content=user_payload))
-        response = MODEL.invoke(messages)
+        response = get_llm(state).invoke(messages)
         content = response.content
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
         decision, reason = parse_initial_response(text)
@@ -138,21 +143,11 @@ def select_very_likely(state: EvalState) -> dict:
 
     candidate_ids = {str(item.get("study_id")) for item in candidates if item.get("study_id")}
     payload = build_likely_group_payload(state["report"], candidates, state["studies"])
-    evaluation_prompt = state.get("evaluation_prompt")
-    prompt = DEFAULT_LIKELY_GROUP_PROMPT
+    prompt = get_prompt(state, "likely_group_prompt", DEFAULT_LIKELY_GROUP_PROMPT)
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
-        if evaluation_prompt:
-            messages.append(
-                SystemMessage(
-                    content=(
-                        "Doctor instructions (follow as primary guidance): "
-                        f"{evaluation_prompt}"
-                    )
-                )
-            )
         messages.append(HumanMessage(content=payload))
-        response = MODEL.invoke(messages)
+        response = get_llm(state).invoke(messages)
         content = response.content
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
         selected_ids, reason = parse_likely_group_response(text, candidate_ids)
@@ -229,21 +224,11 @@ def compare_very_likely(state: EvalState) -> dict:
 
     candidate_ids = {str(item.get("study_id")) for item in candidates if item.get("study_id")}
     payload = build_likely_compare_payload(state["report"], candidates, state["studies"])
-    evaluation_prompt = state.get("evaluation_prompt")
-    prompt = DEFAULT_LIKELY_COMPARE_PROMPT
+    prompt = get_prompt(state, "likely_compare_prompt", DEFAULT_LIKELY_COMPARE_PROMPT)
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
-        if evaluation_prompt:
-            messages.append(
-                SystemMessage(
-                    content=(
-                        "Doctor instructions (follow as primary guidance): "
-                        f"{evaluation_prompt}"
-                    )
-                )
-            )
         messages.append(HumanMessage(content=payload))
-        response = MODEL.invoke(messages)
+        response = get_llm(state).invoke(messages)
         content = response.content
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
         decision, reason, study_id = parse_likely_compare_response(text, candidate_ids)
@@ -383,21 +368,11 @@ def classify_unsure(state: EvalState) -> dict:
         prior_reason,
         state["studies"],
     )
-    evaluation_prompt = state.get("evaluation_prompt")
-    prompt = DEFAULT_UNSURE_REVIEW_PROMPT
+    prompt = get_prompt(state, "unsure_review_prompt", DEFAULT_UNSURE_REVIEW_PROMPT)
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
-        if evaluation_prompt:
-            messages.append(
-                SystemMessage(
-                    content=(
-                        "Doctor instructions (follow as primary guidance): "
-                        f"{evaluation_prompt}"
-                    )
-                )
-            )
         messages.append(HumanMessage(content=payload))
-        response = MODEL.invoke(messages)
+        response = get_llm(state).invoke(messages)
         content = response.content
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
         decision, reason = parse_unsure_review_response(text)
@@ -454,22 +429,12 @@ def summarize_evaluation(state: EvalState) -> dict:
         state.get("likely_matches", []),
         state.get("very_likely", []),
     )
-    evaluation_prompt = state.get("evaluation_prompt")
-    prompt = DEFAULT_SUMMARY_PROMPT
+    prompt = get_prompt(state, "summary_prompt", DEFAULT_SUMMARY_PROMPT)
 
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
-        if evaluation_prompt:
-            messages.append(
-                SystemMessage(
-                    content=(
-                        "Doctor instructions (follow as primary guidance): "
-                        f"{evaluation_prompt}"
-                    )
-                )
-            )
         messages.append(HumanMessage(content=payload))
-        response = MODEL.invoke(messages)
+        response = get_llm(state).invoke(messages)
         content = response.content
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
         has_match, summary = parse_summary_response(text)

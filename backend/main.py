@@ -32,18 +32,44 @@ app.add_middleware(
 
 @app.post("/evaluate", response_model=EvaluateResponse)
 def evaluate(req: EvaluateRequest) -> EvaluateResponse:
-    logger.info("evaluate: studies=%s has_prompt=%s", len(req.studies), bool(req.evaluation_prompt))
-    return run_evaluation(req.report, req.studies, req.evaluation_prompt)
+    logger.info(
+        "evaluate: studies=%s model=%s temperature=%s",
+        len(req.studies),
+        req.model,
+        req.temperature,
+    )
+    prompt_overrides = req.prompt_overrides.model_dump() if req.prompt_overrides else None
+    return run_evaluation(
+        req.report,
+        req.studies,
+        prompt_overrides,
+        req.model,
+        req.temperature,
+    )
 
 
 @app.post("/evaluate/stream")
 def evaluate_stream(req: EvaluateRequest) -> StreamingResponse:
-    logger.info("evaluate_stream: studies=%s has_prompt=%s", len(req.studies), bool(req.evaluation_prompt))
-    initial_state = build_initial_state(req.report, req.studies, req.evaluation_prompt)
+    logger.info(
+        "evaluate_stream: studies=%s model=%s temperature=%s",
+        len(req.studies),
+        req.model,
+        req.temperature,
+    )
+    prompt_overrides = req.prompt_overrides.model_dump() if req.prompt_overrides else None
+    initial_state = build_initial_state(
+        req.report,
+        req.studies,
+        prompt_overrides,
+        req.model,
+        req.temperature,
+    )
 
     def event_stream():
         for event in GRAPH.stream(initial_state, stream_mode="updates"):
             summary = summarize_stream_event(event)
+            if summary is None:
+                continue
             payload = jsonable_encoder(summary)
             yield f"data: {json.dumps(payload, ensure_ascii=True)}\n\n"
         yield "data: {\"event\":\"complete\"}\n\n"
@@ -52,9 +78,15 @@ def evaluate_stream(req: EvaluateRequest) -> StreamingResponse:
 
 
 @app.get("/evaluate/stream/mock")
-def evaluate_stream_mock(evaluation_prompt: str | None = None) -> StreamingResponse:
-    logger.info("evaluate_stream_mock: has_prompt=%s", bool(evaluation_prompt))
-    initial_state = build_initial_state(MOCK_REPORT, MOCK_STUDIES, evaluation_prompt)
+def evaluate_stream_mock() -> StreamingResponse:
+    logger.info("evaluate_stream_mock")
+    initial_state = build_initial_state(
+        MOCK_REPORT,
+        MOCK_STUDIES,
+        None,
+        None,
+        None,
+    )
 
     def event_stream():
         for event in GRAPH.stream(initial_state, stream_mode="updates"):
@@ -67,10 +99,15 @@ def evaluate_stream_mock(evaluation_prompt: str | None = None) -> StreamingRespo
 
 
 @app.get("/evaluate/mock", response_model=EvaluateResponse)
-def evaluate_mock(evaluation_prompt: str | None = None) -> EvaluateResponse:
-    logger.info("evaluate_mock: has_prompt=%s", bool(evaluation_prompt))
-    return run_evaluation(MOCK_REPORT, MOCK_STUDIES, evaluation_prompt)
-
+def evaluate_mock() -> EvaluateResponse:
+    logger.info("evaluate_mock")
+    return run_evaluation(
+        MOCK_REPORT,
+        MOCK_STUDIES,
+        None,
+        None,
+        None,
+    )
 
 # PDF Evaluation Endpoints
 
@@ -122,4 +159,3 @@ def evaluate_pdf_stream_mock(evaluation_prompt: str | None = None) -> StreamingR
         yield "data: {\"event\":\"complete\"}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
-

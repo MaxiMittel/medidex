@@ -6,7 +6,7 @@ import type { AIClassification } from "@/hooks/use-genai-evaluation";
 
 interface StudyAIBadgeProps {
   classification: AIClassification;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent) => void;
 }
 
 const classificationConfig: Record<

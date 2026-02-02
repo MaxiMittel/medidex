@@ -49,13 +49,17 @@ import { Spinner } from "@/components/ui/spinner";
 import { StudyOverview } from "./study-overview";
 import { StudyDetails } from "./study-details";
 import { AddStudyDialog } from "./add-study-dialog";
+import { AIMatchSettingsDialog } from "./ai-match-settings-dialog";
 import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
 import { LoadMoreStudiesButton } from "./load-more-studies-button";
 import { sendReportEvent } from "@/lib/api/reportEventsApi";
 import { useGenAIEvaluation } from "@/hooks/use-genai-evaluation";
-import { AIEvaluationPrompt } from "./ai-evaluation-prompt";
+import type { AIModel } from "@/hooks/use-genai-evaluation";
+import type { PromptOverrides } from "@/types/apiDTOs";
 import { StudyAIBadge } from "./study-ai-badge";
 import { StudyAIReasonDialog } from "./study-ai-reason-dialog";
+import { AiEvaluationProgress } from "./ai-evaluation-progress";
+import { AiEvaluationHistoryDialog } from "./ai-evaluation-history-dialog";
 import { Separator } from "../../../../components/ui/separator";
 
 interface StudyRelevanceTableProps {
@@ -108,9 +112,20 @@ export function StudyRelevanceTable({
   );
 
   // AI Evaluation state
-  const { evaluate, getStudyResult, loading: aiLoading, error: aiError } = useGenAIEvaluation();
+  const { 
+    evaluate,
+    evaluateStream,
+    getStudyResult, 
+    loading: aiLoading, 
+    error: aiError,
+    isStreaming,
+    streamMessages,
+    currentMessage,
+  } = useGenAIEvaluation();
   const [evaluationPrompt, setEvaluationPrompt] = useState("");
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [reasonDialogOpen, setReasonDialogOpen] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedAIStudy, setSelectedAIStudy] = useState<{
     studyId: number;
     studyName: string;
@@ -125,8 +140,7 @@ export function StudyRelevanceTable({
 
   // Reset evaluation state when report changes
   useEffect(() => {
-    setHasEvaluated(false);
-    setEvaluationPrompt("");
+    setAiDialogOpen(false);
   }, [currentBatchHash, currentReportIndex]);
 
   // Filter and sort studies
@@ -149,34 +163,43 @@ export function StudyRelevanceTable({
     return filtered.sort((a, b) => b.Relevance - a.Relevance);
   }, [studies, searchQuery]);
 
-  const handleAIEvaluation = async () => {
+  const handleAIEvaluation = async (options: {
+    model?: AIModel;
+    temperature?: number;
+    promptOverrides?: PromptOverrides;
+  }) => {
     if (!currentBatchHash || currentReportIndex === undefined) {
       toast.error("Missing batch or report context");
-      return;
+      return false;
     }
 
     const currentReport = reportsByBatch[currentBatchHash]?.[currentReportIndex];
     if (!currentReport) {
       toast.error("Report not found");
-      return;
+      return false;
     }
 
     try {
       toast.info(`Evaluating ${filteredStudies.length} studies with AI...`);
-      await evaluate(
+      setHasEvaluated(true);
+      evaluateStream(
         currentBatchHash,
         currentReportIndex,
         currentReport,
         filteredStudies,
-        evaluationPrompt || undefined
+        options,
+        () => {
+          toast.success("AI evaluation complete!");
+        }
       );
-      setHasEvaluated(true);
-      toast.success("AI evaluation complete!");
+      
+      return true;
     } catch (error) {
       toast.error(
         `AI evaluation failed: ${error instanceof Error ? error.message : "Unknown error"
         }`
       );
+      return false;
     }
   };
 
@@ -509,17 +532,16 @@ export function StudyRelevanceTable({
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
+      <AIMatchSettingsDialog
+        open={aiDialogOpen}
+        onOpenChange={setAiDialogOpen}
+        onEvaluate={handleAIEvaluation}
+        isRunning={aiLoading}
+        disableRun={filteredStudies.length === 0}
+      />
+
       {/* Header - Sticky */}
       <div className="shrink-0 space-y-4 pb-4">
-        {/* AI Evaluation Prompt */}
-        {currentBatchHash !== undefined && currentReportIndex !== undefined && (
-          <AIEvaluationPrompt
-            value={evaluationPrompt}
-            onChange={setEvaluationPrompt}
-            disabled={aiLoading || hasEvaluated}
-          />
-        )}
-
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-1.5 rounded-md bg-primary/10">
@@ -539,8 +561,8 @@ export function StudyRelevanceTable({
                     size="sm"
                     variant="outline"
                     className="h-8 gap-2"
-                    onClick={handleAIEvaluation}
-                    disabled={aiLoading || filteredStudies.length === 0 || hasEvaluated}
+                    onClick={() => setAiDialogOpen(true)}
+                    disabled={aiLoading || filteredStudies.length === 0}
                   >
                     {aiLoading ? (
                       <Spinner className="h-4 w-4" />
@@ -549,6 +571,16 @@ export function StudyRelevanceTable({
                     )}
                     AI Match
                   </Button>
+                  {hasEvaluated && streamMessages.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 gap-2"
+                      onClick={() => setHistoryDialogOpen(true)}
+                    >
+                      Show Step History
+                    </Button>
+                  )}
                   <AddStudyDialog
                     currentBatchHash={currentBatchHash}
                     currentReportIndex={currentReportIndex}
@@ -580,6 +612,14 @@ export function StudyRelevanceTable({
           )}
         </div>
       </div>
+
+      {/* AI Evaluation Progress */}
+      {isStreaming && (
+        <AiEvaluationProgress
+          currentMessage={currentMessage}
+          isStreaming={isStreaming}
+        />
+      )}
 
       {/* Scrollable Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
@@ -724,12 +764,13 @@ export function StudyRelevanceTable({
                                 return aiResult ? (
                                   <StudyAIBadge
                                     classification={aiResult.classification}
-                                    onClick={() =>
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       handleAIBadgeClick(
                                         study.CRGStudyID,
                                         study.ShortName
-                                      )
-                                    }
+                                      );
+                                    }}
                                   />
                                 ) : null;
                               })()}
@@ -1081,6 +1122,12 @@ export function StudyRelevanceTable({
           }
         />
       )}
+
+      <AiEvaluationHistoryDialog
+        open={historyDialogOpen}
+        onOpenChange={setHistoryDialogOpen}
+        streamMessages={streamMessages}
+      />
     </div>
   );
 }
