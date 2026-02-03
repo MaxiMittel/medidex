@@ -36,6 +36,12 @@ def apply_background_prompt(prompt: str, background: str) -> str:
     return f"{background} {prompt}"
 
 
+def append_prompt_note(prompt: str, note: str) -> str:
+    if not note.strip():
+        return prompt
+    return f"{prompt} {note}"
+
+
 def invoke_structured(state: EvalState, messages: list, schema: object):
     llm = get_llm(state)
     last_exc: Exception | None = None

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +55,7 @@ import { LoadMoreStudiesButton } from "./load-more-studies-button";
 import { sendReportEvent } from "@/lib/api/reportEventsApi";
 import { useGenAIEvaluation } from "@/hooks/use-genai-evaluation";
 import type { AIModel } from "@/hooks/use-genai-evaluation";
-import type { PromptOverrides } from "@/types/apiDTOs";
+import type { NewStudySuggestion, PromptOverrides } from "@/types/apiDTOs";
 import { StudyAIBadge } from "./study-ai-badge";
 import { StudyAIReasonDialog } from "./study-ai-reason-dialog";
 import { AiEvaluationProgress } from "./ai-evaluation-progress";
@@ -86,6 +86,7 @@ export function StudyRelevanceTable({
   getLastInteraction,
 }: StudyRelevanceTableProps) {
   const {
+    addStudyDialogOpen,
     studyDetails,
     studyDetailsLoading,
     fetchStudyDetails,
@@ -94,6 +95,8 @@ export function StudyRelevanceTable({
     fetchSimilarStudiesForReport,
     fetchAssignedStudiesForReport,
     reportsByBatch,
+    setNewStudyForm,
+    resetNewStudyForm,
   } = useBatchReportsStore();
   const [linkedStudies, setLinkedStudies] = useState<Set<number>>(
     new Set(studies.filter((s) => s.Linked).map((s) => s.CRGStudyID))
@@ -131,6 +134,91 @@ export function StudyRelevanceTable({
     studyName: string;
   } | null>(null);
   const [hasEvaluated, setHasEvaluated] = useState(false);
+  const wasAddStudyDialogOpen = useRef(false);
+  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
+
+  const summaryEvent = useMemo(
+    () =>
+      [...streamMessages]
+        .reverse()
+        .find((event) => event.node === "summarize_evaluation"),
+    [streamMessages]
+  );
+  const suggestionEvent = useMemo(
+    () =>
+      [...streamMessages]
+        .reverse()
+        .find((event) => event.node === "suggest_new_study"),
+    [streamMessages]
+  );
+  const summaryDetails = summaryEvent?.details;
+  const newStudySuggestion: NewStudySuggestion | undefined =
+    summaryDetails?.has_match === false && suggestionEvent?.details?.new_study
+      ? suggestionEvent.details.new_study
+      : undefined;
+
+  const normalizedSuggestion = useMemo(() => {
+    if (!newStudySuggestion) return null;
+    const safe = (value: string | undefined) => (value ?? "").trim();
+    const normalizeChoice = (value: string, allowed: string[]) =>
+      allowed.includes(value) ? value : "";
+    const extractNumber = (value: string) => {
+      const match = value.match(/\d+/);
+      return match ? match[0] : "0";
+    };
+
+    return {
+      short_name: safe(newStudySuggestion.short_name),
+      status_of_study: normalizeChoice(safe(newStudySuggestion.status_of_study), [
+        "Closed",
+        "Stopped early",
+        "Open/Ongoing",
+        "Planned",
+      ]),
+      countries: safe(newStudySuggestion.countries) || "Unclear",
+      central_submission_status: normalizeChoice(
+        safe(newStudySuggestion.central_submission_status),
+        ["Accepted", "Pending", "Rejected", "Not Cochrane"]
+      ),
+      duration: safe(newStudySuggestion.duration) || "Uncertain",
+      number_of_participants: extractNumber(
+        safe(newStudySuggestion.number_of_participants)
+      ),
+      comparison: safe(newStudySuggestion.comparison),
+    };
+  }, [newStudySuggestion]);
+
+  const suggestionKey = normalizedSuggestion
+    ? JSON.stringify(normalizedSuggestion)
+    : null;
+
+  const shouldHighlightSuggestion = Boolean(suggestionKey) && !suggestionDismissed;
+
+  useEffect(() => {
+    if (addStudyDialogOpen && !wasAddStudyDialogOpen.current) {
+      if (normalizedSuggestion && suggestionKey && !suggestionDismissed) {
+        setNewStudyForm(normalizedSuggestion);
+      }
+    }
+
+    if (!addStudyDialogOpen && wasAddStudyDialogOpen.current) {
+      setSuggestionDismissed(true);
+      resetNewStudyForm();
+    }
+
+    wasAddStudyDialogOpen.current = addStudyDialogOpen;
+  }, [
+    addStudyDialogOpen,
+    normalizedSuggestion,
+    resetNewStudyForm,
+    setNewStudyForm,
+    suggestionKey,
+    suggestionDismissed,
+  ]);
+
+  useEffect(() => {
+    setSuggestionDismissed(false);
+  }, [suggestionKey]);
 
   useEffect(() => {
     setLinkedStudies(
@@ -585,6 +673,10 @@ export function StudyRelevanceTable({
                     currentBatchHash={currentBatchHash}
                     currentReportIndex={currentReportIndex}
                     currentReportCRGId={currentReportCRGId}
+                    highlight={shouldHighlightSuggestion}
+                    onStudySaved={() => {
+                      setSuggestionDismissed(true);
+                    }}
                   />
                 </>
               )}
@@ -614,12 +706,16 @@ export function StudyRelevanceTable({
       </div>
 
       {/* AI Evaluation Progress */}
-      {isStreaming && (
-        <AiEvaluationProgress
-          currentMessage={currentMessage}
-          isStreaming={isStreaming}
-        />
-      )}
+      <AiEvaluationProgress
+        message={
+          currentMessage ||
+          summaryEvent?.message ||
+          streamMessages[streamMessages.length - 1]?.message ||
+          null
+        }
+        isStreaming={isStreaming}
+        hasSummary={Boolean(summaryEvent?.message)}
+      />
 
       {/* Scrollable Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
