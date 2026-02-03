@@ -72,12 +72,39 @@ class StudyDto(BaseModel):
 
 
 class PromptOverrides(BaseModel):
+    background_prompt: str | None = None
     initial_eval_prompt: str | None = None
     likely_group_prompt: str | None = None
     likely_compare_prompt: str | None = None
     unsure_review_prompt: str | None = None
     summary_prompt: str | None = None
     pdf_prompt: str | None = None
+
+
+class InitialDecisionOutput(BaseModel):
+    decision: Literal["not_match", "unsure", "likely_match"]
+    reason: str
+
+
+class LikelyGroupOutput(BaseModel):
+    very_likely_ids: list[str]
+    reason: str
+
+
+class LikelyCompareOutput(BaseModel):
+    decision: Literal["match", "unsure"]
+    study_id: str
+    reason: str
+
+
+class UnsureReviewOutput(BaseModel):
+    decision: Literal["match", "unsure", "not_match"]
+    reason: str
+
+
+class SummaryOutput(BaseModel):
+    has_match: bool
+    summary: str
 
 
 class EvaluateRequest(BaseModel):

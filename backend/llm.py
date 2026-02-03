@@ -9,7 +9,6 @@ DEFAULT_MODEL = "gpt-5"
 def build_llm(model: str | None = None) -> ChatOpenAI:
     return ChatOpenAI(
         model=model or DEFAULT_MODEL,
-        model_kwargs={"response_format": {"type": "json_object"}},
     )
 
 

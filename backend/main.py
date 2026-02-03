@@ -11,6 +11,15 @@ from evaluator import build_initial_state, run_evaluation
 from evaluation_graph import GRAPH
 from mock_data import MOCK_REPORT, MOCK_STUDIES
 from schemas import EvaluateRequest, EvaluateResponse
+from prompts import (
+    BACKGROUND_PROMPT,
+    DEFAULT_EVAL_PROMPT,
+    DEFAULT_LIKELY_COMPARE_PROMPT,
+    DEFAULT_LIKELY_GROUP_PROMPT,
+    DEFAULT_SUMMARY_PROMPT,
+    DEFAULT_UNSURE_REVIEW_PROMPT,
+    PDF_ATTACHMENT_NOTE,
+)
 from streaming import summarize_stream_event
 
 app = FastAPI(title="Medidex AI Demo")
@@ -103,3 +112,16 @@ def evaluate_mock() -> EvaluateResponse:
         None,
         False,
     )
+
+
+@app.get("/prompts")
+def get_default_prompts() -> dict:
+    return {
+        "background_prompt": BACKGROUND_PROMPT,
+        "initial_eval_prompt": DEFAULT_EVAL_PROMPT,
+        "likely_group_prompt": DEFAULT_LIKELY_GROUP_PROMPT,
+        "likely_compare_prompt": DEFAULT_LIKELY_COMPARE_PROMPT,
+        "unsure_review_prompt": DEFAULT_UNSURE_REVIEW_PROMPT,
+        "summary_prompt": DEFAULT_SUMMARY_PROMPT,
+        "pdf_prompt": PDF_ATTACHMENT_NOTE,
+    }

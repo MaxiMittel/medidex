@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import json
-
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
 
 from config import logger
 from evaluation_utils import (
+    apply_background_prompt,
     get_bucket_entry,
-    get_llm,
+    get_background_prompt,
     get_prompt,
+    invoke_structured,
     get_study_by_id,
     remove_from_bucket,
     upsert_bucket,
@@ -27,21 +27,22 @@ from pdf_utils import (
     build_report_pdf_attachment,
     get_pdf_prompt_note,
 )
-from parsers import (
-    parse_initial_response,
-    parse_likely_compare_response,
-    parse_likely_group_response,
-    parse_summary_response,
-    parse_unsure_review_response,
-)
 from prompts import (
+    BACKGROUND_PROMPT,
     DEFAULT_EVAL_PROMPT,
     DEFAULT_LIKELY_COMPARE_PROMPT,
     DEFAULT_LIKELY_GROUP_PROMPT,
     DEFAULT_SUMMARY_PROMPT,
     DEFAULT_UNSURE_REVIEW_PROMPT,
 )
-from schemas import EvalState
+from schemas import (
+    EvalState,
+    InitialDecisionOutput,
+    LikelyCompareOutput,
+    LikelyGroupOutput,
+    SummaryOutput,
+    UnsureReviewOutput,
+)
 
 
 def prepare_report_pdf(state: EvalState) -> dict:
@@ -92,8 +93,12 @@ def classify_initial(state: EvalState) -> dict:
 
     logger.info("classify_initial: study_id=%s", current.CRGStudyID)
     user_payload = build_user_payload(state["report"], current)
-    prompt = apply_pdf_prompt_note(
+    prompt = apply_background_prompt(
         get_prompt(state, "initial_eval_prompt", DEFAULT_EVAL_PROMPT),
+        get_background_prompt(state, BACKGROUND_PROMPT),
+    )
+    prompt = apply_pdf_prompt_note(
+        prompt,
         state.get("include_pdf", False),
         bool(state.get("report_pdf_attachment")),
         get_pdf_prompt_note(state),
@@ -102,10 +107,9 @@ def classify_initial(state: EvalState) -> dict:
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
         messages.append(HumanMessage(content=build_human_content(state, user_payload)))
-        response = get_llm(state).invoke(messages)
-        content = response.content
-        text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
-        decision, reason = parse_initial_response(text)
+        result = invoke_structured(state, messages, InitialDecisionOutput)
+        decision = result.decision
+        reason = result.reason
         logger.info("classify_initial: decision=%s", decision)
     except Exception as exc:
         decision, reason = "unsure", f"LLM call failed: {exc.__class__.__name__}"
@@ -152,8 +156,12 @@ def select_very_likely(state: EvalState) -> dict:
 
     candidate_ids = {str(item.get("study_id")) for item in candidates if item.get("study_id")}
     payload = build_likely_group_payload(state["report"], candidates, state["studies"])
-    prompt = apply_pdf_prompt_note(
+    prompt = apply_background_prompt(
         get_prompt(state, "likely_group_prompt", DEFAULT_LIKELY_GROUP_PROMPT),
+        get_background_prompt(state, BACKGROUND_PROMPT),
+    )
+    prompt = apply_pdf_prompt_note(
+        prompt,
         state.get("include_pdf", False),
         bool(state.get("report_pdf_attachment")),
         get_pdf_prompt_note(state),
@@ -161,10 +169,17 @@ def select_very_likely(state: EvalState) -> dict:
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
         messages.append(HumanMessage(content=build_human_content(state, payload)))
-        response = get_llm(state).invoke(messages)
-        content = response.content
-        text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
-        selected_ids, reason = parse_likely_group_response(text, candidate_ids)
+        result = invoke_structured(state, messages, LikelyGroupOutput)
+        raw_ids = result.very_likely_ids or []
+        selected_ids: list[str] = []
+        for item in raw_ids:
+            study_id = str(item).strip()
+            if not study_id or study_id not in candidate_ids:
+                continue
+            if study_id not in selected_ids:
+                selected_ids.append(study_id)
+        selected_ids = selected_ids[:2]
+        reason = result.reason
         logger.info("select_very_likely: selected=%s", selected_ids)
     except Exception as exc:
         selected_ids, reason = [], f"LLM call failed: {exc.__class__.__name__}"
@@ -238,8 +253,12 @@ def compare_very_likely(state: EvalState) -> dict:
 
     candidate_ids = {str(item.get("study_id")) for item in candidates if item.get("study_id")}
     payload = build_likely_compare_payload(state["report"], candidates, state["studies"])
-    prompt = apply_pdf_prompt_note(
+    prompt = apply_background_prompt(
         get_prompt(state, "likely_compare_prompt", DEFAULT_LIKELY_COMPARE_PROMPT),
+        get_background_prompt(state, BACKGROUND_PROMPT),
+    )
+    prompt = apply_pdf_prompt_note(
+        prompt,
         state.get("include_pdf", False),
         bool(state.get("report_pdf_attachment")),
         get_pdf_prompt_note(state),
@@ -247,10 +266,17 @@ def compare_very_likely(state: EvalState) -> dict:
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
         messages.append(HumanMessage(content=build_human_content(state, payload)))
-        response = get_llm(state).invoke(messages)
-        content = response.content
-        text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
-        decision, reason, study_id = parse_likely_compare_response(text, candidate_ids)
+        result = invoke_structured(state, messages, LikelyCompareOutput)
+        decision = result.decision
+        reason = result.reason
+        study_id = result.study_id
+        if decision == "match":
+            if not study_id.strip() or study_id not in candidate_ids:
+                decision = "unsure"
+                reason = "Missing or invalid study_id for match decision."
+                study_id = None
+        else:
+            study_id = None
         logger.info("compare_very_likely: decision=%s", decision)
     except Exception as exc:
         decision, reason, study_id = "unsure", f"LLM call failed: {exc.__class__.__name__}", None
@@ -387,8 +413,12 @@ def classify_unsure(state: EvalState) -> dict:
         prior_reason,
         state["studies"],
     )
-    prompt = apply_pdf_prompt_note(
+    prompt = apply_background_prompt(
         get_prompt(state, "unsure_review_prompt", DEFAULT_UNSURE_REVIEW_PROMPT),
+        get_background_prompt(state, BACKGROUND_PROMPT),
+    )
+    prompt = apply_pdf_prompt_note(
+        prompt,
         state.get("include_pdf", False),
         bool(state.get("report_pdf_attachment")),
         get_pdf_prompt_note(state),
@@ -396,10 +426,9 @@ def classify_unsure(state: EvalState) -> dict:
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
         messages.append(HumanMessage(content=build_human_content(state, payload)))
-        response = get_llm(state).invoke(messages)
-        content = response.content
-        text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
-        decision, reason = parse_unsure_review_response(text)
+        result = invoke_structured(state, messages, UnsureReviewOutput)
+        decision = result.decision
+        reason = result.reason
         logger.info("classify_unsure: decision=%s", decision)
     except Exception as exc:
         decision, reason = "unsure", f"LLM call failed: {exc.__class__.__name__}"
@@ -453,8 +482,12 @@ def summarize_evaluation(state: EvalState) -> dict:
         state.get("likely_matches", []),
         state.get("very_likely", []),
     )
-    prompt = apply_pdf_prompt_note(
+    prompt = apply_background_prompt(
         get_prompt(state, "summary_prompt", DEFAULT_SUMMARY_PROMPT),
+        get_background_prompt(state, BACKGROUND_PROMPT),
+    )
+    prompt = apply_pdf_prompt_note(
+        prompt,
         state.get("include_pdf", False),
         bool(state.get("report_pdf_attachment")),
         get_pdf_prompt_note(state),
@@ -463,10 +496,9 @@ def summarize_evaluation(state: EvalState) -> dict:
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
         messages.append(HumanMessage(content=build_human_content(state, payload)))
-        response = get_llm(state).invoke(messages)
-        content = response.content
-        text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
-        has_match, summary = parse_summary_response(text)
+        result = invoke_structured(state, messages, SummaryOutput)
+        has_match = result.has_match
+        summary = result.summary
         logger.info("summarize_evaluation: has_match=%s", has_match)
     except Exception as exc:
         has_match, summary = None, f"LLM call failed: {exc.__class__.__name__}"
