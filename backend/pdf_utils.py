@@ -9,7 +9,7 @@ from openai import OpenAI
 from config import logger
 from llm_payloads import build_content_blocks_with_report_pdf
 from meerkat_client import fetch_report_pdf
-from prompts import PDF_ATTACHMENT_NOTE
+from prompts import PDF_ATTACHMENT_NOTE, PDF_ATTACHMENT_PAYLOAD_NOTE
 from schemas import EvalState, ReportDto
 
 _REPORT_FILE_CACHE: dict[int, str] = {}
@@ -145,7 +145,10 @@ def apply_pdf_prompt_note(
 ) -> str:
     if not include_pdf or not has_attachment:
         return prompt
-    return f"{prompt} {pdf_note}"
+    note_parts = [PDF_ATTACHMENT_PAYLOAD_NOTE]
+    if pdf_note.strip():
+        note_parts.append(pdf_note)
+    return f"{prompt} {' '.join(note_parts)}"
 
 
 def build_human_content(state: EvalState, payload: str):

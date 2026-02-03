@@ -12,7 +12,7 @@ import type {
 import type { CreateStudyPayload } from "@/lib/api/studiesApi";
 import type { RelevanceStudy, StudyDetailData } from "../types/reports";
 
-type NewStudyFormState = {
+export type NewStudyFormState = {
   short_name: string;
   status_of_study: string;
   countries: string;
@@ -90,6 +90,7 @@ export interface BatchReportsState {
     value: NewStudyFormState[K]
   ) => void;
   resetNewStudyForm: () => void;
+  setNewStudyForm: (form: Partial<NewStudyFormState>) => void;
   submitNewStudy: (options?: { reportIndex?: number; batchHash?: string; reportCRGId?: number }) => Promise<StudyDto>;
 }
 
@@ -682,15 +683,20 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
   },
   setAddStudyDialogOpen: (open: boolean) => {
     set({ addStudyDialogOpen: open });
-    if (!open) {
-      set({ newStudyForm: initialNewStudyForm });
-    }
   },
   updateNewStudyForm: (field, value) => {
     set((state) => ({
       newStudyForm: {
         ...state.newStudyForm,
         [field]: value,
+      },
+    }));
+  },
+  setNewStudyForm: (form) => {
+    set((state) => ({
+      newStudyForm: {
+        ...state.newStudyForm,
+        ...form,
       },
     }));
   },

@@ -39,12 +39,16 @@ interface AddStudyDialogProps {
   currentBatchHash?: string;
   currentReportIndex?: number;
   currentReportCRGId?: number;
+  highlight?: boolean;
+  onStudySaved?: () => void;
 }
 
 export function AddStudyDialog({
   currentBatchHash,
   currentReportIndex,
-  currentReportCRGId
+  currentReportCRGId,
+  highlight = false,
+  onStudySaved,
 }: AddStudyDialogProps) {
   const [durationValue, setDurationValue] = useState("");
   const [durationUnit, setDurationUnit] = useState("");
@@ -94,6 +98,7 @@ export function AddStudyDialog({
         reportCRGId: currentReportCRGId,
       });
       toast.success("Study created successfully.");
+      onStudySaved?.();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to create study."
@@ -121,11 +126,14 @@ export function AddStudyDialog({
   return (
     <Dialog open={addStudyDialogOpen} onOpenChange={setAddStudyDialogOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" className="h-8">
+        <Button size="sm" className={`h-8 ${highlight ? "ai-new-study-glow" : ""}`}>
           Add New Study
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent
+        className="sm:max-w-lg"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>Add New Study</DialogTitle>
           <DialogDescription>
@@ -312,4 +320,3 @@ export function AddStudyDialog({
     </Dialog>
   );
 }
-

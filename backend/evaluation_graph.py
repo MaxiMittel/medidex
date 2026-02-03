@@ -6,6 +6,7 @@ from langgraph.graph import END, StateGraph
 from config import logger
 from evaluation_utils import (
     apply_background_prompt,
+    append_prompt_note,
     get_bucket_entry,
     get_background_prompt,
     get_prompt,
@@ -34,12 +35,16 @@ from prompts import (
     DEFAULT_LIKELY_GROUP_PROMPT,
     DEFAULT_SUMMARY_PROMPT,
     DEFAULT_UNSURE_REVIEW_PROMPT,
+    PDF_ATTACHMENT_NOTE,
+    SUMMARY_MARKDOWN_NOTE,
+    SUGGEST_NEW_STUDY_PROMPT,
 )
 from schemas import (
     EvalState,
     InitialDecisionOutput,
     LikelyCompareOutput,
     LikelyGroupOutput,
+    SuggestNewStudyOutput,
     SummaryOutput,
     UnsureReviewOutput,
 )
@@ -342,6 +347,14 @@ def route_after_very_likely_compare(state: EvalState) -> str:
     return next_step
 
 
+def route_after_summary(state: EvalState) -> str:
+    summary = state.get("evaluation_summary") or {}
+    has_match = summary.get("has_match")
+    if has_match is False:
+        return "needs_new_study"
+    return "done"
+
+
 def prepare_unsure_review(state: EvalState) -> dict:
     """Initialize the unsure queue for a second-pass review."""
     queue = [str(item.get("study_id")) for item in state.get("unsure", []) if item.get("study_id")]
@@ -486,6 +499,7 @@ def summarize_evaluation(state: EvalState) -> dict:
         get_prompt(state, "summary_prompt", DEFAULT_SUMMARY_PROMPT),
         get_background_prompt(state, BACKGROUND_PROMPT),
     )
+    prompt = append_prompt_note(prompt, SUMMARY_MARKDOWN_NOTE)
     prompt = apply_pdf_prompt_note(
         prompt,
         state.get("include_pdf", False),
@@ -513,6 +527,37 @@ def summarize_evaluation(state: EvalState) -> dict:
     }
 
 
+def suggest_new_study(state: EvalState) -> dict:
+    """Suggest a new study when no match is found."""
+    payload = build_summary_payload(
+        state["report"],
+        state["studies"],
+        state.get("match"),
+        state.get("not_matches", []),
+        state.get("unsure", []),
+        state.get("likely_matches", []),
+        state.get("very_likely", []),
+    )
+    prompt = f"{BACKGROUND_PROMPT} {SUGGEST_NEW_STUDY_PROMPT}"
+    prompt = apply_pdf_prompt_note(
+        prompt,
+        state.get("include_pdf", False),
+        bool(state.get("report_pdf_attachment")),
+        PDF_ATTACHMENT_NOTE,
+    )
+    try:
+        messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
+        messages.append(HumanMessage(content=build_human_content(state, payload)))
+        result = invoke_structured(state, messages, SuggestNewStudyOutput)
+        new_study = result.new_study.model_dump()
+        logger.info("suggest_new_study: ok")
+    except Exception as exc:
+        new_study = None
+        logger.info("suggest_new_study: error=%s", exc.__class__.__name__)
+        logger.info("suggest_new_study: reason=%s", str(exc))
+    return {"new_study_suggestion": new_study}
+
+
 def build_graph():
     """Construct the LangGraph workflow and its routing rules.
 
@@ -522,7 +567,7 @@ def build_graph():
     - Likely pass: select_very_likely -> compare_very_likely -> summarize_evaluation
       (or -> prepare_unsure_review if no definitive match)
     - Unsure pass: prepare_unsure_review -> load_next_unsure -> classify_unsure (loop)
-      -> match_not_found_end -> summarize_evaluation
+      -> match_not_found_end -> summarize_evaluation -> suggest_new_study (if no match)
     """
     logger.info("build_graph: init")
     graph = StateGraph(EvalState)
@@ -536,6 +581,7 @@ def build_graph():
     graph.add_node("classify_unsure", classify_unsure)
     graph.add_node("match_not_found_end", match_not_found_end)
     graph.add_node("summarize_evaluation", summarize_evaluation)
+    graph.add_node("suggest_new_study", suggest_new_study)
 
     graph.set_entry_point("prepare_report_pdf")
     graph.add_edge("prepare_report_pdf", "load_next_initial")
@@ -569,7 +615,12 @@ def build_graph():
     )
     graph.add_edge("classify_unsure", "load_next_unsure")
     graph.add_edge("match_not_found_end", "summarize_evaluation")
-    graph.add_edge("summarize_evaluation", END)
+    graph.add_conditional_edges(
+        "summarize_evaluation",
+        route_after_summary,
+        {"needs_new_study": "suggest_new_study", "done": END},
+    )
+    graph.add_edge("suggest_new_study", END)
     return graph.compile()
 
 

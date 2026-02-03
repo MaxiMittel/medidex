@@ -34,6 +34,7 @@ def build_initial_state(
         "rejected_likely": [],
         "evaluation_summary": None,
         "report_pdf_attachment": None,
+        "new_study_suggestion": None,
     }
 
 
@@ -61,18 +62,16 @@ def run_evaluation(
         len(final_state["unsure"]),
         len(final_state["likely_matches"]),
     )
+    evaluation_summary = (final_state.get("evaluation_summary", {}) or {})
     return EvaluateResponse(
         match=final_state["match"],
         not_matches=final_state["not_matches"],
         unsure=final_state["unsure"],
         likely_matches=final_state["likely_matches"],
         very_likely=final_state["very_likely"],
-        evaluation_has_match=(
-            final_state.get("evaluation_summary", {}) or {}
-        ).get("has_match"),
-        evaluation_summary=(
-            final_state.get("evaluation_summary", {}) or {}
-        ).get("summary"),
+        evaluation_has_match=evaluation_summary.get("has_match"),
+        evaluation_summary=evaluation_summary.get("summary"),
+        evaluation_new_study=final_state.get("new_study_suggestion"),
         total_reviewed=(
             len(final_state["not_matches"])
             + len(final_state["unsure"])

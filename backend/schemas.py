@@ -2,8 +2,15 @@ from __future__ import annotations
 
 from typing import Any, Literal, TypedDict
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
+from constants import (
+    CENTRAL_SUBMISSION_STATUS_OPTIONS,
+    COUNTRY_OPTIONS,
+    DURATION_UNCERTAIN_VALUE,
+    DURATION_UNITS,
+    STATUS_OF_STUDY_OPTIONS,
+)
 Decision = Literal["match", "not_match", "unsure", "likely_match"]
 ModelName = Literal["gpt-5.2", "gpt-5", "gpt-5-mini", "gpt-4.1"]
 
@@ -102,9 +109,66 @@ class UnsureReviewOutput(BaseModel):
     reason: str
 
 
+class NewStudySuggestion(BaseModel):
+    short_name: str
+    status_of_study: Literal["Closed", "Stopped early", "Open/Ongoing", "Planned"]
+    countries: str
+    central_submission_status: Literal["Accepted", "Pending", "Rejected", "Not Cochrane"]
+    duration: str
+    number_of_participants: str
+    comparison: str
+
+    @field_validator("countries")
+    @classmethod
+    def validate_countries(cls, value: str) -> str:
+        if value not in set(COUNTRY_OPTIONS):
+            raise ValueError("Invalid country value.")
+        return value
+
+    @field_validator("duration")
+    @classmethod
+    def validate_duration(cls, value: str) -> str:
+        if value == DURATION_UNCERTAIN_VALUE:
+            return value
+        parts = value.split(" ")
+        if len(parts) != 2:
+            raise ValueError("Invalid duration format.")
+        number, unit = parts
+        if not number.isdigit():
+            raise ValueError("Invalid duration number.")
+        if unit not in set(DURATION_UNITS):
+            raise ValueError("Invalid duration unit.")
+        return value
+
+    @field_validator("number_of_participants")
+    @classmethod
+    def validate_participants(cls, value: str) -> str:
+        if not value.isdigit():
+            raise ValueError("Invalid number_of_participants.")
+        return value
+
+    @field_validator("status_of_study")
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        if value not in set(STATUS_OF_STUDY_OPTIONS):
+            raise ValueError("Invalid status_of_study.")
+        return value
+
+    @field_validator("central_submission_status")
+    @classmethod
+    def validate_central_submission_status(cls, value: str) -> str:
+        if value not in set(CENTRAL_SUBMISSION_STATUS_OPTIONS):
+            raise ValueError("Invalid central_submission_status.")
+        return value
+
+
 class SummaryOutput(BaseModel):
     has_match: bool
     summary: str
+
+
+class SuggestNewStudyOutput(BaseModel):
+    new_study: NewStudySuggestion
 
 
 class EvaluateRequest(BaseModel):
@@ -135,6 +199,7 @@ class EvaluateResponse(BaseModel):
     very_likely: list[VeryLikelyDecision]
     evaluation_has_match: bool | None = None
     evaluation_summary: str | None = None
+    evaluation_new_study: NewStudySuggestion | None = None
     total_reviewed: int
 
 
@@ -159,3 +224,4 @@ class EvalState(TypedDict):
     evaluation_summary: dict | None
     report_pdf_attachment: dict | None
     pdf_status: str | None
+    new_study_suggestion: dict | None

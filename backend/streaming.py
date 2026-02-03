@@ -131,12 +131,19 @@ def summarize_stream_event(event: dict) -> dict:
             has_match = evaluation_summary.get("has_match")
             summary_text = evaluation_summary.get("summary")
             if has_match is True:
-                summary["message"] = f"Summary (match): {summary_text}"
+                summary["message"] = f"Summary (match):\n{summary_text}"
             elif has_match is False:
-                summary["message"] = f"Summary (no match): {summary_text}"
+                summary["message"] = f"Summary (no match):\n{summary_text}"
             else:
-                summary["message"] = f"Summary: {summary_text}"
+                summary["message"] = f"Summary:\n{summary_text}"
             summary["details"] = evaluation_summary
+        case "suggest_new_study":
+            new_study = update.get("new_study_suggestion") if isinstance(update, dict) else None
+            if new_study:
+                summary["message"] = "AI suggested a new study draft."
+                summary["details"] = {"new_study": new_study}
+            else:
+                summary["message"] = "No new study suggestion available."
         case "match_not_found_end":
             summary["message"] = "No match found after all reviews."
         case _:

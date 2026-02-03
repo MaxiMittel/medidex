@@ -192,7 +192,20 @@ export interface EvaluateResponse {
   unsure: StudyDecision[];
   likely_matches: StudyDecision[];
   very_likely: VeryLikelyDecision[];
+  evaluation_has_match?: boolean | null;
+  evaluation_summary?: string | null;
+  evaluation_new_study?: NewStudySuggestion | null;
   total_reviewed: number;
+}
+
+export interface NewStudySuggestion {
+  short_name: string;
+  status_of_study: string;
+  countries: string;
+  central_submission_status: string;
+  duration: string;
+  number_of_participants: string;
+  comparison: string;
 }
 
 export type StreamEventNode =
@@ -205,7 +218,8 @@ export type StreamEventNode =
   | "load_next_unsure"
   | "classify_unsure"
   | "match_not_found_end"
-  | "summarize_evaluation";
+  | "summarize_evaluation"
+  | "suggest_new_study";
 
 export type StreamEventType = "node" | "complete" | "error" | "unknown";
 
@@ -220,6 +234,7 @@ export interface StreamEventDetails {
   count?: number;
   has_match?: boolean;
   summary?: string;
+  new_study?: NewStudySuggestion | null;
 }
 
 export interface StreamEvent {
