@@ -6,13 +6,12 @@ from fastapi import FastAPI
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-
-from .config import logger
-from .evaluator import build_initial_state, run_evaluation
-from .evaluation_graph import GRAPH
-from .mock_data import MOCK_REPORT, MOCK_STUDIES
-from .schemas import EvaluateRequest, EvaluateResponse
-from .streaming import summarize_stream_event
+from config import logger
+from evaluator import build_initial_state, run_evaluation
+from evaluation_graph import GRAPH
+from mock_data import MOCK_REPORT, MOCK_STUDIES
+from schemas import EvaluateRequest, EvaluateResponse
+from streaming import summarize_stream_event
 
 app = FastAPI(title="Medidex AI Demo")
 
@@ -29,10 +28,10 @@ app.add_middleware(
 @app.post("/evaluate", response_model=EvaluateResponse)
 def evaluate(req: EvaluateRequest) -> EvaluateResponse:
     logger.info(
-        "evaluate: studies=%s model=%s temperature=%s",
+        "evaluate: studies=%s model=%s include_pdf=%s",
         len(req.studies),
         req.model,
-        req.temperature,
+        req.include_pdf,
     )
     prompt_overrides = req.prompt_overrides.model_dump() if req.prompt_overrides else None
     return run_evaluation(
@@ -40,17 +39,17 @@ def evaluate(req: EvaluateRequest) -> EvaluateResponse:
         req.studies,
         prompt_overrides,
         req.model,
-        req.temperature,
+        bool(req.include_pdf),
     )
 
 
 @app.post("/evaluate/stream")
 def evaluate_stream(req: EvaluateRequest) -> StreamingResponse:
     logger.info(
-        "evaluate_stream: studies=%s model=%s temperature=%s",
+        "evaluate_stream: studies=%s model=%s include_pdf=%s",
         len(req.studies),
         req.model,
-        req.temperature,
+        req.include_pdf,
     )
     prompt_overrides = req.prompt_overrides.model_dump() if req.prompt_overrides else None
     initial_state = build_initial_state(
@@ -58,7 +57,7 @@ def evaluate_stream(req: EvaluateRequest) -> StreamingResponse:
         req.studies,
         prompt_overrides,
         req.model,
-        req.temperature,
+        bool(req.include_pdf),
     )
 
     def event_stream():
@@ -81,7 +80,7 @@ def evaluate_stream_mock() -> StreamingResponse:
         MOCK_STUDIES,
         None,
         None,
-        None,
+        False,
     )
 
     def event_stream():
@@ -102,5 +101,5 @@ def evaluate_mock() -> EvaluateResponse:
         MOCK_STUDIES,
         None,
         None,
-        None,
+        False,
     )

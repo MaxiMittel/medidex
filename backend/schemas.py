@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal, TypedDict
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 Decision = Literal["match", "not_match", "unsure", "likely_match"]
 ModelName = Literal["gpt-5.2", "gpt-5", "gpt-5-mini", "gpt-4.1"]
@@ -77,13 +77,14 @@ class PromptOverrides(BaseModel):
     likely_compare_prompt: str | None = None
     unsure_review_prompt: str | None = None
     summary_prompt: str | None = None
+    pdf_prompt: str | None = None
 
 
 class EvaluateRequest(BaseModel):
     report: ReportDto
     studies: list[StudyDto]
     model: ModelName | None = None
-    temperature: float | None = Field(default=None, ge=0, le=2)
+    include_pdf: bool | None = False
     prompt_overrides: PromptOverrides | None = None
 
 
@@ -119,6 +120,7 @@ class EvalState(TypedDict):
     current: StudyDto | None
     decision: Decision | None
     reason: str | None
+    include_pdf: bool
     prompt_overrides: dict[str, str | None] | None
     llm: Any | None
     match: dict | None
@@ -128,3 +130,5 @@ class EvalState(TypedDict):
     very_likely: list[dict]
     rejected_likely: list[dict]
     evaluation_summary: dict | None
+    report_pdf_attachment: dict | None
+    pdf_status: str | None

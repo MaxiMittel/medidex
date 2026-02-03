@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .schemas import ReportDto, StudyDto
+from schemas import ReportDto, StudyDto
 
 MOCK_REPORT = ReportDto(
     CENTRALReportID=None,

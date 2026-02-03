@@ -150,7 +150,7 @@ export interface EvaluateRequest {
   report: ReportDto;
   studies: StudyDto[];
   model?: "gpt-5.2" | "gpt-5" | "gpt-5-mini" | "gpt-4.1" | null;
-  temperature?: number | null;
+  include_pdf?: boolean | null;
   prompt_overrides?: PromptOverrides | null;
 }
 
@@ -160,6 +160,7 @@ export interface PromptOverrides {
   likely_compare_prompt?: string | null;
   unsure_review_prompt?: string | null;
   summary_prompt?: string | null;
+  pdf_prompt?: string | null;
 }
 
 export interface StudyDecision {
@@ -184,6 +185,7 @@ export interface EvaluateResponse {
 }
 
 export type StreamEventNode =
+  | "prepare_report_pdf"
   | "load_next_initial"
   | "classify_initial"
   | "select_very_likely"
