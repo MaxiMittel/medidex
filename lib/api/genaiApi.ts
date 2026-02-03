@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { EvaluateRequest, EvaluateResponse } from "@/types/apiDTOs";
+import type { DefaultPrompts, EvaluateRequest, EvaluateResponse } from "@/types/apiDTOs";
 
 const GENAI_BASE_URL = process.env.NEXT_PUBLIC_GENAI_API_URL;
 
@@ -9,6 +9,9 @@ const genaiClient = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+let cachedDefaultPrompts: DefaultPrompts | null = null;
+let defaultPromptsPromise: Promise<DefaultPrompts> | null = null;
 
 /**
  * Evaluates a report against a list of studies using AI to find matches.
@@ -28,6 +31,38 @@ export const evaluateStudies = async (
       const errorMessage = typeof error.response.data.detail === 'string' 
         ? error.response.data.detail 
         : JSON.stringify(error.response.data.detail);
+      throw new Error(errorMessage);
+    }
+    throw error;
+  }
+};
+
+export const fetchDefaultPrompts = async (): Promise<DefaultPrompts> => {
+  if (cachedDefaultPrompts) {
+    return cachedDefaultPrompts;
+  }
+  if (defaultPromptsPromise) {
+    return defaultPromptsPromise;
+  }
+
+  defaultPromptsPromise = (async () => {
+    const response = await genaiClient.get<DefaultPrompts>("/prompts");
+    return response.data;
+  })();
+
+  try {
+    const data = await defaultPromptsPromise;
+    cachedDefaultPrompts = data;
+    defaultPromptsPromise = null;
+    return data;
+  } catch (error) {
+    console.error("Error fetching default prompts:", error);
+    defaultPromptsPromise = null;
+    if (axios.isAxiosError(error) && error.response?.data?.detail) {
+      const errorMessage =
+        typeof error.response.data.detail === "string"
+          ? error.response.data.detail
+          : JSON.stringify(error.response.data.detail);
       throw new Error(errorMessage);
     }
     throw error;

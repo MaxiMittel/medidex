@@ -155,12 +155,23 @@ export interface EvaluateRequest {
 }
 
 export interface PromptOverrides {
+  background_prompt?: string | null;
   initial_eval_prompt?: string | null;
   likely_group_prompt?: string | null;
   likely_compare_prompt?: string | null;
   unsure_review_prompt?: string | null;
   summary_prompt?: string | null;
   pdf_prompt?: string | null;
+}
+
+export interface DefaultPrompts {
+  background_prompt: string;
+  initial_eval_prompt: string;
+  likely_group_prompt: string;
+  likely_compare_prompt: string;
+  unsure_review_prompt: string;
+  summary_prompt: string;
+  pdf_prompt: string;
 }
 
 export interface StudyDecision {

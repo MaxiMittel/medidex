@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from config import logger
 from llm import MODEL
 from schemas import EvalState, StudyDto
 
@@ -16,6 +17,46 @@ def get_prompt(state: EvalState, key: str, default: str) -> str:
         if isinstance(override, str) and override.strip():
             return override
     return default
+
+
+def get_background_prompt(state: EvalState, default: str) -> str:
+    overrides = state.get("prompt_overrides") or {}
+    if isinstance(overrides, dict):
+        override = overrides.get("background_prompt")
+        if isinstance(override, str) and override.strip():
+            return override
+    return default
+
+
+def apply_background_prompt(prompt: str, background: str) -> str:
+    if not background.strip():
+        return prompt
+    if background.strip() in prompt:
+        return prompt
+    return f"{background} {prompt}"
+
+
+def invoke_structured(state: EvalState, messages: list, schema: object):
+    llm = get_llm(state)
+    last_exc: Exception | None = None
+    for method in ("json_schema", "function_calling"):
+        try:
+            structured_llm = llm.with_structured_output(
+                schema,
+                method=method,
+                strict=True,
+            )
+            return structured_llm.invoke(messages)
+        except Exception as exc:
+            last_exc = exc
+            logger.info(
+                "invoke_structured: method=%s error=%s",
+                method,
+                exc.__class__.__name__,
+            )
+    if last_exc:
+        raise last_exc
+    raise RuntimeError("invoke_structured: unknown error")
 
 
 def get_study_by_id(studies: list[StudyDto], study_id: str) -> StudyDto | None:

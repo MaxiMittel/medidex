@@ -37,7 +37,7 @@ For a real request, POST `/evaluate` using the `ReportDto` and `StudyDto` shapes
 - `backend/prompts.py`: Default LLM prompt templates.
 - `backend/llm.py`: LLM client initialization (loads env via config import).
 - `backend/llm_payloads.py`: JSON payload builders for LLM calls.
-- `backend/parsers.py`: LLM response parsers/validators.
+- Structured outputs are enforced via LangChain `with_structured_output` in the graph; no standalone parsers.
 - `backend/evaluation_utils.py`: Bucket + lookup helpers.
 - `backend/evaluation_graph.py`: LangGraph workflow nodes + graph construction.
 - `backend/evaluator.py`: Evaluation orchestrator (builds state + runs graph).

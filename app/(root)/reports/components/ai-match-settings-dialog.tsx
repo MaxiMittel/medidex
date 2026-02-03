@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,11 +27,13 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Spinner } from "@/components/ui/spinner";
+import { fetchDefaultPrompts } from "@/lib/api/genaiApi";
 import type { AIModel } from "@/hooks/use-genai-evaluation";
-import type { PromptOverrides } from "@/types/apiDTOs";
+import type { DefaultPrompts, PromptOverrides } from "@/types/apiDTOs";
 
 const MODEL_OPTIONS: AIModel[] = ["gpt-5.2", "gpt-5", "gpt-5-mini", "gpt-4.1"];
 const EMPTY_PROMPT_OVERRIDES: PromptOverrides = {
+  background_prompt: "",
   initial_eval_prompt: "",
   likely_group_prompt: "",
   likely_compare_prompt: "",
@@ -64,6 +66,8 @@ export function AIMatchSettingsDialog({
   const [promptOverrides, setPromptOverrides] = useState<PromptOverrides>(
     EMPTY_PROMPT_OVERRIDES
   );
+  const [defaultPrompts, setDefaultPrompts] = useState<DefaultPrompts | null>(null);
+  const [promptsError, setPromptsError] = useState<string | null>(null);
 
   const updatePromptOverride = (
     key: keyof PromptOverrides,
@@ -72,8 +76,23 @@ export function AIMatchSettingsDialog({
     setPromptOverrides((prev) => ({ ...prev, [key]: value }));
   };
 
+  useEffect(() => {
+    void (async () => {
+      try {
+        const data = await fetchDefaultPrompts();
+        setDefaultPrompts(data);
+        setPromptsError(null);
+      } catch (error) {
+        setPromptsError(
+          error instanceof Error ? error.message : "Failed to load default prompts."
+        );
+      }
+    })();
+  }, []);
+
   const buildPromptOverridesPayload = () => {
     const cleaned: PromptOverrides = {
+      background_prompt: promptOverrides.background_prompt?.trim() || undefined,
       initial_eval_prompt:
         promptOverrides.initial_eval_prompt?.trim() || undefined,
       likely_group_prompt:
@@ -108,6 +127,9 @@ export function AIMatchSettingsDialog({
             before running evaluation.
           </DialogDescription>
         </DialogHeader>
+        {promptsError ? (
+          <p className="text-sm text-destructive">{promptsError}</p>
+        ) : null}
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -147,6 +169,26 @@ export function AIMatchSettingsDialog({
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-3">
                 <div className="space-y-2">
+                  <Label htmlFor="override-background-prompt">
+                    Background prompt
+                  </Label>
+                  <Textarea
+                    id="override-background-prompt"
+                    value={promptOverrides.background_prompt || ""}
+                    onChange={(event) =>
+                      updatePromptOverride(
+                        "background_prompt",
+                        event.target.value
+                      )
+                    }
+                    placeholder={
+                      defaultPrompts?.background_prompt ||
+                      "Leave blank to use BACKGROUND_PROMPT."
+                    }
+                    rows={4}
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="override-eval-prompt">
                     Initial evaluation prompt
                   </Label>
@@ -159,7 +201,10 @@ export function AIMatchSettingsDialog({
                         event.target.value
                       )
                     }
-                    placeholder="Leave blank to use DEFAULT_EVAL_PROMPT."
+                    placeholder={
+                      defaultPrompts?.initial_eval_prompt ||
+                      "Leave blank to use DEFAULT_EVAL_PROMPT."
+                    }
                     rows={4}
                   />
                 </div>
@@ -176,7 +221,10 @@ export function AIMatchSettingsDialog({
                         event.target.value
                       )
                     }
-                    placeholder="Leave blank to use DEFAULT_LIKELY_GROUP_PROMPT."
+                    placeholder={
+                      defaultPrompts?.likely_group_prompt ||
+                      "Leave blank to use DEFAULT_LIKELY_GROUP_PROMPT."
+                    }
                     rows={4}
                   />
                 </div>
@@ -193,7 +241,10 @@ export function AIMatchSettingsDialog({
                         event.target.value
                       )
                     }
-                    placeholder="Leave blank to use DEFAULT_LIKELY_COMPARE_PROMPT."
+                    placeholder={
+                      defaultPrompts?.likely_compare_prompt ||
+                      "Leave blank to use DEFAULT_LIKELY_COMPARE_PROMPT."
+                    }
                     rows={4}
                   />
                 </div>
@@ -210,7 +261,10 @@ export function AIMatchSettingsDialog({
                         event.target.value
                       )
                     }
-                    placeholder="Leave blank to use DEFAULT_UNSURE_REVIEW_PROMPT."
+                    placeholder={
+                      defaultPrompts?.unsure_review_prompt ||
+                      "Leave blank to use DEFAULT_UNSURE_REVIEW_PROMPT."
+                    }
                     rows={4}
                   />
                 </div>
@@ -224,7 +278,10 @@ export function AIMatchSettingsDialog({
                     onChange={(event) =>
                       updatePromptOverride("summary_prompt", event.target.value)
                     }
-                    placeholder="Leave blank to use DEFAULT_SUMMARY_PROMPT."
+                    placeholder={
+                      defaultPrompts?.summary_prompt ||
+                      "Leave blank to use DEFAULT_SUMMARY_PROMPT."
+                    }
                     rows={4}
                   />
                 </div>
@@ -238,7 +295,10 @@ export function AIMatchSettingsDialog({
                     onChange={(event) =>
                       updatePromptOverride("pdf_prompt", event.target.value)
                     }
-                    placeholder="Leave blank to use the default note (appended when Include report PDF is on)."
+                    placeholder={
+                      defaultPrompts?.pdf_prompt ||
+                      "Leave blank to use the default note (appended when Include report PDF is on)."
+                    }
                     rows={3}
                   />
                 </div>
