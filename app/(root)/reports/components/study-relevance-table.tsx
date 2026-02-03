@@ -115,11 +115,11 @@ export function StudyRelevanceTable({
   );
 
   // AI Evaluation state
-  const { 
+  const {
     evaluate,
     evaluateStream,
-    getStudyResult, 
-    loading: aiLoading, 
+    getStudyResult,
+    loading: aiLoading,
     error: aiError,
     isStreaming,
     streamMessages,
@@ -280,7 +280,7 @@ export function StudyRelevanceTable({
           toast.success("AI evaluation complete!");
         }
       );
-      
+
       return true;
     } catch (error) {
       toast.error(
@@ -954,10 +954,6 @@ export function StudyRelevanceTable({
                         <Table>
                           <TableHeader>
                             <TableRow className="hover:bg-transparent">
-                              <TableHead className="w-12"></TableHead>
-                              <TableHead className="font-medium">
-                                CENTRAL ID
-                              </TableHead>
                               <TableHead className="font-medium">
                                 CRG ID
                               </TableHead>
@@ -974,18 +970,6 @@ export function StudyRelevanceTable({
                                   key={report.CRGReportID || idx}
                                   className="hover:bg-muted/50 transition-colors"
                                 >
-                                  <TableCell>
-                                    {report.CENTRALReportID && (
-                                      <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="font-mono text-xs">
-                                    {report.CENTRALReportID || (
-                                      <span className="text-muted-foreground/50">
-                                        -
-                                      </span>
-                                    )}
-                                  </TableCell>
                                   <TableCell className="font-mono text-xs">
                                     {report.CRGReportID}
                                   </TableCell>

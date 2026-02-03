@@ -78,7 +78,7 @@ export function StudyOverview({ study }: StudyOverviewProps) {
     "Rejected": "destructive" as const,
   }[study.CENTRALSubmissionStatus] || "secondary" as const;
 
-  const hasTrialIds = study.ISRCTN || study.TrialRegistrationID || (study.CRGStudyID !== null && study.CRGStudyID !== undefined);
+  const hasTrialIds = study.ISRCTN || study.TrialRegistrationID;
 
   return (
     <Card className="border-none shadow-none py-0">
@@ -178,12 +178,6 @@ export function StudyOverview({ study }: StudyOverviewProps) {
                 <div className="p-2.5 rounded-md bg-muted/50 border border-border/50">
                   <p className="text-xs text-muted-foreground mb-1">Trial Registration ID</p>
                   <code className="text-xs font-mono">{study.TrialRegistrationID}</code>
-                </div>
-              )}
-              {study.CRGStudyID !== null && study.CRGStudyID !== undefined && (
-                <div className="p-2.5 rounded-md bg-muted/50 border border-border/50">
-                  <p className="text-xs text-muted-foreground mb-1">CRG Study ID</p>
-                  <code className="text-xs font-mono">{study.CRGStudyID}</code>
                 </div>
               )}
             </div>

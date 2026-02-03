@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { HomeHero } from "./components/home-hero";
 import { QuickStats } from "./components/quick-stats";
+import { FeaturesShowcase } from "./components/features-showcase";
 
 async function fetchBatches() {
   try {
@@ -62,6 +63,8 @@ export default async function Home() {
 
           <BatchList batches={batches} />
         </div>
+
+        <FeaturesShowcase />
       </div>
     </div>
   );
