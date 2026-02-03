@@ -3,7 +3,6 @@ from __future__ import annotations
 from config import logger
 from evaluation_graph import GRAPH
 from llm import build_llm
-from pdf_attachments import build_study_report_attachments
 from schemas import EvaluateResponse, EvalState, ReportDto, StudyDto
 
 
@@ -15,7 +14,6 @@ def build_initial_state(
     include_pdf: bool,
 ) -> EvalState:
     llm = build_llm(model=model)
-    study_report_pdfs = build_study_report_attachments(studies) if include_pdf else {}
     return {
         "report": report,
         "studies": studies,
@@ -35,7 +33,7 @@ def build_initial_state(
         "very_likely": [],
         "rejected_likely": [],
         "evaluation_summary": None,
-        "study_report_pdfs": study_report_pdfs,
+        "report_pdf_attachment": None,
     }
 
 

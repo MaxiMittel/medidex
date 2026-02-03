@@ -37,6 +37,7 @@ const EMPTY_PROMPT_OVERRIDES: PromptOverrides = {
   likely_compare_prompt: "",
   unsure_review_prompt: "",
   summary_prompt: "",
+  pdf_prompt: "",
 };
 
 interface AIMatchSettingsDialogProps {
@@ -82,6 +83,7 @@ export function AIMatchSettingsDialog({
       unsure_review_prompt:
         promptOverrides.unsure_review_prompt?.trim() || undefined,
       summary_prompt: promptOverrides.summary_prompt?.trim() || undefined,
+      pdf_prompt: promptOverrides.pdf_prompt?.trim() || undefined,
     };
     const hasOverrides = Object.values(cleaned).some((value) => value);
     return hasOverrides ? cleaned : undefined;
@@ -102,8 +104,8 @@ export function AIMatchSettingsDialog({
         <DialogHeader>
           <DialogTitle>AI Match Settings</DialogTitle>
           <DialogDescription>
-            Configure the model, study-report PDF inclusion, and optional prompt
-            overrides before running evaluation.
+            Configure the model, report PDF inclusion, and optional prompt overrides
+            before running evaluation.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-6">
@@ -124,7 +126,7 @@ export function AIMatchSettingsDialog({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ai-include-pdf">Include study report PDFs</Label>
+              <Label htmlFor="ai-include-pdf">Include report PDF</Label>
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="ai-include-pdf"
@@ -132,7 +134,7 @@ export function AIMatchSettingsDialog({
                   onCheckedChange={(checked) => setIncludePdf(Boolean(checked))}
                 />
                 <span className="text-sm text-muted-foreground">
-                  Attach PDFs from reports associated with each study.
+                  Attach the PDF for the report being matched.
                 </span>
               </div>
             </div>
@@ -224,6 +226,20 @@ export function AIMatchSettingsDialog({
                     }
                     placeholder="Leave blank to use DEFAULT_SUMMARY_PROMPT."
                     rows={4}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="override-pdf-prompt">
+                    PDF attachment note
+                  </Label>
+                  <Textarea
+                    id="override-pdf-prompt"
+                    value={promptOverrides.pdf_prompt || ""}
+                    onChange={(event) =>
+                      updatePromptOverride("pdf_prompt", event.target.value)
+                    }
+                    placeholder="Leave blank to use the default note (appended when Include report PDF is on)."
+                    rows={3}
                   />
                 </div>
               </AccordionContent>

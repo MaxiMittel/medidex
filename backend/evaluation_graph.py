@@ -8,18 +8,24 @@ from langgraph.graph import END, StateGraph
 from config import logger
 from evaluation_utils import (
     get_bucket_entry,
+    get_llm,
+    get_prompt,
     get_study_by_id,
     remove_from_bucket,
     upsert_bucket,
 )
-from llm import MODEL
 from llm_payloads import (
-    build_content_blocks_with_study_pdfs,
     build_likely_compare_payload,
     build_likely_group_payload,
     build_summary_payload,
     build_unsure_review_payload,
     build_user_payload,
+)
+from pdf_utils import (
+    apply_pdf_prompt_note,
+    build_human_content,
+    build_report_pdf_attachment,
+    get_pdf_prompt_note,
 )
 from parsers import (
     parse_initial_response,
@@ -38,44 +44,15 @@ from prompts import (
 from schemas import EvalState
 
 
-def get_llm(state: EvalState):
-    llm = state.get("llm")
-    return llm if llm is not None else MODEL
-
-
-def get_prompt(state: EvalState, key: str, default: str) -> str:
-    overrides = state.get("prompt_overrides") or {}
-    if isinstance(overrides, dict):
-        override = overrides.get(key)
-        if isinstance(override, str) and override.strip():
-            return override
-    return default
-
-
-def build_human_content(state: EvalState, payload: str, study_ids: list[str]):
+def prepare_report_pdf(state: EvalState) -> dict:
+    """Prepare the report PDF attachment once at the start of the graph."""
     if not state.get("include_pdf"):
-        return payload
-    attachments: list[dict] = []
-    study_report_pdfs = state.get("study_report_pdfs") or {}
-    for study_id in study_ids:
-        attachments.extend(study_report_pdfs.get(study_id, []))
-    if not attachments:
-        return payload
-    seen: set[tuple[str, int]] = set()
-    deduped: list[dict] = []
-    for item in attachments:
-        report_id = item.get("report_id")
-        study_id = item.get("study_id")
-        if report_id is None or study_id is None:
-            continue
-        key = (str(study_id), int(report_id))
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(item)
-    if not deduped:
-        return payload
-    return build_content_blocks_with_study_pdfs(payload, deduped)
+        logger.info("prepare_report_pdf: include_pdf=false")
+        return {"report_pdf_attachment": None, "pdf_status": "disabled"}
+    attachment = build_report_pdf_attachment(state["report"])
+    logger.info("prepare_report_pdf: attached=%s", bool(attachment))
+    status = "attached" if attachment else "missing"
+    return {"report_pdf_attachment": attachment, "pdf_status": status}
 
 
 def load_next_initial(state: EvalState) -> dict:
@@ -115,12 +92,16 @@ def classify_initial(state: EvalState) -> dict:
 
     logger.info("classify_initial: study_id=%s", current.CRGStudyID)
     user_payload = build_user_payload(state["report"], current)
-    prompt = get_prompt(state, "initial_eval_prompt", DEFAULT_EVAL_PROMPT)
+    prompt = apply_pdf_prompt_note(
+        get_prompt(state, "initial_eval_prompt", DEFAULT_EVAL_PROMPT),
+        state.get("include_pdf", False),
+        bool(state.get("report_pdf_attachment")),
+        get_pdf_prompt_note(state),
+    )
     logger.info("classify_initial: prompt_used=%s", prompt[:60])
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
-        study_ids = [str(current.CRGStudyID)]
-        messages.append(HumanMessage(content=build_human_content(state, user_payload, study_ids)))
+        messages.append(HumanMessage(content=build_human_content(state, user_payload)))
         response = get_llm(state).invoke(messages)
         content = response.content
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
@@ -171,11 +152,15 @@ def select_very_likely(state: EvalState) -> dict:
 
     candidate_ids = {str(item.get("study_id")) for item in candidates if item.get("study_id")}
     payload = build_likely_group_payload(state["report"], candidates, state["studies"])
-    prompt = get_prompt(state, "likely_group_prompt", DEFAULT_LIKELY_GROUP_PROMPT)
+    prompt = apply_pdf_prompt_note(
+        get_prompt(state, "likely_group_prompt", DEFAULT_LIKELY_GROUP_PROMPT),
+        state.get("include_pdf", False),
+        bool(state.get("report_pdf_attachment")),
+        get_pdf_prompt_note(state),
+    )
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
-        study_ids = [str(item.get("study_id")) for item in candidates if item.get("study_id")]
-        messages.append(HumanMessage(content=build_human_content(state, payload, study_ids)))
+        messages.append(HumanMessage(content=build_human_content(state, payload)))
         response = get_llm(state).invoke(messages)
         content = response.content
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
@@ -253,11 +238,15 @@ def compare_very_likely(state: EvalState) -> dict:
 
     candidate_ids = {str(item.get("study_id")) for item in candidates if item.get("study_id")}
     payload = build_likely_compare_payload(state["report"], candidates, state["studies"])
-    prompt = get_prompt(state, "likely_compare_prompt", DEFAULT_LIKELY_COMPARE_PROMPT)
+    prompt = apply_pdf_prompt_note(
+        get_prompt(state, "likely_compare_prompt", DEFAULT_LIKELY_COMPARE_PROMPT),
+        state.get("include_pdf", False),
+        bool(state.get("report_pdf_attachment")),
+        get_pdf_prompt_note(state),
+    )
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
-        study_ids = [str(item.get("study_id")) for item in candidates if item.get("study_id")]
-        messages.append(HumanMessage(content=build_human_content(state, payload, study_ids)))
+        messages.append(HumanMessage(content=build_human_content(state, payload)))
         response = get_llm(state).invoke(messages)
         content = response.content
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
@@ -398,11 +387,15 @@ def classify_unsure(state: EvalState) -> dict:
         prior_reason,
         state["studies"],
     )
-    prompt = get_prompt(state, "unsure_review_prompt", DEFAULT_UNSURE_REVIEW_PROMPT)
+    prompt = apply_pdf_prompt_note(
+        get_prompt(state, "unsure_review_prompt", DEFAULT_UNSURE_REVIEW_PROMPT),
+        state.get("include_pdf", False),
+        bool(state.get("report_pdf_attachment")),
+        get_pdf_prompt_note(state),
+    )
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
-        study_ids = [str(current.CRGStudyID)]
-        messages.append(HumanMessage(content=build_human_content(state, payload, study_ids)))
+        messages.append(HumanMessage(content=build_human_content(state, payload)))
         response = get_llm(state).invoke(messages)
         content = response.content
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
@@ -460,20 +453,16 @@ def summarize_evaluation(state: EvalState) -> dict:
         state.get("likely_matches", []),
         state.get("very_likely", []),
     )
-    prompt = get_prompt(state, "summary_prompt", DEFAULT_SUMMARY_PROMPT)
+    prompt = apply_pdf_prompt_note(
+        get_prompt(state, "summary_prompt", DEFAULT_SUMMARY_PROMPT),
+        state.get("include_pdf", False),
+        bool(state.get("report_pdf_attachment")),
+        get_pdf_prompt_note(state),
+    )
 
     try:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
-        study_ids: list[str] = []
-        match = state.get("match")
-        if match and match.get("study_id"):
-            study_ids.append(str(match.get("study_id")))
-        for bucket_key in ("not_matches", "unsure", "likely_matches", "very_likely"):
-            for item in state.get(bucket_key, []):
-                study_id = item.get("study_id")
-                if study_id:
-                    study_ids.append(str(study_id))
-        messages.append(HumanMessage(content=build_human_content(state, payload, study_ids)))
+        messages.append(HumanMessage(content=build_human_content(state, payload)))
         response = get_llm(state).invoke(messages)
         content = response.content
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=True)
@@ -496,6 +485,7 @@ def build_graph():
     """Construct the LangGraph workflow and its routing rules.
 
     Flow:
+    - Setup: prepare_report_pdf -> load_next_initial
     - Initial pass: load_next_initial -> classify_initial -> (loop) -> select_very_likely
     - Likely pass: select_very_likely -> compare_very_likely -> summarize_evaluation
       (or -> prepare_unsure_review if no definitive match)
@@ -504,6 +494,7 @@ def build_graph():
     """
     logger.info("build_graph: init")
     graph = StateGraph(EvalState)
+    graph.add_node("prepare_report_pdf", prepare_report_pdf)
     graph.add_node("load_next_initial", load_next_initial)
     graph.add_node("classify_initial", classify_initial)
     graph.add_node("select_very_likely", select_very_likely)
@@ -514,7 +505,8 @@ def build_graph():
     graph.add_node("match_not_found_end", match_not_found_end)
     graph.add_node("summarize_evaluation", summarize_evaluation)
 
-    graph.set_entry_point("load_next_initial")
+    graph.set_entry_point("prepare_report_pdf")
+    graph.add_edge("prepare_report_pdf", "load_next_initial")
     graph.add_conditional_edges(
         "load_next_initial",
         route_after_initial_load,

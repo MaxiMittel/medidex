@@ -77,6 +77,7 @@ class PromptOverrides(BaseModel):
     likely_compare_prompt: str | None = None
     unsure_review_prompt: str | None = None
     summary_prompt: str | None = None
+    pdf_prompt: str | None = None
 
 
 class EvaluateRequest(BaseModel):
@@ -129,4 +130,5 @@ class EvalState(TypedDict):
     very_likely: list[dict]
     rejected_likely: list[dict]
     evaluation_summary: dict | None
-    study_report_pdfs: dict[str, list[dict]]
+    report_pdf_attachment: dict | None
+    pdf_status: str | None

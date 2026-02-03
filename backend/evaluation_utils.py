@@ -1,6 +1,21 @@
 from __future__ import annotations
 
-from schemas import StudyDto
+from llm import MODEL
+from schemas import EvalState, StudyDto
+
+
+def get_llm(state: EvalState):
+    llm = state.get("llm")
+    return llm if llm is not None else MODEL
+
+
+def get_prompt(state: EvalState, key: str, default: str) -> str:
+    overrides = state.get("prompt_overrides") or {}
+    if isinstance(overrides, dict):
+        override = overrides.get(key)
+        if isinstance(override, str) and override.strip():
+            return override
+    return default
 
 
 def get_study_by_id(studies: list[StudyDto], study_id: str) -> StudyDto | None:

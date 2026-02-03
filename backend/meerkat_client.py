@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import http.client
-import json
 import time
 import urllib.error
 import urllib.request
@@ -69,19 +68,3 @@ def fetch_report_pdf(report_id: int) -> bytes | None:
 
     return None
 
-
-def fetch_reports_for_study(study_id: int) -> list[dict]:
-    url = _build_meerkat_url(f"/studies/{study_id}/reports")
-    headers = _build_meerkat_headers("application/json")
-    request = urllib.request.Request(url, headers=headers, method="GET")
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            data = response.read()
-        parsed = json.loads(data.decode("utf-8"))
-        if isinstance(parsed, list):
-            return parsed
-        logger.warning("fetch_reports_for_study: unexpected payload study_id=%s", study_id)
-        return []
-    except (urllib.error.HTTPError, urllib.error.URLError, ValueError, json.JSONDecodeError) as exc:
-        logger.warning("fetch_reports_for_study: failed study_id=%s error=%s", study_id, exc)
-        return []

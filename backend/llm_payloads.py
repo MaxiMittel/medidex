@@ -149,58 +149,48 @@ def build_summary_payload(
     return json.dumps(payload, ensure_ascii=True, separators=(",", ":"))
 
 
-def build_content_blocks_with_study_pdfs(
+def build_content_blocks_with_report_pdf(
     text_payload: str,
-    attachments: list[dict],
+    attachment: dict | None,
 ) -> list[dict]:
-    """Build content blocks with study-associated report PDFs.
+    """Build content blocks with the current report PDF attachment.
 
-    Expects attachments with study_id, report_id, title, file_id/base64.
-    If no attachments are provided, returns a single text block.
+    Expects attachment with report_id, title, file_id/base64.
+    If no attachment is provided, returns a single text block.
     """
-    if not attachments:
+    if not attachment:
         return [{"type": "text", "text": text_payload}]
 
-    pdf_blocks: list[dict] = []
-    attachment_meta: list[dict] = []
-    for item in attachments:
-        file_id = item.get("file_id")
-        pdf_base64 = item.get("base64")
-        if not file_id and not pdf_base64:
-            continue
-        report_id = item.get("report_id")
-        study_id = item.get("study_id")
-        title = item.get("title")
-        if file_id:
-            pdf_blocks.append({"type": "file", "file_id": file_id})
-        else:
-            pdf_blocks.append(
-                {
-                    "type": "file",
-                    "base64": pdf_base64,
-                    "mime_type": "application/pdf",
-                    "filename": f"study_{study_id}_report_{report_id}.pdf",
-                }
-            )
-        attachment_meta.append(
-            {
-                "attachment_index": len(pdf_blocks) - 1,
-                "study_id": study_id,
-                "report_id": report_id,
-                "title": title,
-            }
-        )
-
-    if not pdf_blocks:
+    file_id = attachment.get("file_id")
+    pdf_base64 = attachment.get("base64")
+    if not file_id and not pdf_base64:
         return [{"type": "text", "text": text_payload}]
+
+    report_id = attachment.get("report_id")
+    title = attachment.get("title")
+    if file_id:
+        pdf_block = {"type": "file", "file_id": file_id}
+    else:
+        pdf_block = {
+            "type": "file",
+            "base64": pdf_base64,
+            "mime_type": "application/pdf",
+            "filename": f"report_{report_id}.pdf",
+        }
+
+    attachment_meta = {
+        "attachment_index": 0,
+        "report_id": report_id,
+        "title": title,
+    }
 
     try:
         payload_obj = json.loads(text_payload)
-        payload_obj["pdf_attachments"] = attachment_meta
+        payload_obj["pdf_attachment"] = attachment_meta
         text_payload = json.dumps(payload_obj, ensure_ascii=True, separators=(",", ":"))
     except json.JSONDecodeError:
         text_payload = (
-            f"{text_payload}\n\nPDF_ATTACHMENTS={json.dumps(attachment_meta, ensure_ascii=True)}"
+            f"{text_payload}\n\nPDF_ATTACHMENT={json.dumps(attachment_meta, ensure_ascii=True)}"
         )
 
-    return [*pdf_blocks, {"type": "text", "text": text_payload}]
+    return [pdf_block, {"type": "text", "text": text_payload}]

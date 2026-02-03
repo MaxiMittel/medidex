@@ -160,6 +160,7 @@ export interface PromptOverrides {
   likely_compare_prompt?: string | null;
   unsure_review_prompt?: string | null;
   summary_prompt?: string | null;
+  pdf_prompt?: string | null;
 }
 
 export interface StudyDecision {
@@ -184,6 +185,7 @@ export interface EvaluateResponse {
 }
 
 export type StreamEventNode =
+  | "prepare_report_pdf"
   | "load_next_initial"
   | "classify_initial"
   | "select_very_likely"
