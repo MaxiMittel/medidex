@@ -39,7 +39,6 @@ import {
   Search,
   Users,
   Calendar,
-  Link2,
   X,
   Sparkles,
   Download,
@@ -50,7 +49,7 @@ import { StudyOverview } from "./study-overview";
 import { StudyDetails } from "./study-details";
 import { AddStudyDialog } from "./add-study-dialog";
 import { AIMatchSettingsDialog } from "./ai-match-settings-dialog";
-import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
+import { useBatchReportsStore, buildReportKey } from "@/hooks/use-batch-reports-store";
 import { LoadMoreStudiesButton } from "./load-more-studies-button";
 import { sendReportEvent } from "@/lib/api/reportEventsApi";
 import { useGenAIEvaluation } from "@/hooks/use-genai-evaluation";
@@ -97,6 +96,8 @@ export function StudyRelevanceTable({
     reportsByBatch,
     setNewStudyForm,
     resetNewStudyForm,
+    similarStudiesByReport,
+    addUnlinkedStudyToSimilar,
   } = useBatchReportsStore();
   const [linkedStudies, setLinkedStudies] = useState<Set<number>>(
     new Set(studies.filter((s) => s.Linked).map((s) => s.CRGStudyID))
@@ -116,16 +117,14 @@ export function StudyRelevanceTable({
 
   // AI Evaluation state
   const {
-    evaluate,
     evaluateStream,
     getStudyResult,
     loading: aiLoading,
-    error: aiError,
     isStreaming,
     streamMessages,
     currentMessage,
   } = useGenAIEvaluation();
-  const [evaluationPrompt, setEvaluationPrompt] = useState("");
+
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [reasonDialogOpen, setReasonDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
@@ -320,6 +319,16 @@ export function StudyRelevanceTable({
 
     // If we have report context, persist to backend
     if (currentBatchHash && currentReportIndex !== undefined) {
+      let studyToPreserve: RelevanceStudy | undefined;
+      if (!checked) {
+        const key = buildReportKey(currentBatchHash, currentReportIndex);
+        const currentSimilar = similarStudiesByReport[key] ?? [];
+        const isInSimilar = currentSimilar.some((s) => s.CRGStudyID === studyId);
+        if (!isInSimilar) {
+          studyToPreserve = studies.find((s) => s.CRGStudyID === studyId);
+        }
+      }
+
       try {
         if (checked) {
           await assignStudyToReport(
@@ -357,6 +366,14 @@ export function StudyRelevanceTable({
             true
           )
         ]);
+
+        if (studyToPreserve) {
+          addUnlinkedStudyToSimilar(
+            currentBatchHash,
+            currentReportIndex,
+            studyToPreserve
+          );
+        }
       } catch (error) {
         // Revert UI on error
         setLinkedStudies((prev) => {
@@ -377,106 +394,9 @@ export function StudyRelevanceTable({
     }
   };
 
-  const handleBulkToggle = async (selectAll: boolean) => {
-    if (!currentBatchHash || currentReportIndex === undefined) {
-      // Fallback to local state only
-      if (selectAll) {
-        const allIds = new Set(filteredStudies.map((s) => s.CRGStudyID));
-        setLinkedStudies(allIds);
-      } else {
-        setLinkedStudies(new Set());
-      }
-      return;
-    }
-
-    const studiesToProcess = filteredStudies.filter((study) => {
-      const isCurrentlyLinked = linkedStudies.has(study.CRGStudyID);
-      return selectAll ? !isCurrentlyLinked : isCurrentlyLinked;
-    });
-
-    if (studiesToProcess.length === 0) {
-      return;
-    }
-
-    // Optimistically update UI
-    if (selectAll) {
-      const allIds = new Set(filteredStudies.map((s) => s.CRGStudyID));
-      setLinkedStudies(allIds);
-    } else {
-      setLinkedStudies(new Set());
-    }
-
-    // Process assignments/unassignments
-    try {
-      const promises = studiesToProcess.map((study) =>
-        selectAll
-          ? assignStudyToReport(
-            currentBatchHash,
-            currentReportIndex,
-            study.CRGStudyID
-          )
-          : unassignStudyFromReport(
-            currentBatchHash,
-            currentReportIndex,
-            study.CRGStudyID
-          )
-      );
-
-      await Promise.all(promises);
-      toast.success(
-        selectAll
-          ? `${studiesToProcess.length} studies assigned`
-          : `${studiesToProcess.length} studies unassigned`
-      );
-
-      // Send "end" event when studies are bulk assigned
-      if (selectAll && currentReportCRGId) {
-        const lastInteraction = getLastInteraction?.() ?? null;
-        void sendReportEvent(currentReportCRGId, "end", lastInteraction);
-      }
-
-      const updatedAssigned = selectAll
-        ? filteredStudies.map((s) => s.CRGStudyID)
-        : filteredStudies
-          .filter((s) => !linkedStudies.has(s.CRGStudyID))
-          .map((s) => s.CRGStudyID);
-
-      await Promise.all(
-        [
-          fetchSimilarStudiesForReport(
-            currentBatchHash,
-            currentReportIndex,
-            updatedAssigned,
-            true
-          ),
-          fetchAssignedStudiesForReport(
-            currentBatchHash,
-            currentReportIndex,
-            currentReportCRGId,
-            true
-          )
-        ]
-      )
-
-    } catch (error) {
-      // Revert on error
-      setLinkedStudies(
-        new Set(studies.filter((s) => s.Linked).map((s) => s.CRGStudyID))
-      );
-      toast.error(
-        `Failed to ${selectAll ? "assign" : "unassign"} studies: ${error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    }
-  };
-
   const handleAccordionChange = (value: string[]) => {
     setOpenStudies(new Set(value));
   };
-
-  const allFilteredLinked = filteredStudies.every((s) =>
-    linkedStudies.has(s.CRGStudyID)
-  );
 
   const getRelevanceColor = (relevance: number) => {
     if (relevance >= 0.9) return "bg-emerald-500";

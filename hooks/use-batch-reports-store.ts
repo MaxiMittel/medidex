@@ -80,6 +80,11 @@ export interface BatchReportsState {
     reportIndex: number,
     studyId: number
   ) => Promise<void>;
+  addUnlinkedStudyToSimilar: (
+    batchHash: string,
+    reportIndex: number,
+    study: RelevanceStudy
+  ) => void;
   // Add study creation form state
   addStudyDialogOpen: boolean;
   newStudyForm: NewStudyFormState;
@@ -679,6 +684,24 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
     } catch (error) {
       console.error("Failed to unassign study from report:", error);
       throw error;
+    }
+  },
+  addUnlinkedStudyToSimilar: (
+    batchHash: string,
+    reportIndex: number,
+    study: RelevanceStudy
+  ) => {
+    const key = buildReportKey(batchHash, reportIndex);
+    const currentSimilar = get().similarStudiesByReport[key] ?? [];
+
+    // Only add if not already present
+    if (!currentSimilar.some((s) => s.CRGStudyID === study.CRGStudyID)) {
+      set((state) => ({
+        similarStudiesByReport: {
+          ...state.similarStudiesByReport,
+          [key]: [...currentSimilar, { ...study, Linked: false }],
+        },
+      }));
     }
   },
   setAddStudyDialogOpen: (open: boolean) => {
