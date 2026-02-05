@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from config import logger
-from evaluation_graph import GRAPH
-from llm import build_llm
-from schemas import EvaluateResponse, EvalState, ReportDto, StudyDto
+from .config import logger
+from .evaluation_graph import GRAPH
+from .llm import build_llm
+from .schemas import EvaluateResponse, EvalState, ReportDto, StudyDto
 
 
 def build_initial_state(
@@ -21,6 +21,7 @@ def build_initial_state(
         "unsure_idx": 0,
         "unsure_queue": [],
         "current": None,
+        "study_id": None,
         "decision": None,
         "reason": None,
         "include_pdf": include_pdf,
@@ -34,6 +35,7 @@ def build_initial_state(
         "rejected_likely": [],
         "evaluation_summary": None,
         "report_pdf_attachment": None,
+        "pdf_status": None,
         "new_study_suggestion": None,
     }
 

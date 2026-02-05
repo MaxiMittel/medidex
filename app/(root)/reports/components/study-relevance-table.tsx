@@ -43,6 +43,7 @@ import {
   Sparkles,
   Download,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { StudyOverview } from "./study-overview";
@@ -52,8 +53,8 @@ import { AIMatchSettingsDialog } from "./ai-match-settings-dialog";
 import { useBatchReportsStore, buildReportKey } from "@/hooks/use-batch-reports-store";
 import { LoadMoreStudiesButton } from "./load-more-studies-button";
 import { sendReportEvent } from "@/lib/api/reportEventsApi";
-import { useGenAIEvaluation } from "@/hooks/use-genai-evaluation";
-import type { AIModel } from "@/hooks/use-genai-evaluation";
+import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
+import type { AIModel } from "@/hooks/use-genai-evaluation-store";
 import type { NewStudySuggestion, PromptOverrides } from "@/types/apiDTOs";
 import { StudyAIBadge } from "./study-ai-badge";
 import { StudyAIReasonDialog } from "./study-ai-reason-dialog";
@@ -115,15 +116,23 @@ export function StudyRelevanceTable({
     new Set()
   );
 
-  // AI Evaluation state
-  const {
-    evaluateStream,
-    getStudyResult,
-    loading: aiLoading,
-    isStreaming,
-    streamMessages,
-    currentMessage,
-  } = useGenAIEvaluation();
+  // AI Evaluation state - using Zustand store for shared state
+  const results = useGenAIEvaluationStore((state) => state.results);
+  const evaluateStream = useGenAIEvaluationStore((state) => state.evaluateStream);
+  const canStartEvaluation = useGenAIEvaluationStore((state) => state.canStartEvaluation);
+  const getReportEvaluationState = useGenAIEvaluationStore((state) => state.getReportEvaluationState);
+  const isEvaluationRunning = useGenAIEvaluationStore((state) => state.isEvaluationRunning);
+  const getRunningEvaluationsCount = useGenAIEvaluationStore((state) => state.getRunningEvaluationsCount);
+  const getStudyResult = useGenAIEvaluationStore((state) => state.getStudyResult);
+
+  const reportKey = currentBatchHash ? `${currentBatchHash}-${currentReportIndex}` : "";
+  const evalState = currentBatchHash && currentReportIndex !== undefined 
+    ? getReportEvaluationState(currentBatchHash, currentReportIndex) 
+    : null;
+  const isRunning = currentBatchHash && currentReportIndex !== undefined 
+    ? isEvaluationRunning(currentBatchHash, currentReportIndex) 
+    : false;
+  const studyResults = reportKey ? results[reportKey] : undefined;
 
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [reasonDialogOpen, setReasonDialogOpen] = useState(false);
@@ -138,17 +147,21 @@ export function StudyRelevanceTable({
 
   const summaryEvent = useMemo(
     () =>
-      [...streamMessages]
-        .reverse()
-        .find((event) => event.node === "summarize_evaluation"),
-    [streamMessages]
+      evalState?.streamMessages
+        ? [...evalState.streamMessages]
+          .reverse()
+          .find((event) => event.node === "summarize_evaluation")
+        : undefined,
+    [evalState?.streamMessages]
   );
   const suggestionEvent = useMemo(
     () =>
-      [...streamMessages]
-        .reverse()
-        .find((event) => event.node === "suggest_new_study"),
-    [streamMessages]
+      evalState?.streamMessages
+        ? [...evalState.streamMessages]
+          .reverse()
+          .find((event) => event.node === "suggest_new_study")
+        : undefined,
+    [evalState?.streamMessages]
   );
   const summaryDetails = summaryEvent?.details;
   const newStudySuggestion: NewStudySuggestion | undefined =
@@ -267,7 +280,8 @@ export function StudyRelevanceTable({
     }
 
     try {
-      toast.info(`Evaluating ${filteredStudies.length} studies with AI...`);
+      const runningCount = getRunningEvaluationsCount();
+      toast.info(`Evaluating ${filteredStudies.length} studies with AI (${runningCount + 1}/4 running)...`);
       setHasEvaluated(true);
       evaluateStream(
         currentBatchHash,
@@ -544,8 +558,9 @@ export function StudyRelevanceTable({
         open={aiDialogOpen}
         onOpenChange={setAiDialogOpen}
         onEvaluate={handleAIEvaluation}
-        isRunning={aiLoading}
-        disableRun={filteredStudies.length === 0}
+        isRunning={isRunning}
+        disableRun={filteredStudies.length === 0 || !canStartEvaluation()}
+        runningCount={getRunningEvaluationsCount()}
       />
 
       {/* Header - Sticky */}
@@ -570,16 +585,16 @@ export function StudyRelevanceTable({
                     variant="outline"
                     className="h-8 gap-2"
                     onClick={() => setAiDialogOpen(true)}
-                    disabled={aiLoading || filteredStudies.length === 0}
+                    disabled={isRunning || filteredStudies.length === 0}
                   >
-                    {aiLoading ? (
+                    {isRunning ? (
                       <Spinner className="h-4 w-4" />
                     ) : (
                       <Sparkles className="h-4 w-4" />
                     )}
                     AI Match
                   </Button>
-                  {hasEvaluated && streamMessages.length > 0 && (
+                  {hasEvaluated && evalState?.streamMessages && evalState.streamMessages.length > 0 && (
                     <Button
                       size="sm"
                       variant="ghost"
@@ -628,12 +643,14 @@ export function StudyRelevanceTable({
       {/* AI Evaluation Progress */}
       <AiEvaluationProgress
         message={
-          currentMessage ||
+          evalState?.currentMessage ||
           summaryEvent?.message ||
-          streamMessages[streamMessages.length - 1]?.message ||
+          (evalState?.streamMessages && evalState.streamMessages.length > 0
+            ? evalState.streamMessages[evalState.streamMessages.length - 1]?.message
+            : null) ||
           null
         }
-        isStreaming={isStreaming}
+        isStreaming={evalState?.isStreaming ?? false}
         hasSummary={Boolean(summaryEvent?.message)}
       />
 
@@ -769,27 +786,18 @@ export function StudyRelevanceTable({
                               {relevancePercentage}%
                             </Badge>
                             {/* AI Classification Badge */}
-                            {currentBatchHash !== undefined &&
-                              currentReportIndex !== undefined &&
-                              (() => {
-                                const aiResult = getStudyResult(
-                                  currentBatchHash,
-                                  currentReportIndex,
-                                  study.CRGStudyID
-                                );
-                                return aiResult ? (
-                                  <StudyAIBadge
-                                    classification={aiResult.classification}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleAIBadgeClick(
-                                        study.CRGStudyID,
-                                        study.ShortName
-                                      );
-                                    }}
-                                  />
-                                ) : null;
-                              })()}
+                            {studyResults?.[study.CRGStudyID] && (
+                              <StudyAIBadge
+                                classification={studyResults[study.CRGStudyID].classification}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAIBadgeClick(
+                                    study.CRGStudyID,
+                                    study.ShortName
+                                  );
+                                }}
+                              />
+                            )}
                           </div>
 
                           {/* Bottom row: Participants, Duration, Comparison */}
@@ -1126,7 +1134,7 @@ export function StudyRelevanceTable({
       <AiEvaluationHistoryDialog
         open={historyDialogOpen}
         onOpenChange={setHistoryDialogOpen}
-        streamMessages={streamMessages}
+        streamMessages={evalState?.streamMessages || []}
       />
     </div>
   );

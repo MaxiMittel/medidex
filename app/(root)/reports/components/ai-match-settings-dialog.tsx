@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/accordion";
 import { Spinner } from "@/components/ui/spinner";
 import { fetchDefaultPrompts } from "@/lib/api/genaiApi";
-import type { AIModel } from "@/hooks/use-genai-evaluation";
+import type { AIModel } from "@/hooks/use-genai-evaluation-store";
 import type { DefaultPrompts, PromptOverrides } from "@/types/apiDTOs";
 
 const MODEL_OPTIONS: AIModel[] = ["gpt-5.2", "gpt-5", "gpt-5-mini", "gpt-4.1"];
@@ -52,6 +52,7 @@ interface AIMatchSettingsDialogProps {
   }) => Promise<boolean>;
   isRunning: boolean;
   disableRun: boolean;
+  runningCount?: number;
 }
 
 export function AIMatchSettingsDialog({
@@ -60,6 +61,7 @@ export function AIMatchSettingsDialog({
   onEvaluate,
   isRunning,
   disableRun,
+  runningCount,
 }: AIMatchSettingsDialogProps) {
   const [model, setModel] = useState<AIModel>("gpt-5-mini");
   const [includePdf, setIncludePdf] = useState(false);
@@ -126,6 +128,11 @@ export function AIMatchSettingsDialog({
             Configure the model, report PDF inclusion, and optional prompt overrides
             before running evaluation.
           </DialogDescription>
+          {runningCount !== undefined && runningCount > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {runningCount} evaluation{runningCount > 1 ? 's' : ''} currently running
+            </p>
+          )}
         </DialogHeader>
         {promptsError ? (
           <p className="text-sm text-destructive">{promptsError}</p>

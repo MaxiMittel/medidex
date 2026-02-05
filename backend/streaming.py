@@ -1,15 +1,9 @@
 from __future__ import annotations
 
-from schemas import StudyDto
-
-
-# Global state tracker to remember current study across nodes
-_current_study = None
+from .schemas import StudyDto
 
 
 def summarize_stream_event(event: dict) -> dict:
-    global _current_study
-    
     if not isinstance(event, dict) or not event:
         return {"event": "unknown", "message": "Empty stream event."}
 
@@ -30,7 +24,6 @@ def summarize_stream_event(event: dict) -> dict:
     match node:
         case "load_next_initial" | "load_next_unsure":
             current = update.get("current")
-            _current_study = current  # Remember for next nodes
             info = extract_study_info(current)
             if info.get("study_id") is None:
                 summary["message"] = "No more studies."
@@ -58,10 +51,6 @@ def summarize_stream_event(event: dict) -> dict:
             reason = update.get("reason")
             idx = update.get("idx")
             study_id = update.get("study_id")
-            # Fallback: if study_id is missing, extract from _current_study
-            if not study_id and _current_study:
-                study_info = extract_study_info(_current_study)
-                study_id = study_info.get("study_id")
             if study_id:
                 summary["message"] = (
                     f"Initial classification for Study ID {study_id}: {decision}. {reason}"
@@ -114,10 +103,6 @@ def summarize_stream_event(event: dict) -> dict:
             decision = update.get("decision")
             reason = update.get("reason")
             study_id = update.get("study_id")
-            # Fallback: if study_id is missing, extract from _current_study
-            if not study_id and _current_study:
-                study_info = extract_study_info(_current_study)
-                study_id = study_info.get("study_id")
             summary["message"] = f"Unsure re-evaluation: {decision}. {reason}"
             summary["details"] = {
                 "study_id": study_id,

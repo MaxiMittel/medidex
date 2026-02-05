@@ -23,7 +23,7 @@ SUMMARY_MARKDOWN_NOTE = (
     "Return the summary field in markdown. Do not wrap the output in code fences."
 )
 
-from constants import (
+from .constants import (
     CENTRAL_SUBMISSION_STATUS_OPTIONS,
     COUNTRY_OPTIONS,
     DURATION_UNCERTAIN_VALUE,

@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { AIClassification } from "@/hooks/use-genai-evaluation";
+import type { AIClassification } from "@/hooks/use-genai-evaluation-store";
 import { StudyAIBadge } from "./study-ai-badge";
 
 interface StudyAIReasonDialogProps {
