@@ -111,9 +111,9 @@ class UnsureReviewOutput(BaseModel):
 
 class NewStudySuggestion(BaseModel):
     short_name: str
-    status_of_study: Literal["Closed", "Stopped early", "Open/Ongoing", "Planned"]
+    status_of_study: str
     countries: str
-    central_submission_status: Literal["Accepted", "Pending", "Rejected", "Not Cochrane"]
+    central_submission_status: str
     duration: str
     number_of_participants: str
     comparison: str
@@ -121,6 +121,9 @@ class NewStudySuggestion(BaseModel):
     @field_validator("countries")
     @classmethod
     def validate_countries(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            return ""
         if value not in set(COUNTRY_OPTIONS):
             raise ValueError("Invalid country value.")
         return value
@@ -128,6 +131,9 @@ class NewStudySuggestion(BaseModel):
     @field_validator("duration")
     @classmethod
     def validate_duration(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            return ""
         if value == DURATION_UNCERTAIN_VALUE:
             return value
         parts = value.split(" ")
@@ -143,6 +149,9 @@ class NewStudySuggestion(BaseModel):
     @field_validator("number_of_participants")
     @classmethod
     def validate_participants(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            return ""
         if not value.isdigit():
             raise ValueError("Invalid number_of_participants.")
         return value
@@ -150,6 +159,9 @@ class NewStudySuggestion(BaseModel):
     @field_validator("status_of_study")
     @classmethod
     def validate_status(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            return ""
         if value not in set(STATUS_OF_STUDY_OPTIONS):
             raise ValueError("Invalid status_of_study.")
         return value
@@ -157,6 +169,9 @@ class NewStudySuggestion(BaseModel):
     @field_validator("central_submission_status")
     @classmethod
     def validate_central_submission_status(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            return ""
         if value not in set(CENTRAL_SUBMISSION_STATUS_OPTIONS):
             raise ValueError("Invalid central_submission_status.")
         return value

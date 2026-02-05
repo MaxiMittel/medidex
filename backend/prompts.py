@@ -39,10 +39,11 @@ _DURATION_UNITS_TEXT = "|".join(DURATION_UNITS)
 SUGGEST_NEW_STUDY_PROMPT = (
     "You are suggesting the creation of a new study based on the report and the evaluation context. "
     "Return a single new_study object that fits the add-study form. "
+    "If a field is unknown, return an empty string for that field. "
     f"Allowed status_of_study values: {_STATUS_OPTIONS_TEXT}. "
     f"Allowed central_submission_status values: {_CENTRAL_STATUS_OPTIONS_TEXT}. "
     f"Allowed countries values: {_COUNTRY_OPTIONS_TEXT}. "
-    f"duration must be '{DURATION_UNCERTAIN_VALUE}' or '<number> <unit>' where unit is {_DURATION_UNITS_TEXT}. "
+    f"duration must be '{DURATION_UNCERTAIN_VALUE}' or '<number> <unit>' where unit is {_DURATION_UNITS_TEXT}, or empty. "
     "number_of_participants must be a numeric string. "
     "Example output: "
     "{"
