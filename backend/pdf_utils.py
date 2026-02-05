@@ -6,11 +6,11 @@ from typing import Optional
 
 from openai import OpenAI
 
-from config import logger
-from llm_payloads import build_content_blocks_with_report_pdf
-from meerkat_client import fetch_report_pdf
-from prompts import PDF_ATTACHMENT_NOTE, PDF_ATTACHMENT_PAYLOAD_NOTE
-from schemas import EvalState, ReportDto
+from .config import logger
+from .llm_payloads import build_content_blocks_with_report_pdf
+from .meerkat_client import fetch_report_pdf
+from .prompts import PDF_ATTACHMENT_NOTE, PDF_ATTACHMENT_PAYLOAD_NOTE
+from .schemas import EvalState, ReportDto
 
 _REPORT_FILE_CACHE: dict[int, str] = {}
 
@@ -18,14 +18,14 @@ _REPORT_FILE_CACHE: dict[int, str] = {}
 def encode_pdf_to_base64(pdf_bytes: bytes) -> str:
     """
     Encode PDF bytes to base64 string for native LLM upload.
-    
+
     This allows sending the PDF directly to vision-capable models
     like Claude that can "read" PDFs natively, preserving tables
     and figures.
-    
+
     Args:
         pdf_bytes: Raw PDF file bytes
-        
+
     Returns:
         Base64 encoded string
     """
@@ -43,14 +43,14 @@ def cache_report_file_id(report_id: int, file_id: str) -> None:
 def upload_pdf_to_openai(pdf_base64: str, filename: str = "report.pdf") -> Optional[str]:
     """
     Upload a PDF to OpenAI Files API and return the file ID.
-    
+
     This allows referencing the file in multiple requests without
     re-uploading, significantly reducing bandwidth and cost.
-    
+
     Args:
         pdf_base64: Base64-encoded PDF string
         filename: Name for the uploaded file
-        
+
     Returns:
         File ID string if successful, None if upload fails
     """
@@ -59,7 +59,7 @@ def upload_pdf_to_openai(pdf_base64: str, filename: str = "report.pdf") -> Optio
         pdf_bytes = base64.b64decode(pdf_base64)
         pdf_file = io.BytesIO(pdf_bytes)
         pdf_file.name = filename
-        
+
         response = client.files.create(
             file=pdf_file,
             purpose="assistants"
@@ -71,7 +71,7 @@ def upload_pdf_to_openai(pdf_base64: str, filename: str = "report.pdf") -> Optio
 
 
 def upload_pdf_to_openai_cached(
-    report_id: int, pdf_base64: str, filename: str = "report.pdf"
+        report_id: int, pdf_base64: str, filename: str = "report.pdf"
 ) -> Optional[str]:
     cached = get_cached_report_file_id(report_id)
     if cached:
@@ -138,10 +138,10 @@ def get_pdf_prompt_note(state: EvalState) -> str:
 
 
 def apply_pdf_prompt_note(
-    prompt: str,
-    include_pdf: bool,
-    has_attachment: bool,
-    pdf_note: str,
+        prompt: str,
+        include_pdf: bool,
+        has_attachment: bool,
+        pdf_note: str,
 ) -> str:
     if not include_pdf or not has_attachment:
         return prompt

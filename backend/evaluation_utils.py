@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from config import logger
-from llm import MODEL
-from schemas import EvalState, StudyDto
+from .config import logger
+from .llm import MODEL
+from .schemas import EvalState, StudyDto
 
 
 def get_llm(state: EvalState):

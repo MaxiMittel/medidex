@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   FileText,
   Calendar,
@@ -9,12 +9,16 @@ import {
   ChevronDown,
   Search,
   Download,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
 
 interface Report {
   reportIndex: number;
@@ -68,6 +72,10 @@ export function ReportsList({
     new Set()
   );
   const [downloadingPdf, setDownloadingPdf] = useState<Set<number>>(new Set());
+
+  const storeResults = useGenAIEvaluationStore((state) => state.results);
+  const getReportEvaluationState = useGenAIEvaluationStore((state) => state.getReportEvaluationState);
+  const isEvaluationRunning = useGenAIEvaluationStore((state) => state.isEvaluationRunning);
 
   const filteredReports = reports.filter((report) => {
     // Search filter
@@ -326,6 +334,42 @@ export function ReportsList({
                         ))}
                       </div>
                     )}
+
+                    {(() => {
+                      const evalState = getReportEvaluationState(report.batchHash, report.reportIndex);
+                      const isRunning = isEvaluationRunning(report.batchHash, report.reportIndex);
+                      const reportKey = `${report.batchHash}-${report.reportIndex}`;
+                      const reportResults = storeResults[reportKey];
+                      const resultCount = reportResults ? Object.keys(reportResults).length : 0;
+
+                      if (isRunning) {
+                        return (
+                          <div className="flex items-center gap-1.5 text-xs text-blue-600 mt-2">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          </div>
+                        );
+                      }
+
+                      if (evalState?.error) {
+                        return (
+                          <div className="flex items-center gap-1.5 text-xs text-red-600 mt-2">
+                            <AlertCircle className="h-3 w-3" />
+                            <span>AI: Error</span>
+                          </div>
+                        );
+                      }
+
+                      if (resultCount > 0) {
+                        return (
+                          <div className="flex items-center gap-1.5 text-xs text-green-600 mt-2">
+                            <CheckCircle2 className="h-3 w-3" />
+                            <span>AI: {resultCount} results</span>
+                          </div>
+                        );
+                      }
+
+                      return null;
+                    })()}
                   </div>
 
                   {/* Expanded Abstract */}

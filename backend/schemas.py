@@ -4,7 +4,7 @@ from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel, field_validator
 
-from constants import (
+from .constants import (
     CENTRAL_SUBMISSION_STATUS_OPTIONS,
     COUNTRY_OPTIONS,
     DURATION_UNCERTAIN_VALUE,
@@ -210,6 +210,7 @@ class EvalState(TypedDict):
     unsure_idx: int
     unsure_queue: list[str]
     current: StudyDto | None
+    study_id: str | None  # Current study ID being processed (for streaming)
     decision: Decision | None
     reason: str | None
     include_pdf: bool

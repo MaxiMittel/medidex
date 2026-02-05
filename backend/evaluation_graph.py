@@ -3,8 +3,8 @@ from __future__ import annotations
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
 
-from config import logger
-from evaluation_utils import (
+from .config import logger
+from .evaluation_utils import (
     apply_background_prompt,
     append_prompt_note,
     get_bucket_entry,
@@ -15,20 +15,20 @@ from evaluation_utils import (
     remove_from_bucket,
     upsert_bucket,
 )
-from llm_payloads import (
+from .llm_payloads import (
     build_likely_compare_payload,
     build_likely_group_payload,
     build_summary_payload,
     build_unsure_review_payload,
     build_user_payload,
 )
-from pdf_utils import (
+from .pdf_utils import (
     apply_pdf_prompt_note,
     build_human_content,
     build_report_pdf_attachment,
     get_pdf_prompt_note,
 )
-from prompts import (
+from .prompts import (
     BACKGROUND_PROMPT,
     DEFAULT_EVAL_PROMPT,
     DEFAULT_LIKELY_COMPARE_PROMPT,
@@ -39,7 +39,7 @@ from prompts import (
     SUMMARY_MARKDOWN_NOTE,
     SUGGEST_NEW_STUDY_PROMPT,
 )
-from schemas import (
+from .schemas import (
     EvalState,
     InitialDecisionOutput,
     LikelyCompareOutput,
@@ -469,6 +469,7 @@ def classify_unsure(state: EvalState) -> dict:
         )
 
     return {
+        "study_id": study_id,
         "decision": decision,
         "reason": reason,
         "match": match,

@@ -2,7 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, HelpCircle, TrendingUp, Star } from "lucide-react";
-import type { AIClassification } from "@/hooks/use-genai-evaluation";
+import type { AIClassification } from "@/hooks/use-genai-evaluation-store";
 
 interface StudyAIBadgeProps {
   classification: AIClassification;

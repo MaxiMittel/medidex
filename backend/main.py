@@ -6,12 +6,12 @@ from fastapi import FastAPI
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from config import logger
-from evaluator import build_initial_state, run_evaluation
-from evaluation_graph import GRAPH
-from mock_data import MOCK_REPORT, MOCK_STUDIES
-from schemas import EvaluateRequest, EvaluateResponse
-from prompts import (
+from .config import logger
+from .evaluator import build_initial_state, run_evaluation
+from .evaluation_graph import GRAPH
+from .mock_data import MOCK_REPORT, MOCK_STUDIES
+from .schemas import EvaluateRequest, EvaluateResponse
+from .prompts import (
     BACKGROUND_PROMPT,
     DEFAULT_EVAL_PROMPT,
     DEFAULT_LIKELY_COMPARE_PROMPT,
@@ -20,7 +20,7 @@ from prompts import (
     DEFAULT_UNSURE_REVIEW_PROMPT,
     PDF_ATTACHMENT_NOTE,
 )
-from streaming import summarize_stream_event
+from .streaming import summarize_stream_event
 
 app = FastAPI(title="Medidex AI Demo")
 

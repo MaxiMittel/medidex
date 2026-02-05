@@ -6,7 +6,7 @@ import time
 import urllib.error
 import urllib.request
 
-from config import logger
+from .config import logger
 
 
 def _build_meerkat_url(path: str) -> str:
