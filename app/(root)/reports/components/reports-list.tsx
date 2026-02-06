@@ -74,8 +74,8 @@ export function ReportsList({
   const [downloadingPdf, setDownloadingPdf] = useState<Set<number>>(new Set());
 
   const storeResults = useGenAIEvaluationStore((state) => state.results);
-  const getReportEvaluationState = useGenAIEvaluationStore((state) => state.getReportEvaluationState);
-  const isEvaluationRunning = useGenAIEvaluationStore((state) => state.isEvaluationRunning);
+  const evaluationsByReport = useGenAIEvaluationStore((state) => state.evaluationsByReport);
+  const runningEvaluations = useGenAIEvaluationStore((state) => state.runningEvaluations);
 
   const filteredReports = reports.filter((report) => {
     // Search filter
@@ -336,9 +336,9 @@ export function ReportsList({
                     )}
 
                     {(() => {
-                      const evalState = getReportEvaluationState(report.batchHash, report.reportIndex);
-                      const isRunning = isEvaluationRunning(report.batchHash, report.reportIndex);
                       const reportKey = `${report.batchHash}-${report.reportIndex}`;
+                      const evalState = evaluationsByReport[reportKey] || null;
+                      const isRunning = runningEvaluations.includes(reportKey);
                       const reportResults = storeResults[reportKey];
                       const resultCount = reportResults ? Object.keys(reportResults).length : 0;
 

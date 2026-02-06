@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -9,6 +9,8 @@ interface AiEvaluationProgressProps {
   message: string | null;
   isStreaming: boolean;
   hasSummary: boolean;
+  collapsed: boolean;
+  onCollapsedChange: (collapsed: boolean) => void;
 }
 
 const isMarkdown = (value: string) =>
@@ -22,26 +24,27 @@ export function AiEvaluationProgress({
   message,
   isStreaming,
   hasSummary,
+  collapsed,
+  onCollapsedChange,
 }: AiEvaluationProgressProps) {
   if (!isStreaming && !message) {
     return null;
   }
 
-  const [collapsed, setCollapsed] = useState(false);
   const wasStreaming = useRef(isStreaming);
   const canCollapse = hasSummary;
 
   useEffect(() => {
     if (!canCollapse) {
-      setCollapsed(false);
+      if (collapsed) onCollapsedChange(false);
       wasStreaming.current = isStreaming;
       return;
     }
     if (isStreaming) {
-      setCollapsed(false);
+      if (collapsed) onCollapsedChange(false);
     }
     wasStreaming.current = isStreaming;
-  }, [canCollapse, isStreaming]);
+  }, [canCollapse, isStreaming, collapsed, onCollapsedChange]);
 
   const shouldRenderMarkdown = message ? isMarkdown(message) : false;
   const previewText = message
@@ -70,7 +73,7 @@ export function AiEvaluationProgress({
         {canCollapse ? (
           <button
             type="button"
-            onClick={() => setCollapsed((prev) => !prev)}
+            onClick={() => onCollapsedChange(!collapsed)}
             className="ml-auto text-xs font-medium text-blue-700 hover:text-blue-900 dark:text-blue-200 dark:hover:text-blue-100"
             aria-expanded={!collapsed}
           >
