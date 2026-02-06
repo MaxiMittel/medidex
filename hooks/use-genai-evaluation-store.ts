@@ -31,9 +31,12 @@ interface GenAIEvaluationStore {
   evaluationsByReport: EvaluationsMap;
   runningEvaluations: string[];
   streamCleanups: Record<string, () => void>;
+  dismissedSuggestions: Set<string>;
 
   getReportKey: (batchHash: string, reportIndex: number) => string;
   canStartEvaluation: () => boolean;
+  isSuggestionDismissed: (suggestionKey: string) => boolean;
+  dismissSuggestion: (suggestionKey: string) => void;
   getReportEvaluationState: (batchHash: string, reportIndex: number) => ReportEvaluationState | null;
   isEvaluationRunning: (batchHash: string, reportIndex: number) => boolean;
   getRunningEvaluationsCount: () => number;
@@ -64,10 +67,21 @@ export const useGenAIEvaluationStore = create<GenAIEvaluationStore>((set, get) =
   evaluationsByReport: {},
   runningEvaluations: [],
   streamCleanups: {},
+  dismissedSuggestions: new Set(),
 
   getReportKey: (batchHash: string, reportIndex: number) => `${batchHash}-${reportIndex}`,
 
   canStartEvaluation: () => get().runningEvaluations.length < 4,
+
+  isSuggestionDismissed: (suggestionKey: string) => get().dismissedSuggestions.has(suggestionKey),
+
+  dismissSuggestion: (suggestionKey: string) => {
+    set((state) => {
+      const newSet = new Set(state.dismissedSuggestions);
+      newSet.add(suggestionKey);
+      return { dismissedSuggestions: newSet };
+    });
+  },
 
   getReportEvaluationState: (batchHash: string, reportIndex: number) => {
     const key = get().getReportKey(batchHash, reportIndex);

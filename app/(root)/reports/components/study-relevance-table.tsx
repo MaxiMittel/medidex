@@ -116,22 +116,19 @@ export function StudyRelevanceTable({
     new Set()
   );
 
-  // AI Evaluation state - using Zustand store for shared state
   const results = useGenAIEvaluationStore((state) => state.results);
+  const evaluationsByReport = useGenAIEvaluationStore((state) => state.evaluationsByReport);
+  const runningEvaluations = useGenAIEvaluationStore((state) => state.runningEvaluations);
   const evaluateStream = useGenAIEvaluationStore((state) => state.evaluateStream);
   const canStartEvaluation = useGenAIEvaluationStore((state) => state.canStartEvaluation);
-  const getReportEvaluationState = useGenAIEvaluationStore((state) => state.getReportEvaluationState);
-  const isEvaluationRunning = useGenAIEvaluationStore((state) => state.isEvaluationRunning);
   const getRunningEvaluationsCount = useGenAIEvaluationStore((state) => state.getRunningEvaluationsCount);
   const getStudyResult = useGenAIEvaluationStore((state) => state.getStudyResult);
+  const dismissedSuggestions = useGenAIEvaluationStore((state) => state.dismissedSuggestions);
+  const dismissSuggestion = useGenAIEvaluationStore((state) => state.dismissSuggestion);
 
   const reportKey = currentBatchHash ? `${currentBatchHash}-${currentReportIndex}` : "";
-  const evalState = currentBatchHash && currentReportIndex !== undefined 
-    ? getReportEvaluationState(currentBatchHash, currentReportIndex) 
-    : null;
-  const isRunning = currentBatchHash && currentReportIndex !== undefined 
-    ? isEvaluationRunning(currentBatchHash, currentReportIndex) 
-    : false;
+  const evalState = reportKey ? evaluationsByReport[reportKey] || null : null;
+  const isRunning = reportKey ? runningEvaluations.includes(reportKey) : false;
   const studyResults = reportKey ? results[reportKey] : undefined;
 
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
@@ -143,7 +140,7 @@ export function StudyRelevanceTable({
   } | null>(null);
   const [hasEvaluated, setHasEvaluated] = useState(false);
   const wasAddStudyDialogOpen = useRef(false);
-  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
+  const [progressCollapsedByReport, setProgressCollapsedByReport] = useState<Record<string, boolean>>({});
 
   const summaryEvent = useMemo(
     () =>
@@ -201,9 +198,10 @@ export function StudyRelevanceTable({
   }, [newStudySuggestion]);
 
   const suggestionKey = normalizedSuggestion
-    ? JSON.stringify(normalizedSuggestion)
+    ? `${reportKey}:${JSON.stringify(normalizedSuggestion)}`
     : null;
 
+  const suggestionDismissed = suggestionKey ? dismissedSuggestions.has(suggestionKey) : false;
   const shouldHighlightSuggestion = Boolean(suggestionKey) && !suggestionDismissed;
 
   useEffect(() => {
@@ -214,7 +212,9 @@ export function StudyRelevanceTable({
     }
 
     if (!addStudyDialogOpen && wasAddStudyDialogOpen.current) {
-      setSuggestionDismissed(true);
+      if (suggestionKey) {
+        dismissSuggestion(suggestionKey);
+      }
       resetNewStudyForm();
     }
 
@@ -226,11 +226,8 @@ export function StudyRelevanceTable({
     setNewStudyForm,
     suggestionKey,
     suggestionDismissed,
+    dismissSuggestion,
   ]);
-
-  useEffect(() => {
-    setSuggestionDismissed(false);
-  }, [suggestionKey]);
 
   useEffect(() => {
     setLinkedStudies(
@@ -610,7 +607,9 @@ export function StudyRelevanceTable({
                     currentReportCRGId={currentReportCRGId}
                     highlight={shouldHighlightSuggestion}
                     onStudySaved={() => {
-                      setSuggestionDismissed(true);
+                      if (suggestionKey) {
+                        dismissSuggestion(suggestionKey);
+                      }
                     }}
                   />
                 </>
@@ -640,18 +639,27 @@ export function StudyRelevanceTable({
         </div>
       </div>
 
-      {/* AI Evaluation Progress */}
       <AiEvaluationProgress
         message={
-          evalState?.currentMessage ||
-          summaryEvent?.message ||
-          (evalState?.streamMessages && evalState.streamMessages.length > 0
-            ? evalState.streamMessages[evalState.streamMessages.length - 1]?.message
-            : null) ||
-          null
+          evalState?.isStreaming
+            ? (evalState?.currentMessage ||
+               (evalState?.streamMessages && evalState.streamMessages.length > 0
+                 ? evalState.streamMessages[evalState.streamMessages.length - 1]?.message
+                 : null) ||
+               null)
+            : (summaryEvent?.message ||
+               evalState?.currentMessage ||
+               (evalState?.streamMessages && evalState.streamMessages.length > 0
+                 ? evalState.streamMessages[evalState.streamMessages.length - 1]?.message
+                 : null) ||
+               null)
         }
         isStreaming={evalState?.isStreaming ?? false}
         hasSummary={Boolean(summaryEvent?.message)}
+        collapsed={progressCollapsedByReport[reportKey] ?? false}
+        onCollapsedChange={(collapsed) => {
+          setProgressCollapsedByReport(prev => ({ ...prev, [reportKey]: collapsed }));
+        }}
       />
 
       {/* Scrollable Content */}
