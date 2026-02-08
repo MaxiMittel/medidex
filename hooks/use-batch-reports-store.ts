@@ -10,7 +10,7 @@ import type {
   OutcomeDto,
 } from "../types/apiDTOs";
 import type { CreateStudyPayload } from "@/lib/api/studiesApi";
-import type { RelevanceStudy, StudyDetailData } from "../types/reports";
+import type { RelevanceStudy, StudyDetailData, StudyReportSummary } from "../types/reports";
 
 export type NewStudyFormState = {
   short_name: string;
@@ -328,7 +328,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
         throw new Error(errorMessage || "Failed to load assigned studies.");
       }
 
-      const studies = (await response.json()) as StudyDto[];
+      const studies = (await response.json()) as (StudyDto & { reports?: StudyReportSummary[] })[];
 
       const mapped: RelevanceStudy[] = studies.map((study) => ({
         Linked: true,
@@ -347,7 +347,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
         ISRCTN: study.ISRCTN || undefined,
         Notes: study.Notes || undefined,
         UDef4: study.UDef4 || undefined,
-        reports: [],
+        reports: study.reports ?? [],
       }));
 
       set((state) => ({
