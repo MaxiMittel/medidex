@@ -67,7 +67,7 @@ const features: Feature[] = [
       "Choose from multiple AI models (GPT-5-mini and more)",
       "Option to include report PDFs for better matching",
       "Customizable prompts for background, evaluation, and comparison",
-      "Advanced settings for fine-tuned control over matching",
+      "Step-by-step evaluation history and explanations",
     ],
   },
   {
