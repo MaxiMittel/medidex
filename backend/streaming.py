@@ -22,15 +22,21 @@ def summarize_stream_event(event: dict) -> dict:
         return {}
 
     match node:
-        case "load_next_initial" | "load_next_unsure":
+        case "load_next_initial":
             current = update.get("current")
             info = extract_study_info(current)
             if info.get("study_id") is None:
                 summary["message"] = "No more studies."
             else:
-                summary["message"] = (
-                    f"Loaded study with ID {info.get('study_id')} ({info.get('short_name')})."
-                )
+                summary["message"] = f"Initial classification for {info.get('short_name')}."
+                summary["details"] = info
+        case "load_next_unsure":
+            current = update.get("current")
+            info = extract_study_info(current)
+            if info.get("study_id") is None:
+                summary["message"] = "No more studies."
+            else:
+                summary["message"] = f"Review of the unsure study {info.get('short_name')}."
                 summary["details"] = info
         case "prepare_report_pdf":
             status = update.get("pdf_status")
@@ -53,7 +59,7 @@ def summarize_stream_event(event: dict) -> dict:
             study_id = update.get("study_id")
             if study_id:
                 summary["message"] = (
-                    f"Initial classification for Study ID {study_id}: {decision}. {reason}"
+                    f"Initial classification: {decision}. {reason}"
                 )
             else:
                 summary["message"] = f"Initial classification: {decision}. {reason}"
@@ -92,7 +98,7 @@ def summarize_stream_event(event: dict) -> dict:
                 "reason": reason,
             }
             if decision == "match" and match_id:
-                summary["message"] = f"Match found: {match_id}. {reason}"
+                summary["message"] = f"Match found! {reason}"
             else:
                 summary["message"] = f"No match from very_likely. {reason}"
         case "prepare_unsure_review":
@@ -113,14 +119,9 @@ def summarize_stream_event(event: dict) -> dict:
             evaluation_summary = (
                 update.get("evaluation_summary", {}) if isinstance(update, dict) else {}
             )
-            has_match = evaluation_summary.get("has_match")
+
             summary_text = evaluation_summary.get("summary")
-            if has_match is True:
-                summary["message"] = f"Summary (match):\n{summary_text}"
-            elif has_match is False:
-                summary["message"] = f"Summary (no match):\n{summary_text}"
-            else:
-                summary["message"] = f"Summary:\n{summary_text}"
+            summary["message"] = f"\n{summary_text}"
             summary["details"] = evaluation_summary
         case "suggest_new_study":
             new_study = update.get("new_study_suggestion") if isinstance(update, dict) else None

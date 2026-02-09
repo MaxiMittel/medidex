@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import time
+
 from .config import logger
 from .llm import MODEL
 from .schemas import EvalState, StudyDto
@@ -42,8 +45,22 @@ def append_prompt_note(prompt: str, note: str) -> str:
     return f"{prompt} {note}"
 
 
+def _get_llm_retry_settings() -> tuple[int, float]:
+    try:
+        max_retries = int(os.getenv("LLM_STRUCTURED_RETRIES", "1"))
+    except ValueError:
+        max_retries = 1
+    try:
+        base_backoff = float(os.getenv("LLM_STRUCTURED_RETRY_BACKOFF_SECONDS", "0.5"))
+    except ValueError:
+        base_backoff = 0.5
+    return max(0, max_retries), max(0.0, base_backoff)
+
+
 def invoke_structured(state: EvalState, messages: list, schema: object):
     llm = get_llm(state)
+    max_retries, base_backoff = _get_llm_retry_settings()
+    total_attempts = max_retries + 1
     last_exc: Exception | None = None
     for method in ("json_schema", "function_calling"):
         try:
@@ -52,14 +69,30 @@ def invoke_structured(state: EvalState, messages: list, schema: object):
                 method=method,
                 strict=True,
             )
-            return structured_llm.invoke(messages)
         except Exception as exc:
             last_exc = exc
             logger.info(
-                "invoke_structured: method=%s error=%s",
+                "invoke_structured: method=%s setup_error=%s",
                 method,
                 exc.__class__.__name__,
             )
+            continue
+
+        for attempt in range(total_attempts):
+            try:
+                return structured_llm.invoke(messages)
+            except Exception as exc:
+                last_exc = exc
+                attempt_num = attempt + 1
+                logger.info(
+                    "invoke_structured: method=%s attempt=%s/%s error=%s",
+                    method,
+                    attempt_num,
+                    total_attempts,
+                    exc.__class__.__name__,
+                )
+                if attempt < max_retries:
+                    time.sleep(base_backoff * (2 ** attempt))
     if last_exc:
         raise last_exc
     raise RuntimeError("invoke_structured: unknown error")

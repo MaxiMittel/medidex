@@ -352,6 +352,8 @@ def route_after_summary(state: EvalState) -> str:
     has_match = summary.get("has_match")
     if has_match is False:
         return "needs_new_study"
+    if has_match is True and state.get("match") is None:
+        return "needs_new_study"
     return "done"
 
 

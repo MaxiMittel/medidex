@@ -162,9 +162,7 @@ export function StudyRelevanceTable({
   );
   const summaryDetails = summaryEvent?.details;
   const newStudySuggestion: NewStudySuggestion | undefined =
-    summaryDetails?.has_match === false && suggestionEvent?.details?.new_study
-      ? suggestionEvent.details.new_study
-      : undefined;
+    suggestionEvent?.details?.new_study ? suggestionEvent.details.new_study : undefined;
 
   const normalizedSuggestion = useMemo(() => {
     if (!newStudySuggestion) return null;

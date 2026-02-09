@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import base64
 import io
+import os
+import time
 from typing import Optional
 
 from openai import OpenAI
@@ -40,6 +42,18 @@ def cache_report_file_id(report_id: int, file_id: str) -> None:
     _REPORT_FILE_CACHE[report_id] = file_id
 
 
+def _get_upload_retry_settings() -> tuple[int, float]:
+    try:
+        max_retries = int(os.getenv("OPENAI_PDF_UPLOAD_RETRIES", "2"))
+    except ValueError:
+        max_retries = 2
+    try:
+        base_backoff = float(os.getenv("OPENAI_PDF_UPLOAD_RETRY_BACKOFF_SECONDS", "0.5"))
+    except ValueError:
+        base_backoff = 0.5
+    return max(0, max_retries), max(0.0, base_backoff)
+
+
 def upload_pdf_to_openai(pdf_base64: str, filename: str = "report.pdf") -> Optional[str]:
     """
     Upload a PDF to OpenAI Files API and return the file ID.
@@ -55,19 +69,48 @@ def upload_pdf_to_openai(pdf_base64: str, filename: str = "report.pdf") -> Optio
         File ID string if successful, None if upload fails
     """
     try:
-        client = OpenAI()
         pdf_bytes = base64.b64decode(pdf_base64)
-        pdf_file = io.BytesIO(pdf_bytes)
-        pdf_file.name = filename
-
-        response = client.files.create(
-            file=pdf_file,
-            purpose="assistants"
+    except Exception as exc:
+        logger.error(
+            "upload_pdf_to_openai: invalid base64 filename=%s error=%s",
+            filename,
+            exc,
         )
-        return response.id
-    except Exception as e:
-        logger.error(f"Failed to upload PDF to OpenAI: {e}")
         return None
+
+    max_retries, base_backoff = _get_upload_retry_settings()
+    total_attempts = max_retries + 1
+    client = OpenAI()
+    last_exc: Exception | None = None
+
+    for attempt in range(total_attempts):
+        try:
+            pdf_file = io.BytesIO(pdf_bytes)
+            pdf_file.name = filename
+            response = client.files.create(
+                file=pdf_file,
+                purpose="assistants"
+            )
+            return response.id
+        except Exception as exc:
+            last_exc = exc
+            attempt_num = attempt + 1
+            logger.warning(
+                "upload_pdf_to_openai: failed filename=%s attempt=%s/%s error=%s",
+                filename,
+                attempt_num,
+                total_attempts,
+                exc.__class__.__name__,
+            )
+            if attempt < max_retries:
+                time.sleep(base_backoff * (2 ** attempt))
+
+    logger.error(
+        "upload_pdf_to_openai: exhausted retries filename=%s error=%s",
+        filename,
+        last_exc.__class__.__name__ if last_exc else "unknown",
+    )
+    return None
 
 
 def upload_pdf_to_openai_cached(
