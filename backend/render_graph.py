@@ -7,10 +7,10 @@ import sys
 
 from langchain_core.runnables.graph import MermaidDrawMethod
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from main import GRAPH  # noqa: E402
+from backend.main import GRAPH  # noqa: E402
 
 
 def main() -> None:
