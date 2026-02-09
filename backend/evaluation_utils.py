@@ -132,6 +132,33 @@ def remove_from_bucket(bucket: list[dict], study_id: str) -> list[dict]:
     return [item for item in bucket if str(item.get("study_id")) != study_id]
 
 
+def get_pending_likely_study_ids(
+    likely_matches: list[dict],
+    very_likely: list[dict],
+    rejected_likely: list[dict],
+) -> list[str]:
+    selected_ids = {
+        str(item.get("study_id"))
+        for item in very_likely
+        if item.get("study_id") is not None
+    }
+    reviewed_ids = {
+        str(item.get("study_id"))
+        for item in rejected_likely
+        if item.get("study_id") is not None
+    }
+    pending: list[str] = []
+    for item in likely_matches:
+        study_id = str(item.get("study_id", "")).strip()
+        if not study_id:
+            continue
+        if study_id in selected_ids or study_id in reviewed_ids:
+            continue
+        if study_id not in pending:
+            pending.append(study_id)
+    return pending
+
+
 def _normalize_identifier(value: str | None) -> str:
     if not value:
         return ""

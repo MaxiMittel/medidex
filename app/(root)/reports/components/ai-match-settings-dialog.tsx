@@ -44,6 +44,7 @@ const EMPTY_PROMPT_OVERRIDES: PromptOverrides = {
   initial_eval_prompt: "",
   likely_group_prompt: "",
   likely_compare_prompt: "",
+  likely_review_prompt: "",
   unsure_review_prompt: "",
   summary_prompt: "",
   pdf_prompt: "",
@@ -108,6 +109,8 @@ export function AIMatchSettingsDialog({
         promptOverrides.likely_group_prompt?.trim() || undefined,
       likely_compare_prompt:
         promptOverrides.likely_compare_prompt?.trim() || undefined,
+      likely_review_prompt:
+        promptOverrides.likely_review_prompt?.trim() || undefined,
       unsure_review_prompt:
         promptOverrides.unsure_review_prompt?.trim() || undefined,
       summary_prompt: promptOverrides.summary_prompt?.trim() || undefined,
@@ -197,11 +200,15 @@ export function AIMatchSettingsDialog({
                             <strong>Likely</strong>, or <strong>Unsure</strong>.
                           </li>
                           <li>
-                            Likely pass: AI selects up to 2 <strong>Very Likely</strong>{" "}
+                            Likely selection pass: AI selects up to 2 <strong>Very Likely</strong>{" "}
                             candidates and compares them.
                           </li>
                           <li>
-                            Unsure pass: if no <strong>Match</strong> is found, only{" "}
+                            Likely review pass: if no <strong>Match</strong> is found, remaining{" "}
+                            <strong>Likely</strong> studies are re-reviewed.
+                          </li>
+                          <li>
+                            Unsure pass: if still no <strong>Match</strong> is found, only{" "}
                             <strong>Unsure</strong> studies are re-reviewed.
                           </li>
                           <li>
@@ -291,6 +298,26 @@ export function AIMatchSettingsDialog({
                     placeholder={
                       defaultPrompts?.likely_compare_prompt ||
                       "Leave blank to use DEFAULT_LIKELY_COMPARE_PROMPT."
+                    }
+                    rows={4}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="override-likely-review-prompt">
+                    Likely review prompt
+                  </Label>
+                  <Textarea
+                    id="override-likely-review-prompt"
+                    value={promptOverrides.likely_review_prompt || ""}
+                    onChange={(event) =>
+                      updatePromptOverride(
+                        "likely_review_prompt",
+                        event.target.value
+                      )
+                    }
+                    placeholder={
+                      defaultPrompts?.likely_review_prompt ||
+                      "Leave blank to use DEFAULT_LIKELY_REVIEW_PROMPT."
                     }
                     rows={4}
                   />

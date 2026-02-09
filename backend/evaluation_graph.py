@@ -7,6 +7,7 @@ from .config import logger
 from .evaluation_utils import (
     apply_background_prompt,
     append_prompt_note,
+    get_pending_likely_study_ids,
     get_bucket_entry,
     get_background_prompt,
     get_prompt,
@@ -19,6 +20,7 @@ from .evaluation_utils import (
 from .llm_payloads import (
     build_likely_compare_payload,
     build_likely_group_payload,
+    build_likely_review_payload,
     build_summary_payload,
     build_unsure_review_payload,
     build_user_payload,
@@ -33,6 +35,7 @@ from .prompts import (
     BACKGROUND_PROMPT,
     DEFAULT_EVAL_PROMPT,
     DEFAULT_LIKELY_COMPARE_PROMPT,
+    DEFAULT_LIKELY_REVIEW_PROMPT,
     LIKELY_COMPARE_ID_NOTE,
     DEFAULT_LIKELY_GROUP_PROMPT,
     LIKELY_GROUP_ID_NOTE,
@@ -49,6 +52,7 @@ from .schemas import (
     InitialDecisionOutput,
     LikelyCompareOutput,
     LikelyGroupOutput,
+    LikelyReviewOutput,
     SuggestNewStudyOutput,
     SummaryOutput,
     UnsureReviewOutput,
@@ -227,7 +231,7 @@ def select_very_likely(state: EvalState) -> dict:
 
 
 def route_after_very_likely_selection(state: EvalState) -> str:
-    """Route to comparison if very-likely exists, else move to unsure review."""
+    """Route to comparison if very-likely exists, else move to likely review."""
     next_step = "has_very_likely" if state.get("very_likely") else "no_very_likely"
     logger.info("route_after_very_likely_selection: next=%s", next_step)
     return next_step
@@ -308,10 +312,152 @@ def compare_very_likely(state: EvalState) -> dict:
 
 
 def route_after_very_likely_compare(state: EvalState) -> str:
-    """Route to summary if a match is found, otherwise continue to unsure review."""
+    """Route to summary if a match is found, otherwise continue to likely review."""
     next_step = "match_found" if state.get("match") is not None else "no_match_after_compare"
     logger.info("route_after_very_likely_compare: next=%s", next_step)
     return next_step
+
+
+def prepare_likely_review(state: EvalState) -> dict:
+    """Compute remaining likely candidates to review before unsure review."""
+    pending_ids = get_pending_likely_study_ids(
+        state.get("likely_matches", []),
+        state.get("very_likely", []),
+        state.get("rejected_likely", []),
+    )
+    logger.info("prepare_likely_review: count=%s", len(pending_ids))
+    return {
+        "current": None,
+        "decision": None,
+        "reason": None,
+        "count": len(pending_ids),
+    }
+
+
+def load_next_likely(state: EvalState) -> dict:
+    """Load the next pending likely study, derived from current buckets."""
+    if state.get("match") is not None:
+        logger.info("load_next_likely: match_already_found")
+        return {"current": None}
+
+    pending_ids = get_pending_likely_study_ids(
+        state.get("likely_matches", []),
+        state.get("very_likely", []),
+        state.get("rejected_likely", []),
+    )
+    logger.info("load_next_likely: count=%s", len(pending_ids))
+    rejected_likely = list(state.get("rejected_likely", []))
+    for study_id in pending_ids:
+        current = get_study_by_id(state["studies"], study_id)
+        if current is not None:
+            logger.info(
+                "load_next_likely: study_id=%s short_name=%s",
+                current.CRGStudyID,
+                current.ShortName,
+            )
+            return {
+                "current": current,
+                "decision": None,
+                "reason": None,
+            }
+        logger.info("load_next_likely: missing_study_id=%s", study_id)
+        rejected_likely = upsert_bucket(
+            rejected_likely,
+            {
+                "study_id": study_id,
+                "initial_reason": None,
+                "review_reason": "Study could not be loaded for likely review.",
+            },
+        )
+    if rejected_likely != list(state.get("rejected_likely", [])):
+        return {"current": None, "rejected_likely": rejected_likely}
+
+    logger.info("load_next_likely: no_more_likely")
+    return {"current": None}
+
+
+def route_after_likely_load(state: EvalState) -> str:
+    """Route from likely review loader based on match or remaining studies."""
+    if state.get("match") is not None:
+        next_step = "match_found"
+    elif state.get("current") is None:
+        next_step = "no_more_likely"
+    else:
+        next_step = "has_likely"
+    logger.info("route_after_likely_load: next=%s", next_step)
+    return next_step
+
+
+def classify_likely_review(state: EvalState) -> dict:
+    """Re-review a likely study while keeping likely bucket stable unless match."""
+    current = state["current"]
+    if current is None:
+        logger.info("classify_likely_review: no_current_study")
+        return {"decision": "unsure", "reason": "No study loaded."}
+
+    study_id = str(current.CRGStudyID)
+    prior_entry = get_bucket_entry(state.get("likely_matches", []), study_id)
+    prior_reason = prior_entry.get("reason") if prior_entry else None
+    logger.info("classify_likely_review: study_id=%s", study_id)
+
+    payload = build_likely_review_payload(
+        state["report"],
+        current,
+        prior_reason,
+        state.get("rejected_likely", []),
+        state["studies"],
+    )
+    prompt = apply_background_prompt(
+        get_prompt(state, "likely_review_prompt", DEFAULT_LIKELY_REVIEW_PROMPT),
+        get_background_prompt(state, BACKGROUND_PROMPT),
+    )
+    prompt = append_prompt_note(prompt, REASON_NOTE)
+    prompt = apply_pdf_prompt_note(
+        prompt,
+        state.get("include_pdf", False),
+        bool(state.get("report_pdf_attachment")),
+        get_pdf_prompt_note(state),
+    )
+    try:
+        messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
+        messages.append(HumanMessage(content=build_human_content(state, payload)))
+        result = invoke_structured(state, messages, LikelyReviewOutput)
+        decision = result.decision
+        reason = result.reason
+        logger.info("classify_likely_review: decision=%s", decision)
+    except Exception as exc:
+        decision, reason = "unsure", f"LLM call failed: {exc.__class__.__name__}"
+        logger.info("classify_likely_review: error=%s", exc.__class__.__name__)
+        logger.info("classify_likely_review: reason=%s", str(exc))
+
+    match = state["match"]
+    rejected_likely = list(state.get("rejected_likely", []))
+    if decision == "match":
+        if match is None:
+            match = {"study_id": study_id, "decision": "match", "reason": reason}
+    else:
+        existing_rejected = get_bucket_entry(rejected_likely, study_id)
+        initial_reason = (
+            existing_rejected.get("initial_reason")
+            if existing_rejected
+            else prior_reason
+        )
+        rejected_likely = upsert_bucket(
+            rejected_likely,
+            {
+                "study_id": study_id,
+                "initial_reason": initial_reason,
+                "review_reason": reason,
+            },
+        )
+
+    return {
+        "study_id": study_id,
+        "decision": decision,
+        "reason": reason,
+        "match": match,
+        "rejected_likely": rejected_likely,
+    }
 
 
 def route_after_summary(state: EvalState) -> str:
@@ -537,8 +683,8 @@ def build_graph():
     Flow:
     - Setup: prepare_report_pdf -> load_next_initial
     - Initial pass: load_next_initial -> classify_initial -> (loop) -> select_very_likely
-    - Likely pass: select_very_likely -> compare_very_likely -> summarize_evaluation
-      (or -> prepare_unsure_review if no definitive match)
+    - Likely selection pass: select_very_likely -> compare_very_likely
+    - Likely review pass: prepare_likely_review -> load_next_likely -> classify_likely_review (loop)
     - Unsure pass: prepare_unsure_review -> load_next_unsure -> classify_unsure (loop)
       -> match_not_found_end -> summarize_evaluation -> suggest_new_study (if no match)
     """
@@ -549,6 +695,9 @@ def build_graph():
     graph.add_node("classify_initial", classify_initial)
     graph.add_node("select_very_likely", select_very_likely)
     graph.add_node("compare_very_likely", compare_very_likely)
+    graph.add_node("prepare_likely_review", prepare_likely_review)
+    graph.add_node("load_next_likely", load_next_likely)
+    graph.add_node("classify_likely_review", classify_likely_review)
     graph.add_node("prepare_unsure_review", prepare_unsure_review)
     graph.add_node("load_next_unsure", load_next_unsure)
     graph.add_node("classify_unsure", classify_unsure)
@@ -568,13 +717,25 @@ def build_graph():
     graph.add_conditional_edges(
         "select_very_likely",
         route_after_very_likely_selection,
-        {"has_very_likely": "compare_very_likely", "no_very_likely": "prepare_unsure_review"},
+        {"has_very_likely": "compare_very_likely", "no_very_likely": "prepare_likely_review"},
     )
     graph.add_conditional_edges(
         "compare_very_likely",
         route_after_very_likely_compare,
-        {"match_found": "summarize_evaluation", "no_match_after_compare": "prepare_unsure_review"},
+        {"match_found": "summarize_evaluation", "no_match_after_compare": "prepare_likely_review"},
     )
+
+    graph.add_edge("prepare_likely_review", "load_next_likely")
+    graph.add_conditional_edges(
+        "load_next_likely",
+        route_after_likely_load,
+        {
+            "has_likely": "classify_likely_review",
+            "no_more_likely": "prepare_unsure_review",
+            "match_found": "summarize_evaluation",
+        },
+    )
+    graph.add_edge("classify_likely_review", "load_next_likely")
 
     graph.add_edge("prepare_unsure_review", "load_next_unsure")
     graph.add_conditional_edges(

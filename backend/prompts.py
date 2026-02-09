@@ -87,6 +87,12 @@ DEFAULT_LIKELY_COMPARE_PROMPT = (
     "Explain why you picked that study and not the other."
 )
 
+DEFAULT_LIKELY_REVIEW_PROMPT = (
+    "You are reviewing studies that were initially marked likely_match but were not selected as very_likely. "
+    "Use prior likely reasoning as context. Only choose match if you are highly confident; "
+    "otherwise respond unsure or not_match."
+)
+
 DEFAULT_UNSURE_REVIEW_PROMPT = (
     "You are reviewing unsure studies. Use the rejected likely_match list as historical "
     "context. Only choose match if you are highly confident; otherwise respond unsure or "

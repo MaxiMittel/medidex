@@ -264,16 +264,43 @@ export const useGenAIEvaluationStore = create<GenAIEvaluationStore>((set, get) =
           });
 
           if (
-            (event.node === "classify_initial" || event.node === "classify_unsure") &&
+            (
+              event.node === "classify_initial" ||
+              event.node === "classify_unsure" ||
+              event.node === "classify_likely_review"
+            ) &&
             event.details?.study_id &&
             event.details?.decision
           ) {
             const studyId = typeof event.details.study_id === "string"
               ? parseInt(event.details.study_id)
               : event.details.study_id;
-            const classification = event.details.decision as AIClassification;
             const reason = event.details.reason || "No reason provided";
-            addStudyResult(reportKey, studyId, classification, reason);
+            const decision = event.details.decision as AIClassification;
+
+            if (event.node === "classify_likely_review") {
+              if (decision === "match") {
+                const existingResult = get().results[reportKey]?.[studyId];
+                if (existingResult) {
+                  updateClassification(reportKey, studyId, "match", reason);
+                } else {
+                  addStudyResult(reportKey, studyId, "match", reason);
+                }
+              } else {
+                const existingResult = get().results[reportKey]?.[studyId];
+                if (existingResult) {
+                  const stableClassification =
+                    existingResult.classification === "very_likely"
+                      ? "very_likely"
+                      : "likely_match";
+                  updateClassification(reportKey, studyId, stableClassification, reason);
+                } else {
+                  addStudyResult(reportKey, studyId, "likely_match", reason);
+                }
+              }
+            } else {
+              addStudyResult(reportKey, studyId, decision, reason);
+            }
           }
 
           if (event.node === "select_very_likely" && event.details?.very_likely_study_ids) {

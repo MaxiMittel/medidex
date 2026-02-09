@@ -83,6 +83,7 @@ class PromptOverrides(BaseModel):
     initial_eval_prompt: str | None = None
     likely_group_prompt: str | None = None
     likely_compare_prompt: str | None = None
+    likely_review_prompt: str | None = None
     unsure_review_prompt: str | None = None
     summary_prompt: str | None = None
     pdf_prompt: str | None = None
@@ -101,6 +102,11 @@ class LikelyGroupOutput(BaseModel):
 class LikelyCompareOutput(BaseModel):
     decision: Literal["match", "unsure"]
     study_id: str
+    reason: str
+
+
+class LikelyReviewOutput(BaseModel):
+    decision: Literal["match", "unsure", "not_match"]
     reason: str
 
 

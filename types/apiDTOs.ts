@@ -159,6 +159,7 @@ export interface PromptOverrides {
   initial_eval_prompt?: string | null;
   likely_group_prompt?: string | null;
   likely_compare_prompt?: string | null;
+  likely_review_prompt?: string | null;
   unsure_review_prompt?: string | null;
   summary_prompt?: string | null;
   pdf_prompt?: string | null;
@@ -169,6 +170,7 @@ export interface DefaultPrompts {
   initial_eval_prompt: string;
   likely_group_prompt: string;
   likely_compare_prompt: string;
+  likely_review_prompt: string;
   unsure_review_prompt: string;
   summary_prompt: string;
   pdf_prompt: string;
@@ -213,6 +215,9 @@ export type StreamEventNode =
   | "classify_initial"
   | "select_very_likely"
   | "compare_very_likely"
+  | "prepare_likely_review"
+  | "load_next_likely"
+  | "classify_likely_review"
   | "prepare_unsure_review"
   | "load_next_unsure"
   | "classify_unsure"

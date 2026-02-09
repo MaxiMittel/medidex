@@ -38,6 +38,14 @@ def summarize_stream_event(event: dict) -> dict:
             else:
                 summary["message"] = f"Review of the unsure study {info.get('short_name')}."
                 summary["details"] = info
+        case "load_next_likely":
+            current = update.get("current")
+            info = extract_study_info(current)
+            if info.get("study_id") is None:
+                summary["message"] = "No more likely studies to review."
+            else:
+                summary["message"] = f"Review of the likely study {info.get('short_name')}."
+                summary["details"] = info
         case "prepare_report_pdf":
             status = update.get("pdf_status")
             if status == "disabled":
@@ -117,11 +125,28 @@ def summarize_stream_event(event: dict) -> dict:
             queue = update.get("unsure_queue", []) or []
             summary["message"] = f"Prepared unsure review queue ({len(queue)} studies)."
             summary["details"] = {"count": len(queue)}
+        case "prepare_likely_review":
+            count = update.get("count")
+            if isinstance(count, int):
+                summary["message"] = f"Prepared likely review queue ({count} studies)."
+                summary["details"] = {"count": count}
+            else:
+                summary["message"] = "Prepared likely review queue."
         case "classify_unsure":
             decision = update.get("decision")
             reason = update.get("reason")
             study_id = update.get("study_id")
             summary["message"] = f"Unsure re-evaluation: {decision}. {reason}"
+            summary["details"] = {
+                "study_id": study_id,
+                "decision": decision,
+                "reason": reason,
+            }
+        case "classify_likely_review":
+            decision = update.get("decision")
+            reason = update.get("reason")
+            study_id = update.get("study_id")
+            summary["message"] = f"Likely re-evaluation: {decision}. {reason}"
             summary["details"] = {
                 "study_id": study_id,
                 "decision": decision,

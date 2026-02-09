@@ -83,6 +83,49 @@ def build_likely_compare_payload(
     )
 
 
+def build_likely_review_payload(
+    report: ReportDto,
+    current_study: StudyDto,
+    prior_reason: str | None,
+    rejected_likely: list[dict],
+    studies: list[StudyDto],
+) -> str:
+    """Serialize the likely review context for non-selected likely studies.
+
+    Includes the current likely study and previously reviewed likely history.
+    """
+    by_id = {str(study.CRGStudyID): study for study in studies}
+    rejected_payload: list[dict] = []
+    for item in rejected_likely:
+        study_id = str(item.get("study_id", ""))
+        study = by_id.get(study_id)
+        if study is None:
+            continue
+        rejected_payload.append(
+            {
+                "study_id": study_id,
+                "short_name": study.ShortName,
+                "study": study.model_dump(),
+                "initial_reason": item.get("initial_reason"),
+                "review_reason": item.get("review_reason"),
+            }
+        )
+    return json.dumps(
+        {
+            "report": report.model_dump(),
+            "rejected_likely": rejected_payload,
+            "current": {
+                "study_id": str(current_study.CRGStudyID),
+                "short_name": current_study.ShortName,
+                "study": current_study.model_dump(),
+                "prior_reason": prior_reason,
+            },
+        },
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+
+
 def build_unsure_review_payload(
     report: ReportDto,
     rejected_likely: list[dict],
