@@ -13,6 +13,7 @@ from .evaluation_utils import (
     invoke_structured,
     get_study_by_id,
     remove_from_bucket,
+    resolve_candidate_study_id,
     upsert_bucket,
 )
 from .llm_payloads import (
@@ -32,10 +33,14 @@ from .prompts import (
     BACKGROUND_PROMPT,
     DEFAULT_EVAL_PROMPT,
     DEFAULT_LIKELY_COMPARE_PROMPT,
+    LIKELY_COMPARE_ID_NOTE,
     DEFAULT_LIKELY_GROUP_PROMPT,
+    LIKELY_GROUP_ID_NOTE,
+    SUMMARY_MATCH_EVAL_NOTE,
     DEFAULT_SUMMARY_PROMPT,
     DEFAULT_UNSURE_REVIEW_PROMPT,
     PDF_ATTACHMENT_NOTE,
+    REASON_NOTE,
     SUMMARY_MARKDOWN_NOTE,
     SUGGEST_NEW_STUDY_PROMPT,
 )
@@ -102,6 +107,7 @@ def classify_initial(state: EvalState) -> dict:
         get_prompt(state, "initial_eval_prompt", DEFAULT_EVAL_PROMPT),
         get_background_prompt(state, BACKGROUND_PROMPT),
     )
+    prompt = append_prompt_note(prompt, REASON_NOTE)
     prompt = apply_pdf_prompt_note(
         prompt,
         state.get("include_pdf", False),
@@ -165,6 +171,8 @@ def select_very_likely(state: EvalState) -> dict:
         get_prompt(state, "likely_group_prompt", DEFAULT_LIKELY_GROUP_PROMPT),
         get_background_prompt(state, BACKGROUND_PROMPT),
     )
+    prompt = append_prompt_note(prompt, REASON_NOTE)
+    prompt = append_prompt_note(prompt, LIKELY_GROUP_ID_NOTE)
     prompt = apply_pdf_prompt_note(
         prompt,
         state.get("include_pdf", False),
@@ -175,7 +183,8 @@ def select_very_likely(state: EvalState) -> dict:
         messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=prompt)]
         messages.append(HumanMessage(content=build_human_content(state, payload)))
         result = invoke_structured(state, messages, LikelyGroupOutput)
-        raw_ids = result.very_likely_ids or []
+        raw_ids = result.very_likely_study_ids or []
+        logger.info("select_very_likely: raw_selected_ids=%s", raw_ids)
         selected_ids: list[str] = []
         for item in raw_ids:
             study_id = str(item).strip()
@@ -241,6 +250,8 @@ def compare_very_likely(state: EvalState) -> dict:
         get_prompt(state, "likely_compare_prompt", DEFAULT_LIKELY_COMPARE_PROMPT),
         get_background_prompt(state, BACKGROUND_PROMPT),
     )
+    prompt = append_prompt_note(prompt, REASON_NOTE)
+    prompt = append_prompt_note(prompt, LIKELY_COMPARE_ID_NOTE)
     prompt = apply_pdf_prompt_note(
         prompt,
         state.get("include_pdf", False),
@@ -253,15 +264,21 @@ def compare_very_likely(state: EvalState) -> dict:
         result = invoke_structured(state, messages, LikelyCompareOutput)
         decision = result.decision
         reason = result.reason
-        study_id = result.study_id
+        raw_study_id = result.study_id
+        study_id = resolve_candidate_study_id(raw_study_id, candidates, state["studies"])
         if decision == "match":
-            if not study_id.strip() or study_id not in candidate_ids:
+            if not study_id or study_id not in candidate_ids:
                 decision = "unsure"
                 reason = "Missing or invalid study_id for match decision."
                 study_id = None
         else:
             study_id = None
-        logger.info("compare_very_likely: decision=%s", decision)
+        logger.info(
+            "compare_very_likely: decision=%s raw_study_id=%s resolved_study_id=%s",
+            decision,
+            raw_study_id,
+            study_id,
+        )
     except Exception as exc:
         decision, reason, study_id = "unsure", f"LLM call failed: {exc.__class__.__name__}", None
         logger.info("compare_very_likely: error=%s", exc.__class__.__name__)
@@ -382,6 +399,7 @@ def classify_unsure(state: EvalState) -> dict:
         get_prompt(state, "unsure_review_prompt", DEFAULT_UNSURE_REVIEW_PROMPT),
         get_background_prompt(state, BACKGROUND_PROMPT),
     )
+    prompt = append_prompt_note(prompt, REASON_NOTE)
     prompt = apply_pdf_prompt_note(
         prompt,
         state.get("include_pdf", False),
@@ -452,6 +470,8 @@ def summarize_evaluation(state: EvalState) -> dict:
         get_prompt(state, "summary_prompt", DEFAULT_SUMMARY_PROMPT),
         get_background_prompt(state, BACKGROUND_PROMPT),
     )
+    prompt = append_prompt_note(prompt, SUMMARY_MATCH_EVAL_NOTE)
+    prompt = append_prompt_note(prompt, REASON_NOTE)
     prompt = append_prompt_note(prompt, SUMMARY_MARKDOWN_NOTE)
     prompt = apply_pdf_prompt_note(
         prompt,

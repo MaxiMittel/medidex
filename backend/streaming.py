@@ -88,7 +88,7 @@ def summarize_stream_event(event: dict) -> dict:
             reason = update.get("reason")
             summary["message"] = "Selected very_likely candidates."
             summary["details"] = {
-                "very_likely_ids": selected_ids,
+                "very_likely_study_ids": selected_ids,
                 "very_likely_names": selected_names,
                 "reason": reason,
             }

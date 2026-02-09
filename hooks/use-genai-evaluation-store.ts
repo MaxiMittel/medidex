@@ -276,8 +276,8 @@ export const useGenAIEvaluationStore = create<GenAIEvaluationStore>((set, get) =
             addStudyResult(reportKey, studyId, classification, reason);
           }
 
-          if (event.node === "select_very_likely" && event.details?.very_likely_ids) {
-            event.details.very_likely_ids.forEach((id: string | number) => {
+          if (event.node === "select_very_likely" && event.details?.very_likely_study_ids) {
+            event.details.very_likely_study_ids.forEach((id: string | number) => {
               const studyId = typeof id === "string" ? parseInt(id) : id;
               updateClassification(reportKey, studyId, "very_likely", event.details?.reason);
             });

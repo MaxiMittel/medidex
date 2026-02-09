@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 
 from .config import logger
@@ -129,3 +130,57 @@ def upsert_bucket(bucket: list[dict], entry: dict) -> list[dict]:
 
 def remove_from_bucket(bucket: list[dict], study_id: str) -> list[dict]:
     return [item for item in bucket if str(item.get("study_id")) != study_id]
+
+
+def _normalize_identifier(value: str | None) -> str:
+    if not value:
+        return ""
+    return "".join(ch for ch in value.lower() if ch.isalnum())
+
+
+def resolve_candidate_study_id(
+    raw_study_id: str | None,
+    candidates: list[dict],
+    studies: list[StudyDto],
+) -> str | None:
+    token = (raw_study_id or "").strip()
+    if not token:
+        return None
+
+    candidate_ids = {str(item.get("study_id")) for item in candidates if item.get("study_id")}
+    if token in candidate_ids:
+        return token
+
+    aliases: dict[str, set[str]] = {}
+    study_lookup = {str(study.CRGStudyID): study for study in studies}
+
+    def add_alias(alias_value: str | None, study_id: str) -> None:
+        normalized = _normalize_identifier(alias_value)
+        if not normalized:
+            return
+        aliases.setdefault(normalized, set()).add(study_id)
+
+    for item in candidates:
+        study_id = str(item.get("study_id", "")).strip()
+        if not study_id:
+            continue
+        add_alias(study_id, study_id)
+        add_alias(item.get("short_name"), study_id)
+        study = study_lookup.get(study_id)
+        if study is not None:
+            add_alias(study.ShortName, study_id)
+            add_alias(study.TrialRegistrationID, study_id)
+            add_alias(study.ISRCTN, study_id)
+
+    normalized_token = _normalize_identifier(token)
+    mapped_ids = aliases.get(normalized_token, set())
+    if len(mapped_ids) == 1:
+        return next(iter(mapped_ids))
+
+    # Handle values like "study_id 35006" by extracting candidate numeric IDs.
+    numeric_tokens = re.findall(r"\d+", token)
+    numeric_matches = [num for num in numeric_tokens if num in candidate_ids]
+    if len(numeric_matches) == 1:
+        return numeric_matches[0]
+
+    return None

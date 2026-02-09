@@ -228,7 +228,8 @@ export interface StreamEventDetails {
   decision?: "match" | "likely_match" | "unsure" | "not_match";
   reason?: string;
   idx?: number;
-  very_likely_ids?: string[];
+  very_likely_study_ids?: Array<string | number>;
+  very_likely_names?: string[];
   match_study_id?: string;
   count?: number;
   has_match?: boolean;

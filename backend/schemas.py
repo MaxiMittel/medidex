@@ -94,7 +94,7 @@ class InitialDecisionOutput(BaseModel):
 
 
 class LikelyGroupOutput(BaseModel):
-    very_likely_ids: list[str]
+    very_likely_study_ids: list[str]
     reason: str
 
 

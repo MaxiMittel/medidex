@@ -17,7 +17,21 @@ SUMMARY_MARKDOWN_NOTE = (
     "Return the summary field in markdown. Do not wrap the output in code fences."
 )
 
+SUMMARY_MATCH_EVAL_NOTE = (
+    "Check the field \"match\" in the payload to see if there is a definitive match."
+    " Beware that items in very_likely and likely_matches are not considered as definitive matches. "
+)
+
 REASON_NOTE = "Always address studies by their short names."
+LIKELY_GROUP_ID_NOTE = (
+    "Return very_likely_study_ids using only candidate study_id values (CRG study IDs). "
+    "Do not return trial registration IDs, short names, or free text in very_likely_study_ids. "
+    "If none qualify, return an empty list."
+)
+LIKELY_COMPARE_ID_NOTE = (
+    "If decision is match, study_id must be exactly one candidate study_id (CRG study ID) from the payload. "
+    "Do not return trial registration IDs, short names, or free text in study_id."
+)
 
 from .constants import (
     CENTRAL_SUBMISSION_STATUS_OPTIONS,
@@ -58,35 +72,31 @@ SUGGEST_NEW_STUDY_PROMPT = (
 DEFAULT_EVAL_PROMPT = (
     "Determine whether the study is relevant to the report's intent. This is the first pass: "
     "respond ONLY with one of not_match, unsure, or likely_match. Never respond match "
-    "in this pass. "
-    f"{REASON_NOTE}"
+    "in this pass."
 )
 
 DEFAULT_LIKELY_GROUP_PROMPT = (
     "You are reviewing studies previously marked as likely_match. Select 2 studies to "
     "mark as very_likely for a final comparison. Explain why you picked them but not the "
-    "other studies. If none are strong, return an empty list. "
-    f"{REASON_NOTE}"
+    "other studies. If none are strong, return an empty list."
 )
 
 DEFAULT_LIKELY_COMPARE_PROMPT = (
     "You are comparing the 2 very_likely studies to decide if any is a definitive match. "
     "Choose at most one match if you are highly confident; otherwise respond unsure. "
-    "Explain why you picked that study and not the other. "
-    f"{REASON_NOTE}"
+    "Explain why you picked that study and not the other."
 )
 
 DEFAULT_UNSURE_REVIEW_PROMPT = (
     "You are reviewing unsure studies. Use the rejected likely_match list as historical "
     "context. Only choose match if you are highly confident; otherwise respond unsure or "
-    "not_match. "
-    f"{REASON_NOTE}"
+    "not_match."
 )
 
 DEFAULT_SUMMARY_PROMPT = (
     "You are summarizing the evaluation results for the report. Use the report details "
-    "and prior decisions. If there is a definitive match (beware that items in very_likely and likely_matches are not considered as definitive matches), explain why it matches and explicitly "
+    "and prior decisions. "
+    "Explain why it matches and explicitly "
     "state why the other studies are not matched. If there is no definitive match, explain why no "
-    "study matches. "
-    f"{REASON_NOTE}"
+    "study matches."
 )
