@@ -195,7 +195,6 @@ export interface EvaluateResponse {
   evaluation_has_match?: boolean | null;
   evaluation_summary?: string | null;
   evaluation_new_study?: NewStudySuggestion | null;
-  total_reviewed: number;
 }
 
 export interface NewStudySuggestion {

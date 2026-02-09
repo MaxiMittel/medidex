@@ -74,15 +74,27 @@ def summarize_stream_event(event: dict) -> dict:
             selected_ids = [
                 item.get("study_id") for item in very_likely if isinstance(item, dict)
             ]
+            selected_names = []
+            for item in very_likely:
+                if not isinstance(item, dict):
+                    continue
+                short_name = item.get("short_name")
+                if isinstance(short_name, str) and short_name.strip():
+                    selected_names.append(short_name)
+                    continue
+                study_id = item.get("study_id")
+                if study_id is not None:
+                    selected_names.append(str(study_id))
             reason = update.get("reason")
             summary["message"] = "Selected very_likely candidates."
             summary["details"] = {
                 "very_likely_ids": selected_ids,
+                "very_likely_names": selected_names,
                 "reason": reason,
             }
-            if selected_ids:
+            if selected_names:
                 summary["message"] = (
-                    f"Selected very_likely candidates: {', '.join(selected_ids)}. {reason}"
+                    f"Selected very_likely candidates: {', '.join(selected_names)}. {reason}"
                 )
             else:
                 summary["message"] = f"No very_likely candidates selected. {reason}"

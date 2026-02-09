@@ -74,11 +74,4 @@ def run_evaluation(
         evaluation_has_match=evaluation_summary.get("has_match"),
         evaluation_summary=evaluation_summary.get("summary"),
         evaluation_new_study=final_state.get("new_study_suggestion"),
-        total_reviewed=(
-            len(final_state["not_matches"])
-            + len(final_state["unsure"])
-            + len(final_state["likely_matches"])
-            + len(final_state["very_likely"])
-            + (1 if final_state["match"] else 0)
-        ),
     )

@@ -85,8 +85,8 @@ DEFAULT_UNSURE_REVIEW_PROMPT = (
 
 DEFAULT_SUMMARY_PROMPT = (
     "You are summarizing the evaluation results for the report. Use the report details "
-    "and prior decisions. If there is a match, explain why it matches and explicitly "
-    "state why the other studies are not matched. If there is no match, explain why no "
+    "and prior decisions. If there is a definitive match (beware that items in very_likely and likely_matches are not considered as definitive matches), explain why it matches and explicitly "
+    "state why the other studies are not matched. If there is no definitive match, explain why no "
     "study matches. "
     f"{REASON_NOTE}"
 )

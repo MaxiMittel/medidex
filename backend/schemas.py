@@ -215,7 +215,6 @@ class EvaluateResponse(BaseModel):
     evaluation_has_match: bool | None = None
     evaluation_summary: str | None = None
     evaluation_new_study: NewStudySuggestion | None = None
-    total_reviewed: int
 
 
 class EvalState(TypedDict):

@@ -27,6 +27,13 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { CircleHelp } from "lucide-react";
 import { fetchDefaultPrompts } from "@/lib/api/genaiApi";
 import type { AIModel } from "@/hooks/use-genai-evaluation-store";
 import type { DefaultPrompts, PromptOverrides } from "@/types/apiDTOs";
@@ -172,7 +179,40 @@ export function AIMatchSettingsDialog({
           <Accordion type="single" collapsible>
             <AccordionItem value="prompt-overrides" className="border-b-0">
               <AccordionTrigger className="text-sm">
-                Custom prompt overrides (advanced)
+                <span className="flex items-center gap-2">
+                  <span>Custom prompt overrides (advanced)</span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          className="inline-flex cursor-help items-center text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          <CircleHelp className="h-4 w-4" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[34rem] text-left text-wrap text-xs leading-relaxed">
+                        <ol className="list-decimal space-y-1 pl-4">
+                          <li>
+                            Initial pass: each study is labeled <strong>Not Match</strong>,{" "}
+                            <strong>Likely</strong>, or <strong>Unsure</strong>.
+                          </li>
+                          <li>
+                            Likely pass: AI selects up to 2 <strong>Very Likely</strong>{" "}
+                            candidates and compares them.
+                          </li>
+                          <li>
+                            Unsure pass: if no <strong>Match</strong> is found, only{" "}
+                            <strong>Unsure</strong> studies are re-reviewed.
+                          </li>
+                          <li>
+                            Summary pass: AI returns a final explanation and may suggest a new
+                            study.
+                          </li>
+                        </ol>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </span>
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-3">
                 <div className="space-y-2">

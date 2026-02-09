@@ -192,39 +192,20 @@ def select_very_likely(state: EvalState) -> dict:
         logger.info("select_very_likely: reason=%s", str(exc))
 
     selected_set = set(selected_ids)
-    likely_matches: list[dict] = []
+    likely_matches = list(state.get("likely_matches", []))
     very_likely: list[dict] = []
-    unsure = list(state["unsure"])
-    rejected_likely = list(state.get("rejected_likely", []))
 
     for item in candidates:
         study_id = str(item.get("study_id"))
         prior_reason = item.get("reason")
         if study_id in selected_set:
-            likely_matches.append(
-                {"study_id": study_id, "decision": "likely_match", "reason": reason}
-            )
+            study = get_study_by_id(state["studies"], study_id)
             very_likely.append(
                 {
                     "study_id": study_id,
+                    "short_name": study.ShortName if study else None,
                     "prior_reason": prior_reason,
                     "group_reason": reason,
-                }
-            )
-        else:
-            unsure = upsert_bucket(
-                unsure,
-                {
-                    "study_id": study_id,
-                    "decision": "unsure",
-                    "reason": f"Not selected as very_likely: {reason}",
-                },
-            )
-            rejected_likely.append(
-                {
-                    "study_id": study_id,
-                    "initial_reason": prior_reason,
-                    "review_reason": reason,
                 }
             )
 
@@ -233,8 +214,6 @@ def select_very_likely(state: EvalState) -> dict:
         "reason": reason,
         "likely_matches": likely_matches,
         "very_likely": very_likely,
-        "unsure": unsure,
-        "rejected_likely": rejected_likely,
     }
 
 
@@ -290,53 +269,24 @@ def compare_very_likely(state: EvalState) -> dict:
 
     match = state["match"]
     likely_matches = list(state.get("likely_matches", []))
-    unsure = list(state["unsure"])
-    rejected_likely = list(state.get("rejected_likely", []))
 
     if decision == "match" and study_id:
         if match is None:
             match = {"study_id": study_id, "decision": "match", "reason": reason}
-        remaining_very_likely = [
-            item for item in candidates if str(item.get("study_id")) != study_id
-        ]
-        for item in candidates:
-            cid = str(item.get("study_id"))
-            likely_matches = remove_from_bucket(likely_matches, cid)
         return {
             "decision": decision,
             "reason": reason,
             "match": match,
             "likely_matches": likely_matches,
-            "very_likely": remaining_very_likely,
+            "very_likely": candidates,
         }
-
-    for item in candidates:
-        cid = str(item.get("study_id"))
-        prior_reason = item.get("prior_reason")
-        likely_matches = remove_from_bucket(likely_matches, cid)
-        unsure = upsert_bucket(
-            unsure,
-            {
-                "study_id": cid,
-                "decision": "unsure",
-                "reason": f"Very likely but no definitive match: {reason}",
-            },
-        )
-        rejected_likely.append(
-            {
-                "study_id": cid,
-                "initial_reason": prior_reason,
-                "review_reason": reason,
-            }
-        )
 
     return {
         "decision": decision,
         "reason": reason,
         "match": match,
         "likely_matches": likely_matches,
-        "unsure": unsure,
-        "rejected_likely": rejected_likely,
+        "very_likely": candidates,
     }
 
 
