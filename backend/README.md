@@ -10,11 +10,6 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Create `backend/.env` with:
-
-```bash
-OPENAI_API_KEY="your-api-key"
-```
 
 Then run from the repo root:
 
