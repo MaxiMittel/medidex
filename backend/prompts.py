@@ -82,9 +82,9 @@ DEFAULT_LIKELY_GROUP_PROMPT = (
 )
 
 DEFAULT_LIKELY_COMPARE_PROMPT = (
-    "You are comparing the 2 very_likely studies to decide if any is a definitive match. "
+    "You are comparing the very_likely studie(s) to decide if any is a definitive match. "
     "Choose at most one match if you are highly confident; otherwise respond unsure. "
-    "Explain why you picked that study and not the other."
+    "Explain why you picked / did not pick that study."
 )
 
 DEFAULT_LIKELY_REVIEW_PROMPT = (
