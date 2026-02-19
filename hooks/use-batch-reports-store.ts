@@ -15,7 +15,7 @@ import type { RelevanceStudy, StudyDetailData, StudyReportSummary } from "../typ
 export type NewStudyFormState = {
   short_name: string;
   status_of_study: string;
-  countries: string;
+  countries: string[];
   duration: string;
   number_of_participants: string;
   comparison: string;
@@ -24,7 +24,7 @@ export type NewStudyFormState = {
 const initialNewStudyForm: NewStudyFormState = {
   short_name: "",
   status_of_study: "",
-  countries: "",
+  countries: [],
   duration: "",
   number_of_participants: "",
   comparison: "",
@@ -729,7 +729,6 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
     const reportCRGId = options?.reportCRGId;
 
     const countries = newStudyForm.countries
-      .split(",")
       .map((country) => country.trim())
       .filter(Boolean);
 

@@ -173,6 +173,17 @@ export function StudyRelevanceTable({
       const match = value.match(/\d+/);
       return match ? match[0] : "0";
     };
+    const parseCountryValues = (value?: string) =>
+      value
+        ? value
+            .split(",")
+            .map((item) => item.trim())
+            .filter((item) => item.length > 0)
+        : [];
+
+    const normalizedCountries = parseCountryValues(newStudySuggestion.countries);
+    const countries =
+      normalizedCountries.length > 0 ? normalizedCountries : ["Unclear"];
 
     return {
       short_name: safe(newStudySuggestion.short_name),
@@ -182,7 +193,7 @@ export function StudyRelevanceTable({
         "Open/Ongoing",
         "Planned",
       ]),
-      countries: safe(newStudySuggestion.countries) || "Unclear",
+      countries,
       duration: safe(newStudySuggestion.duration) || "Uncertain",
       number_of_participants: extractNumber(
         safe(newStudySuggestion.number_of_participants)

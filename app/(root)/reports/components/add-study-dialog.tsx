@@ -31,6 +31,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { Check } from "lucide-react";
 import { toast } from "sonner";
 import { COUNTRY_OPTIONS } from "./constants";
 import { useCallback, useEffect, useState } from "react";
@@ -52,7 +53,7 @@ export function AddStudyDialog({
 }: AddStudyDialogProps) {
   const [durationValue, setDurationValue] = useState("");
   const [durationUnit, setDurationUnit] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState("");
+  const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [countryOpen, setCountryOpen] = useState(false);
   const [shortName, setShortName] = useState("");
   const [statusOfStudy, setStatusOfStudy] = useState("");
@@ -70,7 +71,7 @@ export function AddStudyDialog({
   const resetLocalFormState = useCallback(() => {
     setShortName("");
     setStatusOfStudy("");
-    setSelectedCountry("");
+    setSelectedCountries([]);
     setDurationValue("");
     setDurationUnit("");
     setNumberOfParticipants("");
@@ -84,7 +85,11 @@ export function AddStudyDialog({
 
     setShortName(newStudyForm.short_name || "");
     setStatusOfStudy(newStudyForm.status_of_study || "");
-    setSelectedCountry(newStudyForm.countries || "Unclear");
+    setSelectedCountries(
+      newStudyForm.countries && newStudyForm.countries.length > 0
+        ? [...newStudyForm.countries]
+        : []
+    );
     const parts = (newStudyForm.duration || "").split(" ");
     if (parts.length === 2 && !Number.isNaN(Number(parts[0]))) {
       setDurationValue(parts[0]);
@@ -111,7 +116,8 @@ export function AddStudyDialog({
     if (creatingStudy) return;
 
     try {
-      const payloadCountries = selectedCountry || "Unclear";
+      const payloadCountries =
+        selectedCountries.length > 0 ? [...selectedCountries] : ["Unclear"];
       setNewStudyForm({
         short_name: shortName,
         status_of_study: statusOfStudy,
@@ -147,13 +153,22 @@ export function AddStudyDialog({
     setDurationUnit(unit);
   };
 
+  const toggleCountrySelection = (country: string) => {
+    setSelectedCountries((previous) =>
+      previous.includes(country)
+        ? previous.filter((entry) => entry !== country)
+        : [...previous, country]
+    );
+  };
+
   const computedDuration =
     durationUnit === "uncertain"
       ? "Uncertain"
       : durationValue && durationUnit
         ? `${durationValue} ${durationUnit}`
         : "";
-  const normalizedCountry = selectedCountry || "Unclear";
+  const normalizedCountry =
+    selectedCountries.length > 0 ? selectedCountries.join(", ") : "Unclear";
 
   const isSubmitDisabled =
     creatingStudy ||
@@ -228,18 +243,22 @@ export function AddStudyDialog({
                   <CommandList className="max-h-[300px] overflow-y-auto overflow-x-auto">
                     <CommandEmpty>No country found.</CommandEmpty>
                     <CommandGroup>
-                      {COUNTRY_OPTIONS.map((country) => (
-                        <CommandItem
-                          key={country}
-                          value={country}
-                          onSelect={(value) => {
-                            setSelectedCountry(value);
-                            setCountryOpen(false);
-                          }}
-                        >
-                      {country}
-                        </CommandItem>
-                      ))}
+                      {COUNTRY_OPTIONS.map((country) => {
+                        const isSelected = selectedCountries.includes(country);
+                        return (
+                          <CommandItem
+                            key={country}
+                            value={country}
+                            onSelect={() => toggleCountrySelection(country)}
+                            aria-pressed={isSelected}
+                          >
+                            <span className="flex-1">{country}</span>
+                            {isSelected && (
+                              <Check className="h-4 w-4 text-primary" />
+                            )}
+                          </CommandItem>
+                        );
+                      })}
                     </CommandGroup>
                   </CommandList>
                 </Command>
