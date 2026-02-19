@@ -16,7 +16,6 @@ export type NewStudyFormState = {
   short_name: string;
   status_of_study: string;
   countries: string;
-  central_submission_status: string;
   duration: string;
   number_of_participants: string;
   comparison: string;
@@ -26,7 +25,6 @@ const initialNewStudyForm: NewStudyFormState = {
   short_name: "",
   status_of_study: "",
   countries: "",
-  central_submission_status: "",
   duration: "",
   number_of_participants: "",
   comparison: "",
@@ -741,7 +739,6 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
       short_name: newStudyForm.short_name.trim(),
       status_of_study: newStudyForm.status_of_study.trim(),
       countries,
-      central_submission_status: newStudyForm.central_submission_status.trim(),
       duration: newStudyForm.duration.trim(),
       number_of_participants,
       comparison: newStudyForm.comparison.trim(),
@@ -751,7 +748,6 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
     if (
       !payload.short_name ||
       !payload.status_of_study ||
-      !payload.central_submission_status ||
       !payload.duration ||
       !payload.comparison ||
       Number.isNaN(number_of_participants)

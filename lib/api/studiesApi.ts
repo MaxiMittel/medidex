@@ -7,7 +7,6 @@ export interface CreateStudyPayload {
   short_name: string;
   status_of_study: string;
   countries: string[];
-  central_submission_status: string;
   duration: string;
   number_of_participants: number;
   comparison: string;

@@ -171,25 +171,6 @@ export function AddStudyDialog({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>CENTRAL submission status</Label>
-            <Select
-              value={newStudyForm.central_submission_status}
-              onValueChange={(value) =>
-                updateNewStudyForm("central_submission_status", value)
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Accepted">Accepted</SelectItem>
-                <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="Rejected">Rejected</SelectItem>
-                <SelectItem value="Not Cochrane">Not Cochrane</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
             <Label htmlFor="study-countries">Countries</Label>
             <Popover open={countryOpen} onOpenChange={setCountryOpen}>
               <PopoverTrigger asChild>
@@ -305,7 +286,6 @@ export function AddStudyDialog({
                 creatingStudy ||
                 newStudyForm.short_name.trim().length === 0 ||
                 newStudyForm.status_of_study.trim().length === 0 ||
-                newStudyForm.central_submission_status.trim().length === 0 ||
                 newStudyForm.countries.trim().length === 0 ||
                 newStudyForm.duration.trim().length === 0 ||
                 newStudyForm.comparison.trim().length === 0 ||

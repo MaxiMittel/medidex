@@ -34,7 +34,6 @@ LIKELY_COMPARE_ID_NOTE = (
 )
 
 from .constants import (
-    CENTRAL_SUBMISSION_STATUS_OPTIONS,
     COUNTRY_OPTIONS,
     DURATION_UNCERTAIN_VALUE,
     DURATION_UNITS,
@@ -43,7 +42,6 @@ from .constants import (
 
 _COUNTRY_OPTIONS_TEXT = ", ".join(COUNTRY_OPTIONS)
 _STATUS_OPTIONS_TEXT = ", ".join(STATUS_OF_STUDY_OPTIONS)
-_CENTRAL_STATUS_OPTIONS_TEXT = ", ".join(CENTRAL_SUBMISSION_STATUS_OPTIONS)
 _DURATION_UNITS_TEXT = "|".join(DURATION_UNITS)
 
 SUGGEST_NEW_STUDY_PROMPT = (
@@ -51,7 +49,6 @@ SUGGEST_NEW_STUDY_PROMPT = (
     "Return a single new_study object that fits the add-study form. "
     "If a field is unknown, return an empty string for that field. "
     f"Allowed status_of_study values: {_STATUS_OPTIONS_TEXT}. "
-    f"Allowed central_submission_status values: {_CENTRAL_STATUS_OPTIONS_TEXT}. "
     f"Allowed countries values: {_COUNTRY_OPTIONS_TEXT}. "
     f"duration must be '{DURATION_UNCERTAIN_VALUE}' or '<number> <unit>' where unit is {_DURATION_UNITS_TEXT}, or empty. "
     "number_of_participants must be a numeric string. "
@@ -61,7 +58,6 @@ SUGGEST_NEW_STUDY_PROMPT = (
     "\"short_name\":\"Zhang 2025\","
     "\"status_of_study\":\"Planned\","
     "\"countries\":\"Unclear\","
-    "\"central_submission_status\":\"Pending\","
     "\"duration\":\"3 months\","
     "\"number_of_participants\":\"600\","
     "\"comparison\":\"Group psychological counseling vs usual care\""

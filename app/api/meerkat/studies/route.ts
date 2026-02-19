@@ -16,7 +16,6 @@ export async function PUT(request: NextRequest) {
   const requiredFields: Array<keyof CreateStudyPayload> = [
     "short_name",
     "status_of_study",
-    "central_submission_status",
     "comparison",
     "countries",
     "duration",
@@ -44,7 +43,6 @@ export async function PUT(request: NextRequest) {
   const payload: CreateStudyPayload = {
     short_name: body.short_name!.trim(),
     status_of_study: body.status_of_study!.trim(),
-    central_submission_status: body.central_submission_status!.trim(),
     comparison: body.comparison!.trim(),
     duration: body.duration!.trim(),
     countries: Array.isArray(body.countries)

@@ -114,13 +114,6 @@ STATUS_OF_STUDY_OPTIONS = [
     "Planned",
 ]
 
-CENTRAL_SUBMISSION_STATUS_OPTIONS = [
-    "Accepted",
-    "Pending",
-    "Rejected",
-    "Not Cochrane",
-]
-
 DURATION_UNCERTAIN_VALUE = "Uncertain"
 
 DURATION_UNITS = [

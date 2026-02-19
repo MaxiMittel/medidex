@@ -5,7 +5,6 @@ from typing import Any, Literal, TypedDict
 from pydantic import BaseModel, field_validator
 
 from .constants import (
-    CENTRAL_SUBMISSION_STATUS_OPTIONS,
     COUNTRY_OPTIONS,
     DURATION_UNCERTAIN_VALUE,
     DURATION_UNITS,
@@ -119,7 +118,6 @@ class NewStudySuggestion(BaseModel):
     short_name: str
     status_of_study: str
     countries: str
-    central_submission_status: str
     duration: str
     number_of_participants: str
     comparison: str
@@ -170,16 +168,6 @@ class NewStudySuggestion(BaseModel):
             return ""
         if value not in set(STATUS_OF_STUDY_OPTIONS):
             raise ValueError("Invalid status_of_study.")
-        return value
-
-    @field_validator("central_submission_status")
-    @classmethod
-    def validate_central_submission_status(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            return ""
-        if value not in set(CENTRAL_SUBMISSION_STATUS_OPTIONS):
-            raise ValueError("Invalid central_submission_status.")
         return value
 
 

@@ -183,10 +183,6 @@ export function StudyRelevanceTable({
         "Planned",
       ]),
       countries: safe(newStudySuggestion.countries) || "Unclear",
-      central_submission_status: normalizeChoice(
-        safe(newStudySuggestion.central_submission_status),
-        ["Accepted", "Pending", "Rejected", "Not Cochrane"]
-      ),
       duration: safe(newStudySuggestion.duration) || "Uncertain",
       number_of_participants: extractNumber(
         safe(newStudySuggestion.number_of_participants)
