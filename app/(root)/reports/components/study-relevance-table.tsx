@@ -1,77 +1,33 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import type { RelevanceStudy } from "@/types/reports";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  ChevronDown,
-  FileText,
-  Search,
-  Users,
-  Calendar,
-  X,
-  Sparkles,
-  Download,
-  CheckCircle2,
-  Loader2,
-} from "lucide-react";
-import { Spinner } from "@/components/ui/spinner";
-import { StudyOverview } from "./study-overview";
-import { StudyDetails } from "./study-details";
-import { AddStudyDialog } from "./add-study-dialog";
-import { AIMatchSettingsDialog } from "./ai-match-settings-dialog";
+import { Accordion } from "@/components/ui/accordion";
+import { FileText, Sparkles } from "lucide-react";
 import { useBatchReportsStore, buildReportKey } from "@/hooks/use-batch-reports-store";
 import { LoadMoreStudiesButton } from "./load-more-studies-button";
 import { sendReportEvent } from "@/lib/api/reportEventsApi";
 import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
 import type { AIModel } from "@/hooks/use-genai-evaluation-store";
 import type { NewStudySuggestion, PromptOverrides } from "@/types/apiDTOs";
-import { StudyAIBadge } from "./study-ai-badge";
 import { StudyAIReasonDialog } from "./study-ai-reason-dialog";
 import { AiEvaluationProgress } from "./ai-evaluation-progress";
 import { AiEvaluationHistoryDialog } from "./ai-evaluation-history-dialog";
-import { Separator } from "../../../../components/ui/separator";
+import { AIMatchSettingsDialog } from "./ai-match-settings-dialog";
+
+import { StudyRelevanceHeader } from "./study-relevance-header";
+import { StudyCard } from "./study-card";
+import { StudyDetailSheet } from "./study-detail-sheet";
 
 interface StudyRelevanceTableProps {
   studies: RelevanceStudy[];
   loading?: boolean;
   onLinkedChange?: (studyId: number, linked: boolean) => void;
   onStudySelect?: (studyId: number | null) => void;
-  // Add current report context
   currentBatchHash?: string;
   currentReportIndex?: number;
   currentReportCRGId?: number;
-  // For event tracking
   getLastInteraction?: () => string | null;
 }
 
@@ -85,6 +41,7 @@ export function StudyRelevanceTable({
   currentReportCRGId,
   getLastInteraction,
 }: StudyRelevanceTableProps) {
+  // ── Store hooks ──────────────────────────────────────────────────────
   const {
     addStudyDialogOpen,
     studyDetails,
@@ -100,36 +57,27 @@ export function StudyRelevanceTable({
     similarStudiesByReport,
     addUnlinkedStudyToSimilar,
   } = useBatchReportsStore();
+
+  const results = useGenAIEvaluationStore((s) => s.results);
+  const evaluationsByReport = useGenAIEvaluationStore((s) => s.evaluationsByReport);
+  const runningEvaluations = useGenAIEvaluationStore((s) => s.runningEvaluations);
+  const evaluateStream = useGenAIEvaluationStore((s) => s.evaluateStream);
+  const canStartEvaluation = useGenAIEvaluationStore((s) => s.canStartEvaluation);
+  const getRunningEvaluationsCount = useGenAIEvaluationStore((s) => s.getRunningEvaluationsCount);
+  const getStudyResult = useGenAIEvaluationStore((s) => s.getStudyResult);
+  const dismissedSuggestions = useGenAIEvaluationStore((s) => s.dismissedSuggestions);
+  const dismissSuggestion = useGenAIEvaluationStore((s) => s.dismissSuggestion);
+
+  // ── Local state ──────────────────────────────────────────────────────
   const [linkedStudies, setLinkedStudies] = useState<Set<number>>(
     new Set(studies.filter((s) => s.Linked).map((s) => s.CRGStudyID))
   );
   const [openStudies, setOpenStudies] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStudy, setSelectedStudy] = useState<RelevanceStudy | null>(
-    null
-  );
+  const [selectedStudy, setSelectedStudy] = useState<RelevanceStudy | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [downloadingPdfs, setDownloadingPdfs] = useState<Set<number>>(
-    new Set()
-  );
-  const [downloadingSingle, setDownloadingSingle] = useState<Set<number>>(
-    new Set()
-  );
-
-  const results = useGenAIEvaluationStore((state) => state.results);
-  const evaluationsByReport = useGenAIEvaluationStore((state) => state.evaluationsByReport);
-  const runningEvaluations = useGenAIEvaluationStore((state) => state.runningEvaluations);
-  const evaluateStream = useGenAIEvaluationStore((state) => state.evaluateStream);
-  const canStartEvaluation = useGenAIEvaluationStore((state) => state.canStartEvaluation);
-  const getRunningEvaluationsCount = useGenAIEvaluationStore((state) => state.getRunningEvaluationsCount);
-  const getStudyResult = useGenAIEvaluationStore((state) => state.getStudyResult);
-  const dismissedSuggestions = useGenAIEvaluationStore((state) => state.dismissedSuggestions);
-  const dismissSuggestion = useGenAIEvaluationStore((state) => state.dismissSuggestion);
-
-  const reportKey = currentBatchHash ? `${currentBatchHash}-${currentReportIndex}` : "";
-  const evalState = reportKey ? evaluationsByReport[reportKey] || null : null;
-  const isRunning = reportKey ? runningEvaluations.includes(reportKey) : false;
-  const studyResults = reportKey ? results[reportKey] : undefined;
+  const [downloadingPdfs, setDownloadingPdfs] = useState<Set<number>>(new Set());
+  const [downloadingSingle, setDownloadingSingle] = useState<Set<number>>(new Set());
 
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [reasonDialogOpen, setReasonDialogOpen] = useState(false);
@@ -140,7 +88,15 @@ export function StudyRelevanceTable({
   } | null>(null);
   const [hasEvaluated, setHasEvaluated] = useState(false);
   const wasAddStudyDialogOpen = useRef(false);
-  const [progressCollapsedByReport, setProgressCollapsedByReport] = useState<Record<string, boolean>>({});
+  const [progressCollapsedByReport, setProgressCollapsedByReport] = useState<
+    Record<string, boolean>
+  >({});
+
+  // ── Derived state ────────────────────────────────────────────────────
+  const reportKey = currentBatchHash ? `${currentBatchHash}-${currentReportIndex}` : "";
+  const evalState = reportKey ? evaluationsByReport[reportKey] || null : null;
+  const isRunning = reportKey ? runningEvaluations.includes(reportKey) : false;
+  const studyResults = reportKey ? results[reportKey] : undefined;
 
   const summaryEvent = useMemo(
     () =>
@@ -198,10 +154,30 @@ export function StudyRelevanceTable({
   const suggestionKey = normalizedSuggestion
     ? `${reportKey}:${JSON.stringify(normalizedSuggestion)}`
     : null;
-
   const suggestionDismissed = suggestionKey ? dismissedSuggestions.has(suggestionKey) : false;
   const shouldHighlightSuggestion = Boolean(suggestionKey) && !suggestionDismissed;
 
+  // ── Filtered & sorted studies ────────────────────────────────────────
+  const filteredStudies = useMemo(() => {
+    let filtered = [...studies];
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (study) =>
+          study.ShortName.toLowerCase().includes(query) ||
+          study.CRGStudyID.toString().includes(query) ||
+          (study.Comparison || "").toLowerCase().includes(query) ||
+          (study.NumberParticipants !== null &&
+            study.NumberParticipants !== undefined &&
+            study.NumberParticipants.toString().toLowerCase().includes(query))
+      );
+    }
+
+    return filtered.sort((a, b) => b.Relevance - a.Relevance);
+  }, [studies, searchQuery]);
+
+  // ── Effects ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (addStudyDialogOpen && !wasAddStudyDialogOpen.current) {
       if (normalizedSuggestion && suggestionKey && !suggestionDismissed) {
@@ -233,31 +209,11 @@ export function StudyRelevanceTable({
     );
   }, [studies]);
 
-  // Reset evaluation state when report changes
   useEffect(() => {
     setAiDialogOpen(false);
   }, [currentBatchHash, currentReportIndex]);
 
-  // Filter and sort studies
-  const filteredStudies = useMemo(() => {
-    let filtered = [...studies];
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (study) =>
-          study.ShortName.toLowerCase().includes(query) ||
-          study.CRGStudyID.toString().includes(query) ||
-          (study.Comparison || "").toLowerCase().includes(query) ||
-          (study.NumberParticipants !== null &&
-            study.NumberParticipants !== undefined &&
-            study.NumberParticipants.toString().toLowerCase().includes(query))
-      );
-    }
-
-    return filtered.sort((a, b) => b.Relevance - a.Relevance);
-  }, [studies, searchQuery]);
-
+  // ── Handlers ─────────────────────────────────────────────────────────
   const handleAIEvaluation = async (options: {
     model?: AIModel;
     includePdf?: boolean;
@@ -276,7 +232,9 @@ export function StudyRelevanceTable({
 
     try {
       const runningCount = getRunningEvaluationsCount();
-      toast.info(`Evaluating ${filteredStudies.length} studies with AI (${runningCount + 1}/4 running)...`);
+      toast.info(
+        `Evaluating ${filteredStudies.length} studies with AI (${runningCount + 1}/4 running)...`
+      );
       setHasEvaluated(true);
       evaluateStream(
         currentBatchHash,
@@ -323,10 +281,8 @@ export function StudyRelevanceTable({
       return newSet;
     });
 
-    // Call the callback if provided (for backward compatibility)
     onLinkedChange?.(studyId, checked);
 
-    // If we have report context, persist to backend
     if (currentBatchHash && currentReportIndex !== undefined) {
       let studyToPreserve: RelevanceStudy | undefined;
       if (!checked) {
@@ -340,24 +296,15 @@ export function StudyRelevanceTable({
 
       try {
         if (checked) {
-          await assignStudyToReport(
-            currentBatchHash,
-            currentReportIndex,
-            studyId
-          );
+          await assignStudyToReport(currentBatchHash, currentReportIndex, studyId);
           toast.success(`Study assigned to report`);
 
-          // Send "end" event when a study is assigned (checkbox checked)
           if (currentReportCRGId) {
             const lastInteraction = getLastInteraction?.() ?? null;
             void sendReportEvent(currentReportCRGId, "end", lastInteraction);
           }
         } else {
-          await unassignStudyFromReport(
-            currentBatchHash,
-            currentReportIndex,
-            studyId
-          );
+          await unassignStudyFromReport(currentBatchHash, currentReportIndex, studyId);
           toast.success(`Study unassigned from report`);
         }
 
@@ -373,15 +320,11 @@ export function StudyRelevanceTable({
             currentReportIndex,
             currentReportCRGId,
             true
-          )
+          ),
         ]);
 
         if (studyToPreserve) {
-          addUnlinkedStudyToSimilar(
-            currentBatchHash,
-            currentReportIndex,
-            studyToPreserve
-          );
+          addUnlinkedStudyToSimilar(currentBatchHash, currentReportIndex, studyToPreserve);
         }
       } catch (error) {
         // Revert UI on error
@@ -403,63 +346,11 @@ export function StudyRelevanceTable({
     }
   };
 
-  const handleAccordionChange = (value: string[]) => {
-    setOpenStudies(new Set(value));
-  };
-
-  const getRelevanceColor = (relevance: number) => {
-    if (relevance >= 0.9) return "bg-emerald-500";
-    if (relevance >= 0.7) return "bg-blue-500";
-    if (relevance >= 0.5) return "bg-amber-500";
-    return "bg-orange-500";
-  };
-
-  const getRelevanceBadgeStyle = (relevance: number) => {
-    if (relevance >= 0.9) return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400";
-    if (relevance >= 0.7) return "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400";
-    if (relevance >= 0.5) return "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400";
-    return "bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-400";
-  };
-
   const handleStudyClick = (study: RelevanceStudy) => {
     setSelectedStudy(study);
     setIsSheetOpen(true);
     onStudySelect?.(study.CRGStudyID);
-    // Fetch detailed study information
     void fetchStudyDetails(study.CRGStudyID);
-  };
-
-  // Convert RelevanceStudy to study format for StudyOverview
-  const getStudyForSheet = (study: RelevanceStudy) => {
-    const numberParticipants = study.NumberParticipants;
-    const formattedParticipants =
-      numberParticipants === null || numberParticipants === undefined
-        ? "-"
-        : typeof numberParticipants === "number"
-          ? numberParticipants.toString()
-          : numberParticipants;
-
-    // Get additional details from studyDetails if available
-    const details = studyDetails[study.CRGStudyID];
-
-    return {
-      ShortName: study.ShortName,
-      StatusofStudy: study.StatusofStudy || "Unknown",
-      CENTRALSubmissionStatus: study.CENTRALSubmissionStatus || "Unknown",
-      TrialistContactDetails: study.TrialistContactDetails || "",
-      NumberParticipants: formattedParticipants,
-      Countries: study.Countries || "",
-      Duration: study.Duration || "",
-      Comparison: study.Comparison || "",
-      ISRCTN: study.ISRCTN || "",
-      Notes: study.Notes || "",
-      UDef4: study.UDef4 || "",
-      DateEntered: details?.studyInfo.DateEntered || study.DateEntered,
-      DateEdited: details?.studyInfo.DateEdited || study.DateEdited,
-      TrialRegistrationID: details?.studyInfo.TrialRegistrationID || undefined,
-      CENTRALStudyID: details?.studyInfo.CENTRALStudyID,
-      CRGStudyID: study.CRGStudyID,
-    };
   };
 
   const handleDownloadAllReportPdfs = async (study: RelevanceStudy) => {
@@ -495,7 +386,6 @@ export function StudyRelevanceTable({
             }`
           );
         }
-        // Add delay between downloads to avoid browser throttling
         await new Promise((resolve) => setTimeout(resolve, 300));
       }
 
@@ -510,10 +400,7 @@ export function StudyRelevanceTable({
     }
   };
 
-  const handleDownloadSingleReportPdf = async (
-    report: any,
-    studyShortName: string
-  ) => {
+  const handleDownloadSingleReportPdf = async (report: any, studyShortName: string) => {
     setDownloadingSingle(new Set([report.CRGReportID]));
 
     try {
@@ -547,6 +434,7 @@ export function StudyRelevanceTable({
     }
   };
 
+  // ── Render ───────────────────────────────────────────────────────────
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <AIMatchSettingsDialog
@@ -558,105 +446,54 @@ export function StudyRelevanceTable({
         runningCount={getRunningEvaluationsCount()}
       />
 
-      {/* Header - Sticky */}
-      <div className="shrink-0 space-y-4 pb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-1.5 rounded-md bg-primary/10">
-              <Sparkles className="h-4 w-4 text-primary" />
-            </div>
-            <h2 className="text-lg font-semibold">Relevant Studies</h2>
-            <Badge variant="secondary" className="text-xs font-normal">
-              {filteredStudies.length}
-              {searchQuery && ` of ${studies.length}`}
-            </Badge>
-          </div>
-          <div className="flex items-center gap-2">
-            {currentBatchHash !== undefined &&
-              currentReportIndex !== undefined && (
-                <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 gap-2"
-                    onClick={() => setAiDialogOpen(true)}
-                    disabled={isRunning || filteredStudies.length === 0}
-                  >
-                    {isRunning ? (
-                      <Spinner className="h-4 w-4" />
-                    ) : (
-                      <Sparkles className="h-4 w-4" />
-                    )}
-                    AI Match
-                  </Button>
-                  {hasEvaluated && evalState?.streamMessages && evalState.streamMessages.length > 0 && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 gap-2"
-                      onClick={() => setHistoryDialogOpen(true)}
-                    >
-                      Show Step History
-                    </Button>
-                  )}
-                  <AddStudyDialog
-                    currentBatchHash={currentBatchHash}
-                    currentReportIndex={currentReportIndex}
-                    currentReportCRGId={currentReportCRGId}
-                    highlight={shouldHighlightSuggestion}
-                    onStudySaved={() => {
-                      if (suggestionKey) {
-                        dismissSuggestion(suggestionKey);
-                      }
-                    }}
-                  />
-                </>
-              )}
-          </div>
-        </div>
-
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, ID, comparison, or participants..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-          {searchQuery && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
-              onClick={() => setSearchQuery("")}
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          )}
-        </div>
-      </div>
+      {/* Header */}
+      <StudyRelevanceHeader
+        filteredCount={filteredStudies.length}
+        totalCount={studies.length}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        currentBatchHash={currentBatchHash}
+        currentReportIndex={currentReportIndex}
+        currentReportCRGId={currentReportCRGId}
+        isRunning={isRunning}
+        canStartEvaluation={canStartEvaluation()}
+        filteredStudiesEmpty={filteredStudies.length === 0}
+        onAiDialogOpen={() => setAiDialogOpen(true)}
+        hasEvaluated={hasEvaluated}
+        hasStreamMessages={
+          Boolean(evalState?.streamMessages && evalState.streamMessages.length > 0)
+        }
+        onHistoryDialogOpen={() => setHistoryDialogOpen(true)}
+        shouldHighlightSuggestion={shouldHighlightSuggestion}
+        suggestionKey={suggestionKey}
+        onSuggestionDismiss={() => {
+          if (suggestionKey) dismissSuggestion(suggestionKey);
+        }}
+      />
 
       <AiEvaluationProgress
         message={
           evalState?.isStreaming
-            ? (evalState?.currentMessage ||
-               (evalState?.streamMessages && evalState.streamMessages.length > 0
-                 ? evalState.streamMessages[evalState.streamMessages.length - 1]?.message
-                 : null) ||
-               null)
-            : (summaryEvent?.message ||
-               evalState?.currentMessage ||
-               (evalState?.streamMessages && evalState.streamMessages.length > 0
-                 ? evalState.streamMessages[evalState.streamMessages.length - 1]?.message
-                 : null) ||
-               null)
+            ? evalState?.currentMessage ||
+            (evalState?.streamMessages && evalState.streamMessages.length > 0
+              ? evalState.streamMessages[evalState.streamMessages.length - 1]?.message
+              : null) ||
+            null
+            : summaryEvent?.message ||
+            evalState?.currentMessage ||
+            (evalState?.streamMessages && evalState.streamMessages.length > 0
+              ? evalState.streamMessages[evalState.streamMessages.length - 1]?.message
+              : null) ||
+            null
         }
         isStreaming={evalState?.isStreaming ?? false}
         hasSummary={Boolean(summaryEvent?.message)}
         collapsed={progressCollapsedByReport[reportKey] ?? false}
         onCollapsedChange={(collapsed) => {
-          setProgressCollapsedByReport(prev => ({ ...prev, [reportKey]: collapsed }));
+          setProgressCollapsedByReport((prev) => ({
+            ...prev,
+            [reportKey]: collapsed,
+          }));
         }}
       />
 
@@ -683,289 +520,29 @@ export function StudyRelevanceTable({
           </div>
         ) : (
           <div className="space-y-3">
-            {/* Studies list */}
             <Accordion
               type="multiple"
               className="w-full space-y-2"
-              onValueChange={handleAccordionChange}
+              onValueChange={(value) => setOpenStudies(new Set(value))}
             >
-              {filteredStudies.map((study) => {
-                const isLinked = linkedStudies.has(study.CRGStudyID);
-                const relevancePercentage = (study.Relevance * 100).toFixed(1);
-                const studyValue = `study-${study.CRGStudyID}`;
-                const isOpen = openStudies.has(studyValue);
-                const reportCount = study.reports.length;
-
-                return (
-                  <AccordionItem
-                    key={study.CRGStudyID}
-                    value={studyValue}
-                    className="border-none"
-                  >
-                    <AccordionTrigger className="hover:no-underline p-0 [&>svg]:hidden group">
-                      <div className="p-4 mb-2 bg-card hover:bg-muted/50 rounded-lg relative w-full transition-all duration-200 border border-border/60 hover:border-border group-hover:shadow-sm">
-                        {/* Left indicator bar with relevance color */}
-                        <div
-                          className={`${getRelevanceColor(
-                            study.Relevance
-                          )} rounded-l-lg h-full w-1 absolute left-0 top-0 bottom-0 transition-all`}
-                        ></div>
-
-                        <div className="flex flex-col gap-3 pl-4">
-                          {/* Top row: Checkbox, Short Name, and Details button */}
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              {/* Checkbox - smaller */}
-                              <div
-                                className="flex items-center shrink-0"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div>
-                                        <Checkbox
-                                          checked={isLinked}
-                                          onCheckedChange={(checked) =>
-                                            handleLinkedChange(
-                                              study.CRGStudyID,
-                                              checked as boolean
-                                            )
-                                          }
-                                          className="data-[state=checked]:bg-primary h-4 w-4"
-                                        />
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      {isLinked ? "Unlink study" : "Link study"}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-
-                              {/* ShortName */}
-                              <div className="flex-1 min-w-0">
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <h3 className="text-base font-semibold truncate">
-                                        {study.ShortName}
-                                      </h3>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>{study.ShortName}</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-                            </div>
-
-                            {/* Details button - more prominent */}
-                            <div className="flex items-center gap-2 shrink-0">
-                              <Button
-                                variant="default"
-                                size="sm"
-                                className="h-8 px-3 text-sm font-medium"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleStudyClick(study);
-                                }}
-                              >
-                                Details
-                              </Button>
-                              <ChevronDown
-                                className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-180" : ""
-                                  }`}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Relevance */}
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-                              Relevance
-                            </span>
-                            <Badge
-                              variant="secondary"
-                              className={`font-semibold text-xs px-2 py-0.5 ${getRelevanceBadgeStyle(study.Relevance)}`}
-                            >
-                              {relevancePercentage}%
-                            </Badge>
-                            {/* AI Classification Badge */}
-                            {studyResults?.[study.CRGStudyID] && (
-                              <StudyAIBadge
-                                classification={studyResults[study.CRGStudyID].classification}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleAIBadgeClick(
-                                    study.CRGStudyID,
-                                    study.ShortName
-                                  );
-                                }}
-                              />
-                            )}
-                          </div>
-
-                          {/* Bottom row: Participants, Duration, Comparison */}
-                          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs">
-                            {/* NumberParticipants */}
-                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                              <div className="p-0.5 rounded bg-blue-50 dark:bg-blue-950/30">
-                                <Users className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                              </div>
-                              <span>
-                                {typeof study.NumberParticipants === "number"
-                                  ? study.NumberParticipants.toLocaleString()
-                                  : study.NumberParticipants || "-"} participants
-                              </span>
-                            </div>
-
-                            {/* Duration */}
-                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                              <div className={`p-0.5 rounded ${study.Duration ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-muted"}`}>
-                                <Calendar className={`h-3 w-3 ${study.Duration ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/50"}`} />
-                              </div>
-                              <span className={study.Duration ? "" : "text-muted-foreground/50"}>
-                                {study.Duration || "No duration"}
-                              </span>
-                            </div>
-
-                            {/* Comparison */}
-                            {study.Comparison && (
-                              <div className="flex items-center gap-1.5 text-muted-foreground flex-1 min-w-0">
-                                <div className="p-0.5 rounded bg-violet-50 dark:bg-violet-950/30 shrink-0">
-                                  <CheckCircle2 className="h-3 w-3 text-violet-600 dark:text-violet-400" />
-                                </div>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="truncate">
-                                        {study.Comparison}
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="max-w-xs">
-                                      <p>{study.Comparison}</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-
-                    {/* Expanded content - Reports table */}
-                    <AccordionContent className="pt-0 pb-3 px-5">
-                      <div className="mt-2 border border-border/60 rounded-lg overflow-hidden bg-card">
-                        <div className="bg-muted/40 px-4 py-2.5 border-b border-border/60 flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <div className="p-1 rounded bg-slate-100 dark:bg-slate-800/50">
-                              <FileText className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400" />
-                            </div>
-                            <span className="text-sm font-medium">
-                              Associated Reports
-                            </span>
-                            <Badge variant="secondary" className="text-xs font-normal h-5">
-                              {reportCount}
-                            </Badge>
-                          </div>
-                          {reportCount > 0 && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDownloadAllReportPdfs(study)}
-                              disabled={downloadingPdfs.has(study.CRGStudyID)}
-                              className="h-7 px-2 text-xs flex items-center gap-1"
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                              {downloadingPdfs.has(study.CRGStudyID)
-                                ? "Downloading..."
-                                : "Download All"}
-                            </Button>
-                          )}
-                        </div>
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="hover:bg-transparent">
-                              <TableHead className="font-medium">
-                                CRG ID
-                              </TableHead>
-                              <TableHead className="font-medium">
-                                Title
-                              </TableHead>
-                              <TableHead className="w-12"></TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {study.reports.length > 0 ? (
-                              study.reports.map((report, idx) => (
-                                <TableRow
-                                  key={report.CRGReportID || idx}
-                                  className="hover:bg-muted/50 transition-colors"
-                                >
-                                  <TableCell className="font-mono text-xs">
-                                    {report.CRGReportID}
-                                  </TableCell>
-                                  <TableCell className="max-w-md">
-                                    <TooltipProvider>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <div className="truncate text-sm">
-                                            {report.Title}
-                                          </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="max-w-md">
-                                          <p className="text-sm">
-                                            {report.Title}
-                                          </p>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        handleDownloadSingleReportPdf(
-                                          report,
-                                          study.ShortName
-                                        )
-                                      }
-                                      disabled={downloadingSingle.has(
-                                        report.CRGReportID
-                                      )}
-                                      className="h-6 w-6 p-0 flex items-center justify-center"
-                                    >
-                                      <Download className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
-                              ))
-                            ) : (
-                              <TableRow>
-                                <TableCell
-                                  colSpan={5}
-                                  className="text-center text-muted-foreground py-8"
-                                >
-                                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                                  <p className="text-sm">
-                                    No reports available
-                                  </p>
-                                </TableCell>
-                              </TableRow>
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                );
-              })}
+              {filteredStudies.map((study) => (
+                <StudyCard
+                  key={study.CRGStudyID}
+                  study={study}
+                  isLinked={linkedStudies.has(study.CRGStudyID)}
+                  isOpen={openStudies.has(`study-${study.CRGStudyID}`)}
+                  onLinkedChange={handleLinkedChange}
+                  onStudyClick={handleStudyClick}
+                  studyResult={studyResults?.[study.CRGStudyID]}
+                  onAIBadgeClick={handleAIBadgeClick}
+                  isDownloadingAllPdfs={downloadingPdfs.has(study.CRGStudyID)}
+                  downloadingSingle={downloadingSingle}
+                  onDownloadAllPdfs={handleDownloadAllReportPdfs}
+                  onDownloadSinglePdf={handleDownloadSingleReportPdf}
+                />
+              ))}
             </Accordion>
 
-            {/* Load More Button */}
             <LoadMoreStudiesButton
               currentBatchHash={currentBatchHash}
               currentReportIndex={currentReportIndex}
@@ -975,167 +552,44 @@ export function StudyRelevanceTable({
         )}
       </div>
 
-      {/* Sheet for Study Details */}
-      <Sheet
-        open={isSheetOpen}
-        onOpenChange={(open) => {
-          setIsSheetOpen(open);
-          if (!open) {
-            onStudySelect?.(null);
-          }
-        }}
-      >
-        <SheetContent
-          side="right"
-          className="w-full sm:max-w-2xl overflow-y-auto pb-8"
-        >
-          {selectedStudy && (
-            <>
-              <SheetHeader className="border-b border-border/60">
-                <SheetTitle>{selectedStudy.ShortName}</SheetTitle>
-              </SheetHeader>
-              <div className="mt-6 space-y-6">
-                <StudyOverview study={getStudyForSheet(selectedStudy)} />
-
-                <Separator />
-
-                {/* Study Details Section */}
-                {studyDetails[selectedStudy.CRGStudyID] ? (
-                  <StudyDetails
-                    interventions={
-                      studyDetails[selectedStudy.CRGStudyID].interventions
-                    }
-                    conditions={
-                      studyDetails[selectedStudy.CRGStudyID].conditions
-                    }
-                    outcomes={studyDetails[selectedStudy.CRGStudyID].outcomes}
-                    design={studyDetails[selectedStudy.CRGStudyID].design}
-                    persons={studyDetails[selectedStudy.CRGStudyID].persons}
-                    loading={false}
-                  />
-                ) : (
-                  <StudyDetails
-                    interventions={[]}
-                    conditions={[]}
-                    outcomes={[]}
-                    design={[]}
-                    persons={[]}
-                    loading={
-                      studyDetailsLoading[selectedStudy.CRGStudyID] ?? false
-                    }
-                  />
-                )}
-
-                <Separator />
-
-                {/* Reports Section with Download */}
-                <div className="space-y-4 px-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-base font-semibold flex items-center gap-2.5">
-                      <div className="p-1.5 rounded-md bg-muted">
-                        <FileText className="h-4 w-4" />
-                      </div>
-                      Reports
-                      <Badge variant="secondary" className="text-xs font-normal">
-                        {selectedStudy.reports.length}
-                      </Badge>
-                    </h3>
-                    {selectedStudy.reports.length > 0 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          handleDownloadAllReportPdfs(selectedStudy)
-                        }
-                        disabled={downloadingPdfs.has(selectedStudy.CRGStudyID)}
-                        className="flex items-center gap-2"
-                      >
-                        <Download className="h-4 w-4" />
-                        {downloadingPdfs.has(selectedStudy.CRGStudyID)
-                          ? "Downloading..."
-                          : "Download All PDFs"}
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    {selectedStudy.reports.length > 0 ? (
-                      selectedStudy.reports.map((report, idx) => (
-                        <div
-                          key={report.CRGReportID || idx}
-                          className="p-3.5 rounded-md border border-border/60 bg-muted/30 hover:bg-muted/50 transition-colors"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium leading-snug">
-                                {report.Title}
-                              </p>
-                              <div className="flex items-center gap-3 mt-2">
-                                {report.CENTRALReportID && (
-                                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">
-                                    CENTRAL: {report.CENTRALReportID}
-                                  </code>
-                                )}
-                                <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">
-                                  CRG: {report.CRGReportID}
-                                </code>
-                              </div>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                handleDownloadSingleReportPdf(
-                                  report,
-                                  selectedStudy.ShortName
-                                )
-                              }
-                              disabled={downloadingSingle.has(
-                                report.CRGReportID
-                              )}
-                              className="h-8 w-8 p-0 flex items-center justify-center shrink-0"
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                        <FileText className="h-8 w-8 mb-2 opacity-30" />
-                        <p className="text-sm">No reports available</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
+      {/* Study Detail Sheet */}
+      <StudyDetailSheet
+        isOpen={isSheetOpen}
+        onOpenChange={setIsSheetOpen}
+        selectedStudy={selectedStudy}
+        studyDetails={studyDetails}
+        studyDetailsLoading={studyDetailsLoading}
+        onStudyDeselect={() => onStudySelect?.(null)}
+        downloadingPdfs={downloadingPdfs}
+        downloadingSingle={downloadingSingle}
+        onDownloadAllPdfs={handleDownloadAllReportPdfs}
+        onDownloadSinglePdf={handleDownloadSingleReportPdf}
+      />
 
       {/* AI Reason Dialog */}
-      {selectedAIStudy && currentBatchHash !== undefined && currentReportIndex !== undefined && (
-        <StudyAIReasonDialog
-          open={reasonDialogOpen}
-          onOpenChange={setReasonDialogOpen}
-          studyName={selectedAIStudy.studyName}
-          classification={
-            getStudyResult(
-              currentBatchHash,
-              currentReportIndex,
-              selectedAIStudy.studyId
-            )?.classification || "unsure"
-          }
-          reason={
-            getStudyResult(
-              currentBatchHash,
-              currentReportIndex,
-              selectedAIStudy.studyId
-            )?.reason || "No reason available"
-          }
-        />
-      )}
+      {selectedAIStudy &&
+        currentBatchHash !== undefined &&
+        currentReportIndex !== undefined && (
+          <StudyAIReasonDialog
+            open={reasonDialogOpen}
+            onOpenChange={setReasonDialogOpen}
+            studyName={selectedAIStudy.studyName}
+            classification={
+              getStudyResult(
+                currentBatchHash,
+                currentReportIndex,
+                selectedAIStudy.studyId
+              )?.classification || "unsure"
+            }
+            reason={
+              getStudyResult(
+                currentBatchHash,
+                currentReportIndex,
+                selectedAIStudy.studyId
+              )?.reason || "No reason available"
+            }
+          />
+        )}
 
       <AiEvaluationHistoryDialog
         open={historyDialogOpen}
