@@ -12,6 +12,9 @@ import type { RelevanceStudy } from "@/types/reports";
 import { sendReportEvent } from "@/lib/api/reportEventsApi";
 import { InactivityDialog } from "./inactivity-dialog";
 
+const INACTIVITY_DIALOG_ENABLED =
+  process.env.INACTIVITY_DIALOG === "true";
+
 interface StudyDetailContentProps {
   reports: Array<{
     reportIndex: number;
@@ -251,11 +254,13 @@ export function StudyDetailContent({
 
   return (
     <>
-      <InactivityDialog
-        isTimerActive={selectedReportIndex !== null}
-        onContinue={handleInactivityContinue}
-        onStop={handleInactivityStop}
-      />
+      {INACTIVITY_DIALOG_ENABLED ? (
+        <InactivityDialog
+          isTimerActive={selectedReportIndex !== null}
+          onContinue={handleInactivityContinue}
+          onStop={handleInactivityStop}
+        />
+      ) : null}
       <PanelGroup direction="horizontal" className="h-full">
       <Panel
         defaultSize={40}
