@@ -698,8 +698,8 @@ export function StudyRelevanceTable({
                     value={studyValue}
                     className="border-none"
                   >
-                    <AccordionTrigger className="hover:no-underline p-0 [&>svg]:hidden group">
-                      <div className="p-4 mb-2 bg-card hover:bg-muted/50 rounded-lg relative w-full transition-all duration-200 border border-border/60 hover:border-border group-hover:shadow-sm">
+                    <AccordionTrigger className="hover:no-underline p-0 [&>svg]:hidden group min-w-0">
+                      <div className="p-4 mb-2 bg-card hover:bg-muted/50 rounded-lg relative w-full max-w-full overflow-hidden transition-all duration-200 border border-border/60 hover:border-border group-hover:shadow-sm">
                         {/* Left indicator bar with relevance color */}
                         <div
                           className={`${getRelevanceColor(
@@ -803,7 +803,7 @@ export function StudyRelevanceTable({
                           </div>
 
                           {/* Bottom row: Participants, Duration, Comparison */}
-                          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs">
+                          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs w-full">
                             {/* NumberParticipants */}
                             <div className="flex items-center gap-1.5 text-muted-foreground">
                               <div className="p-0.5 rounded bg-blue-50 dark:bg-blue-950/30">
@@ -828,14 +828,14 @@ export function StudyRelevanceTable({
 
                             {/* Comparison */}
                             {study.Comparison && (
-                              <div className="flex items-center gap-1.5 text-muted-foreground flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 text-muted-foreground flex-1 min-w-0 basis-0 max-w-full overflow-hidden">
                                 <div className="p-0.5 rounded bg-violet-50 dark:bg-violet-950/30 shrink-0">
                                   <CheckCircle2 className="h-3 w-3 text-violet-600 dark:text-violet-400" />
                                 </div>
                                 <TooltipProvider>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
-                                      <span className="truncate">
+                                      <span className="truncate block w-full max-w-full">
                                         {study.Comparison}
                                       </span>
                                     </TooltipTrigger>
