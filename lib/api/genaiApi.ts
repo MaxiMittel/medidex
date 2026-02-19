@@ -1,13 +1,9 @@
 import axios from "axios";
 import type { DefaultPrompts, EvaluateRequest, EvaluateResponse } from "@/types/apiDTOs";
 
-const GENAI_BASE_URL = process.env.NEXT_PUBLIC_GENAI_API_URL;
-
 const genaiClient = axios.create({
-  baseURL: GENAI_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
+  baseURL: "/api/genai",
+  headers: { "Content-Type": "application/json" },
 });
 
 let cachedDefaultPrompts: DefaultPrompts | null = null;

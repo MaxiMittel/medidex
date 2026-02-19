@@ -4,7 +4,7 @@ import type {
   StreamCallbacks,
 } from "@/types/apiDTOs";
 
-const GENAI_BASE_URL = process.env.NEXT_PUBLIC_GENAI_API_URL;
+const STREAM_ENDPOINT = "/api/genai/evaluate/stream";
 
 export const evaluateStudiesStream = (
   request: EvaluateRequest,
@@ -15,7 +15,7 @@ export const evaluateStudiesStream = (
 
   const startStream = async () => {
     try {
-      const response = await fetch(`${GENAI_BASE_URL}/evaluate/stream`, {
+      const response = await fetch(STREAM_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
