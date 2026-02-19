@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/command";
 import { toast } from "sonner";
 import { COUNTRY_OPTIONS } from "./constants";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 interface AddStudyDialogProps {
   currentBatchHash?: string;
@@ -54,35 +54,55 @@ export function AddStudyDialog({
   const [durationUnit, setDurationUnit] = useState("");
   const [selectedCountry, setSelectedCountry] = useState("");
   const [countryOpen, setCountryOpen] = useState(false);
+  const [shortName, setShortName] = useState("");
+  const [statusOfStudy, setStatusOfStudy] = useState("");
+  const [numberOfParticipants, setNumberOfParticipants] = useState("");
+  const [comparison, setComparison] = useState("");
   const {
     addStudyDialogOpen,
     setAddStudyDialogOpen,
     newStudyForm,
-    updateNewStudyForm,
+    setNewStudyForm,
     resetNewStudyForm,
     submitNewStudy,
     creatingStudy,
   } = useBatchReportsStore();
+  const resetLocalFormState = useCallback(() => {
+    setShortName("");
+    setStatusOfStudy("");
+    setSelectedCountry("");
+    setDurationValue("");
+    setDurationUnit("");
+    setNumberOfParticipants("");
+    setComparison("");
+  }, []);
   useEffect(() => {
-    if (addStudyDialogOpen) {
-      setSelectedCountry(newStudyForm.countries || "Unclear");
-      const parts = (newStudyForm.duration || "").split(" ");
-      if (parts.length === 2 && !Number.isNaN(Number(parts[0]))) {
-        setDurationValue(parts[0]);
-        setDurationUnit(parts[1]);
-      } else if (newStudyForm.duration?.toLowerCase() === "uncertain") {
-        setDurationValue("");
-        setDurationUnit("uncertain");
-      } else {
-        setDurationValue("");
-        setDurationUnit("");
-      }
+    if (!addStudyDialogOpen) {
+      resetLocalFormState();
+      return;
+    }
+
+    setShortName(newStudyForm.short_name || "");
+    setStatusOfStudy(newStudyForm.status_of_study || "");
+    setSelectedCountry(newStudyForm.countries || "Unclear");
+    const parts = (newStudyForm.duration || "").split(" ");
+    if (parts.length === 2 && !Number.isNaN(Number(parts[0]))) {
+      setDurationValue(parts[0]);
+      setDurationUnit(parts[1]);
+    } else if (newStudyForm.duration?.toLowerCase() === "uncertain") {
+      setDurationValue("");
+      setDurationUnit("uncertain");
     } else {
       setDurationValue("");
       setDurationUnit("");
-      setSelectedCountry("");
     }
-  }, [addStudyDialogOpen, newStudyForm.countries, newStudyForm.duration]);
+    setNumberOfParticipants(newStudyForm.number_of_participants || "");
+    setComparison(newStudyForm.comparison || "");
+  }, [
+    addStudyDialogOpen,
+    newStudyForm,
+    resetLocalFormState,
+  ]);
 
   const handleAddStudySubmit = async (
     event: React.FormEvent<HTMLFormElement>
@@ -91,6 +111,16 @@ export function AddStudyDialog({
     if (creatingStudy) return;
 
     try {
+      const payloadCountries = selectedCountry || "Unclear";
+      setNewStudyForm({
+        short_name: shortName,
+        status_of_study: statusOfStudy,
+        countries: payloadCountries,
+        duration: computedDuration,
+        number_of_participants: numberOfParticipants,
+        comparison,
+      });
+
       await submitNewStudy({
         reportIndex:
           typeof currentReportIndex === "number" ? currentReportIndex : undefined,
@@ -110,18 +140,29 @@ export function AddStudyDialog({
     if (unit === "uncertain") {
       setDurationValue("");
       setDurationUnit("uncertain");
-      updateNewStudyForm("duration", "Uncertain");
       return;
     }
 
     setDurationValue(value);
     setDurationUnit(unit);
-    if (value && unit) {
-      updateNewStudyForm("duration", `${value} ${unit}`);
-    } else {
-      updateNewStudyForm("duration", "");
-    }
   };
+
+  const computedDuration =
+    durationUnit === "uncertain"
+      ? "Uncertain"
+      : durationValue && durationUnit
+        ? `${durationValue} ${durationUnit}`
+        : "";
+  const normalizedCountry = selectedCountry || "Unclear";
+
+  const isSubmitDisabled =
+    creatingStudy ||
+    shortName.trim().length === 0 ||
+    statusOfStudy.trim().length === 0 ||
+    normalizedCountry.trim().length === 0 ||
+    computedDuration.trim().length === 0 ||
+    comparison.trim().length === 0 ||
+    numberOfParticipants.trim().length === 0;
 
   return (
     <Dialog open={addStudyDialogOpen} onOpenChange={setAddStudyDialogOpen}>
@@ -137,7 +178,7 @@ export function AddStudyDialog({
         <DialogHeader>
           <DialogTitle>Add New Study</DialogTitle>
           <DialogDescription>
-            Add a study to this report without leaving the page.
+            Link this report to a new study.
           </DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={handleAddStudySubmit}>
@@ -146,18 +187,16 @@ export function AddStudyDialog({
             <Input
               id="study-short-name"
               placeholder="e.g. Cardiovascular Outcomes Trial"
-              value={newStudyForm.short_name}
-              onChange={(event) =>
-                updateNewStudyForm("short_name", event.target.value)
-              }
+              value={shortName}
+              onChange={(event) => setShortName(event.target.value)}
               required
             />
           </div>
           <div className="space-y-2">
             <Label>Status of study</Label>
             <Select
-              value={newStudyForm.status_of_study}
-              onValueChange={(value) => updateNewStudyForm("status_of_study", value)}
+              value={statusOfStudy}
+              onValueChange={(value) => setStatusOfStudy(value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Choose status" />
@@ -180,7 +219,7 @@ export function AddStudyDialog({
                   aria-expanded={countryOpen}
                   className="w-full justify-between"
                 >
-                  {selectedCountry || "Unclear"}
+                  {normalizedCountry}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[480px] max-w-screen-sm p-0 overflow-x-auto">
@@ -195,7 +234,6 @@ export function AddStudyDialog({
                           value={country}
                           onSelect={(value) => {
                             setSelectedCountry(value);
-                            updateNewStudyForm("countries", value);
                             setCountryOpen(false);
                           }}
                         >
@@ -249,10 +287,11 @@ export function AddStudyDialog({
               type="number"
               min="0"
               placeholder="0"
-              value={newStudyForm.number_of_participants}
-              onChange={(event) =>
-                updateNewStudyForm("number_of_participants", event.target.value)
-              }
+              value={numberOfParticipants}
+              onChange={(event) => {
+                const value = event.target.value;
+                setNumberOfParticipants(value);
+              }}
               required
             />
           </div>
@@ -261,10 +300,8 @@ export function AddStudyDialog({
             <Input
               id="study-comparison"
               placeholder="e.g. Drug A vs placebo"
-              value={newStudyForm.comparison}
-              onChange={(event) =>
-                updateNewStudyForm("comparison", event.target.value)
-              }
+              value={comparison}
+              onChange={(event) => setComparison(event.target.value)}
               required
             />
           </div>
@@ -273,6 +310,7 @@ export function AddStudyDialog({
               type="button"
               variant="ghost"
               onClick={() => {
+                resetLocalFormState();
                 resetNewStudyForm();
                 setAddStudyDialogOpen(false);
               }}
@@ -282,15 +320,7 @@ export function AddStudyDialog({
             </Button>
             <Button
               type="submit"
-              disabled={
-                creatingStudy ||
-                newStudyForm.short_name.trim().length === 0 ||
-                newStudyForm.status_of_study.trim().length === 0 ||
-                newStudyForm.countries.trim().length === 0 ||
-                newStudyForm.duration.trim().length === 0 ||
-                newStudyForm.comparison.trim().length === 0 ||
-                newStudyForm.number_of_participants.trim().length === 0
-              }
+              disabled={isSubmitDisabled}
             >
               {creatingStudy ? "Saving..." : "Save Study"}
             </Button>
