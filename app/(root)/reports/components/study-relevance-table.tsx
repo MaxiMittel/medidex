@@ -61,6 +61,7 @@ import { StudyAIReasonDialog } from "./study-ai-reason-dialog";
 import { AiEvaluationProgress } from "./ai-evaluation-progress";
 import { AiEvaluationHistoryDialog } from "./ai-evaluation-history-dialog";
 import { Separator } from "../../../../components/ui/separator";
+import { parseComparisonString } from "@/lib/comparisonUtils";
 
 interface StudyRelevanceTableProps {
   studies: RelevanceStudy[];
@@ -198,7 +199,9 @@ export function StudyRelevanceTable({
       number_of_participants: extractNumber(
         safe(newStudySuggestion.number_of_participants)
       ),
-      comparison: safe(newStudySuggestion.comparison),
+      comparisonGroups: parseComparisonString(
+        safe(newStudySuggestion.comparison)
+      ),
     };
   }, [newStudySuggestion]);
 

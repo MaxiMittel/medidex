@@ -10,7 +10,16 @@ import type {
   OutcomeDto,
 } from "../types/apiDTOs";
 import type { CreateStudyPayload } from "@/lib/api/studiesApi";
-import type { RelevanceStudy, StudyDetailData, StudyReportSummary } from "../types/reports";
+import type {
+  RelevanceStudy,
+  StudyDetailData,
+  StudyReportSummary,
+} from "../types/reports";
+import { ComparisonGroup } from "@/types/comparisons";
+import {
+  createComparisonGroup,
+  formatComparisonGroups,
+} from "@/lib/comparisonUtils";
 
 export type NewStudyFormState = {
   short_name: string;
@@ -18,17 +27,19 @@ export type NewStudyFormState = {
   countries: string[];
   duration: string;
   number_of_participants: string;
-  comparison: string;
+  comparisonGroups: ComparisonGroup[];
 };
 
-const initialNewStudyForm: NewStudyFormState = {
+const createInitialNewStudyForm = (): NewStudyFormState => ({
   short_name: "",
   status_of_study: "",
   countries: [],
   duration: "",
   number_of_participants: "",
-  comparison: "",
-};
+  comparisonGroups: [createComparisonGroup()],
+});
+
+const initialNewStudyForm: NewStudyFormState = createInitialNewStudyForm();
 
 export interface BatchReportsState {
   batches: BatchDto[];
@@ -721,7 +732,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
       },
     }));
   },
-  resetNewStudyForm: () => set({ newStudyForm: initialNewStudyForm }),
+  resetNewStudyForm: () => set({ newStudyForm: createInitialNewStudyForm() }),
   submitNewStudy: async (options) => {
     const { newStudyForm } = get();
     const reportIndex = options?.reportIndex;
@@ -734,13 +745,15 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
 
     const number_of_participants = Number(newStudyForm.number_of_participants);
 
+    const comparisonText = formatComparisonGroups(newStudyForm.comparisonGroups);
+
     const payload: CreateStudyPayload = {
       short_name: newStudyForm.short_name.trim(),
       status_of_study: newStudyForm.status_of_study.trim(),
       countries,
       duration: newStudyForm.duration.trim(),
       number_of_participants,
-      comparison: newStudyForm.comparison.trim(),
+      comparison: comparisonText,
     };
 
     // Basic required field guard
@@ -748,7 +761,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
       !payload.short_name ||
       !payload.status_of_study ||
       !payload.duration ||
-      !payload.comparison ||
+      !comparisonText ||
       Number.isNaN(number_of_participants)
     ) {
       throw new Error("Please fill in all required fields.");
@@ -786,7 +799,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
 
       set({
         creatingStudy: false,
-        newStudyForm: initialNewStudyForm,
+        newStudyForm: createInitialNewStudyForm(),
         addStudyDialogOpen: false,
       });
 
