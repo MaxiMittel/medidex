@@ -13,26 +13,36 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  user: {
+    additionalFields: {
+      roles: {
+        type: [Role.USER, Role.ADMIN],
+        required: false,
+        defaultValue: Role.USER,
+        input: false, // don't allow user to set role
+      },
+      isApproved: {
+        type: "boolean",
+        required: true,
+        defaultValue: false,
+        input: false,
+      },
+    },
+  },
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 300,
+      strategy: "jwt",
+      refreshCache: true,
+    },
+  },
+  account: {
+    storeStateStrategy: "cookie",
+    storeAccountCookie: true,
+  },
   plugins: [
     jwt(),
-    nextCookies(),
-    customSession(async ({ user, session }) => {
-      const dbUser = await prisma.user.findUnique({
-        where: {
-          id: user.id,
-        },
-        select: {
-          roles: true,
-          isApproved: true,
-        },
-      });
-
-      return {
-        roles: dbUser?.roles as Role[],
-        isApproved: dbUser?.isApproved ?? false,
-        user,
-        session,
-      };
-    }),
+    nextCookies()
   ],
 });

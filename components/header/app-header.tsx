@@ -13,7 +13,7 @@ export async function AppHeader() {
         name: session.user.name || "User",
         email: session.user.email || "",
         avatar: session.user.image || "",
-        roles: session.roles as Role[],
+        roles: session.user.roles as Role[],
       }
     : null;
 
