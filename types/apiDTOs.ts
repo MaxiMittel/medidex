@@ -12,25 +12,9 @@ export interface BatchDto {
   assigned: number;
 }
 
-export interface VectorDto {
-  model_id: string;
-  embedding: number[];
-  author_embedding: number[];
-  participants: number[];
-  intervention: number[];
-  condition: number[];
-  outcome: number[];
-}
-
 export interface ReportDetailDto {
-  title: string;
-  abstract: string | null;
-  crgreportid: number;
-  authors: string[];
-  trial_id: string | null;
-  vectors: VectorDto;
-  assigned_studies: number[];
-  year: number | null;
+  report: ReportDto;
+  assignedStudies: number[];
 }
 
 export interface SimilarTagDto {
@@ -78,7 +62,6 @@ export interface StudyDto {
   DateEntered: string | null;
   Comparison: string | null;
   CENTRALStudyID: number;
-  DateToCENTRAL: string | null;
   ISRCTN: string | null;
   ShortName: string;
   DateEdited: string | null;
@@ -88,44 +71,12 @@ export interface StudyDto {
 }
 
 export interface ReportDto {
-  CENTRALReportID: number | null;
-  CRGReportID: number;
-  Title: string;
-  Notes: string | null;
-  ReportNumber: number;
-  OriginalTitle: string | null;
-  Authors: string | null;
-  Journal: string | null;
-  Year: number | null;
-  Volume: string | null;
-  Issue: string | null;
-  Pages: string | null;
-  Language: string | null;
-  Abstract: string | null;
-  CENTRALSubmissionStatus: string | null;
-  CopyStatus: string | null;
-  DatetoCENTRAL: string | null;
-  Dateentered: string | null;
-  DateEdited: string | null;
-  Editors: string | null;
-  Publisher: string | null;
-  City: string | null;
-  DupString: string;
-  TypeofReportID: number | null;
-  PublicationTypeID: number;
-  Edition: string | null;
-  Medium: string | null;
-  StudyDesign: string | null;
-  DOI: string | null;
-  UDef3: string | null;
-  ISBN: string | null;
-  UDef5: string | null;
-  PMID: string | null;
-  TrialRegistrationID: string | null;
-  UDef9: string | null;
-  UDef10: string | null;
-  UDef8: string | null;
-  PDFLinks: string | null; 
+  reportId: number;
+  year: number;
+  title: string;
+  abstract: string | null;
+  trialId: string | null;
+  authors: string[];
 }
 
 export interface InterventionDto {

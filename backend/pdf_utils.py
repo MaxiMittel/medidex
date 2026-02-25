@@ -127,7 +127,7 @@ def upload_pdf_to_openai_cached(
 
 def build_report_pdf_attachment(report: ReportDto) -> dict | None:
     """Fetch and prepare a single PDF attachment for the report being matched."""
-    report_id = report.CRGReportID
+    report_id = report.reportId
     pdf_bytes = fetch_report_pdf(report_id)
     if not pdf_bytes:
         logger.warning(

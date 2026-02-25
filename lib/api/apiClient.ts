@@ -1,6 +1,10 @@
 import axios from "axios";
 
-const API_BASE_URL = `${process.env.MEERKAT_API_URL}/api`;
+const baseUrl =
+  process.env.MEERKAT_API_URL ??
+  process.env.NEXT_PUBLIC_MEERKAT_API_URL;
+
+const API_BASE_URL = `${baseUrl}/api`;
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

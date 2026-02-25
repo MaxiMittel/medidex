@@ -50,7 +50,7 @@ import { StudyOverview } from "./study-overview";
 import { StudyDetails } from "./study-details";
 import { AddStudyDialog } from "./add-study-dialog";
 import { AIMatchSettingsDialog } from "./ai-match-settings-dialog";
-import { useBatchReportsStore, buildReportKey } from "@/hooks/use-batch-reports-store";
+import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
 import { LoadMoreStudiesButton } from "./load-more-studies-button";
 import { sendReportEvent } from "@/lib/api/reportEventsApi";
 import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
@@ -60,47 +60,28 @@ import { StudyAIBadge } from "./study-ai-badge";
 import { StudyAIReasonDialog } from "./study-ai-reason-dialog";
 import { AiEvaluationProgress } from "./ai-evaluation-progress";
 import { AiEvaluationHistoryDialog } from "./ai-evaluation-history-dialog";
-import { Separator } from "../../../../components/ui/separator";
+import { Separator } from "../separator";
 import { parseComparisonString } from "@/lib/comparisonUtils";
+import { useReportStore } from "@/hooks/use-report-store";
 
 interface StudyRelevanceTableProps {
   studies: RelevanceStudy[];
-  loading?: boolean;
   onLinkedChange?: (studyId: number, linked: boolean) => void;
   onStudySelect?: (studyId: number | null) => void;
-  // Add current report context
   currentBatchHash?: string;
-  currentReportIndex?: number;
-  currentReportCRGId?: number;
-  // For event tracking
+  currentReportId?: number;
   getLastInteraction?: () => string | null;
 }
 
 export function StudyRelevanceTable({
   studies,
-  loading,
   onLinkedChange,
   onStudySelect,
   currentBatchHash,
-  currentReportIndex,
-  currentReportCRGId,
+  currentReportId,
   getLastInteraction,
 }: StudyRelevanceTableProps) {
-  const {
-    addStudyDialogOpen,
-    studyDetails,
-    studyDetailsLoading,
-    fetchStudyDetails,
-    assignStudyToReport,
-    unassignStudyFromReport,
-    fetchSimilarStudiesForReport,
-    fetchAssignedStudiesForReport,
-    reportsByBatch,
-    setNewStudyForm,
-    resetNewStudyForm,
-    similarStudiesByReport,
-    addUnlinkedStudyToSimilar,
-  } = useBatchReportsStore();
+  
   const [linkedStudies, setLinkedStudies] = useState<Set<number>>(
     new Set(studies.filter((s) => s.Linked).map((s) => s.CRGStudyID))
   );
@@ -117,6 +98,9 @@ export function StudyRelevanceTable({
     new Set()
   );
 
+  const getReport = useReportStore((state) => state.getReport);
+  const updateAssignedStudies = useReportStore((state) => state.updateAssignedStudies);
+
   const results = useGenAIEvaluationStore((state) => state.results);
   const evaluationsByReport = useGenAIEvaluationStore((state) => state.evaluationsByReport);
   const runningEvaluations = useGenAIEvaluationStore((state) => state.runningEvaluations);
@@ -127,7 +111,7 @@ export function StudyRelevanceTable({
   const dismissedSuggestions = useGenAIEvaluationStore((state) => state.dismissedSuggestions);
   const dismissSuggestion = useGenAIEvaluationStore((state) => state.dismissSuggestion);
 
-  const reportKey = currentBatchHash ? `${currentBatchHash}-${currentReportIndex}` : "";
+  const reportKey = currentBatchHash ? `${currentBatchHash}-${currentReportId}` : "";
   const evalState = reportKey ? evaluationsByReport[reportKey] || null : null;
   const isRunning = reportKey ? runningEvaluations.includes(reportKey) : false;
   const studyResults = reportKey ? results[reportKey] : undefined;
@@ -212,6 +196,7 @@ export function StudyRelevanceTable({
   const suggestionDismissed = suggestionKey ? dismissedSuggestions.has(suggestionKey) : false;
   const shouldHighlightSuggestion = Boolean(suggestionKey) && !suggestionDismissed;
 
+  /*
   useEffect(() => {
     if (addStudyDialogOpen && !wasAddStudyDialogOpen.current) {
       if (normalizedSuggestion && suggestionKey && !suggestionDismissed) {
@@ -236,6 +221,7 @@ export function StudyRelevanceTable({
     suggestionDismissed,
     dismissSuggestion,
   ]);
+  */
 
   useEffect(() => {
     setLinkedStudies(
@@ -246,7 +232,7 @@ export function StudyRelevanceTable({
   // Reset evaluation state when report changes
   useEffect(() => {
     setAiDialogOpen(false);
-  }, [currentBatchHash, currentReportIndex]);
+  }, [currentBatchHash, currentReportId]);
 
   // Filter and sort studies
   const filteredStudies = useMemo(() => {
@@ -268,17 +254,18 @@ export function StudyRelevanceTable({
     return filtered.sort((a, b) => b.Relevance - a.Relevance);
   }, [studies, searchQuery]);
 
+  
   const handleAIEvaluation = async (options: {
     model?: AIModel;
     includePdf?: boolean;
     promptOverrides?: PromptOverrides;
   }) => {
-    if (!currentBatchHash || currentReportIndex === undefined) {
+    if (!currentBatchHash || currentReportId === undefined) {
       toast.error("Missing batch or report context");
       return false;
     }
 
-    const currentReport = reportsByBatch[currentBatchHash]?.[currentReportIndex];
+    const currentReport = getReport(currentReportId);
     if (!currentReport) {
       toast.error("Report not found");
       return false;
@@ -290,8 +277,7 @@ export function StudyRelevanceTable({
       setHasEvaluated(true);
       evaluateStream(
         currentBatchHash,
-        currentReportIndex,
-        currentReport,
+        currentReport.report,
         filteredStudies,
         options,
         () => {
@@ -315,11 +301,16 @@ export function StudyRelevanceTable({
   };
 
   const handleLinkedChange = async (studyId: number, checked: boolean) => {
+    if (currentReportId === undefined) {
+      return;
+    }
     const updatedAssigned = new Set(linkedStudies);
     if (checked) {
       updatedAssigned.add(studyId);
+      updateAssignedStudies(currentReportId, [studyId]);
     } else {
       updatedAssigned.delete(studyId);
+      updateAssignedStudies(currentReportId, []);
     }
 
     // Optimistically update UI
@@ -335,9 +326,10 @@ export function StudyRelevanceTable({
 
     // Call the callback if provided (for backward compatibility)
     onLinkedChange?.(studyId, checked);
+    
 
-    // If we have report context, persist to backend
-    if (currentBatchHash && currentReportIndex !== undefined) {
+    /*// If we have report context, persist to backend
+    if (currentBatchHash && currentReportId !== undefined) {
       let studyToPreserve: RelevanceStudy | undefined;
       if (!checked) {
         const key = buildReportKey(currentBatchHash, currentReportIndex);
@@ -374,7 +366,7 @@ export function StudyRelevanceTable({
         await Promise.all([
           fetchSimilarStudiesForReport(
             currentBatchHash,
-            currentReportIndex,
+            currentReportId,
             Array.from(updatedAssigned),
             true
           ),
@@ -411,6 +403,7 @@ export function StudyRelevanceTable({
         );
       }
     }
+    */
   };
 
   const handleAccordionChange = (value: string[]) => {
@@ -430,6 +423,7 @@ export function StudyRelevanceTable({
     if (relevance >= 0.5) return "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400";
     return "bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-400";
   };
+
 
   const handleStudyClick = (study: RelevanceStudy) => {
     setSelectedStudy(study);
@@ -483,7 +477,7 @@ export function StudyRelevanceTable({
       for (const report of study.reports) {
         try {
           const response = await fetch(
-            `/api/meerkat/reports/${report.CRGReportID}/pdf`
+            `/api/meerkat/reports/${report.reportId}/pdf`
           );
           if (!response.ok) {
             throw new Error("Failed to download PDF");
@@ -492,7 +486,7 @@ export function StudyRelevanceTable({
           const url = URL.createObjectURL(blob);
           const link = document.createElement("a");
           link.href = url;
-          link.download = `${study.ShortName}_Report_${report.CRGReportID}.pdf`;
+          link.download = `${study.ShortName}_Report_${report.reportId}.pdf`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
@@ -501,7 +495,7 @@ export function StudyRelevanceTable({
         } catch (error) {
           failureCount++;
           toast.error(
-            `Failed to download report ${report.CRGReportID}: ${error instanceof Error ? error.message : "Unknown error"
+            `Failed to download report ${report.reportId}: ${error instanceof Error ? error.message : "Unknown error"
             }`
           );
         }
@@ -524,11 +518,11 @@ export function StudyRelevanceTable({
     report: any,
     studyShortName: string
   ) => {
-    setDownloadingSingle(new Set([report.CRGReportID]));
+    setDownloadingSingle(new Set([report.reportId]));
 
     try {
       const response = await fetch(
-        `/api/meerkat/reports/${report.CRGReportID}/pdf`
+        `/api/meerkat/reports/${report.reportId}/pdf`
       );
       if (!response.ok) {
         throw new Error("Failed to download PDF");
@@ -537,21 +531,21 @@ export function StudyRelevanceTable({
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${studyShortName}_Report_${report.CRGReportID}.pdf`;
+      link.download = `${studyShortName}_Report_${report.reportId}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      toast.success(`Downloaded report ${report.CRGReportID}`);
+      toast.success(`Downloaded report ${report.reportId}`);
     } catch (error) {
       toast.error(
-        `Failed to download report ${report.CRGReportID}: ${error instanceof Error ? error.message : "Unknown error"
+        `Failed to download report ${report.reportId}: ${error instanceof Error ? error.message : "Unknown error"
         }`
       );
     } finally {
       setDownloadingSingle((prev) => {
         const newSet = new Set(prev);
-        newSet.delete(report.CRGReportID);
+        newSet.delete(report.reportId);
         return newSet;
       });
     }
@@ -582,8 +576,6 @@ export function StudyRelevanceTable({
             </Badge>
           </div>
           <div className="flex items-center gap-2">
-            {currentBatchHash !== undefined &&
-              currentReportIndex !== undefined && (
                 <>
                   <Button
                     size="sm"
@@ -611,8 +603,7 @@ export function StudyRelevanceTable({
                   )}
                   <AddStudyDialog
                     currentBatchHash={currentBatchHash}
-                    currentReportIndex={currentReportIndex}
-                    currentReportCRGId={currentReportCRGId}
+                    currentReportId={currentReportId}
                     highlight={shouldHighlightSuggestion}
                     onStudySaved={() => {
                       if (suggestionKey) {
@@ -621,7 +612,6 @@ export function StudyRelevanceTable({
                     }}
                   />
                 </>
-              )}
           </div>
         </div>
 
@@ -672,14 +662,7 @@ export function StudyRelevanceTable({
 
       {/* Scrollable Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {loading && filteredStudies.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <div className="p-3 rounded-full bg-primary/10 mb-4">
-              <Sparkles className="h-6 w-6 text-primary animate-pulse" />
-            </div>
-            <p className="text-sm font-medium">Loading relevant studies...</p>
-          </div>
-        ) : filteredStudies.length === 0 ? (
+        {filteredStudies.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <div className="p-3 rounded-full bg-muted mb-4">
               <FileText className="h-6 w-6 opacity-50" />
@@ -911,23 +894,23 @@ export function StudyRelevanceTable({
                             {study.reports.length > 0 ? (
                               study.reports.map((report, idx) => (
                                 <TableRow
-                                  key={report.CRGReportID || idx}
+                                  key={report.reportId || idx}
                                   className="hover:bg-muted/50 transition-colors"
                                 >
                                   <TableCell className="font-mono text-xs">
-                                    {report.CRGReportID}
+                                    {report.reportId}
                                   </TableCell>
                                   <TableCell className="max-w-md">
                                     <TooltipProvider>
                                       <Tooltip>
                                         <TooltipTrigger asChild>
                                           <div className="truncate text-sm">
-                                            {report.Title}
+                                            {report.title}
                                           </div>
                                         </TooltipTrigger>
                                         <TooltipContent className="max-w-md">
                                           <p className="text-sm">
-                                            {report.Title}
+                                            {report.title}
                                           </p>
                                         </TooltipContent>
                                       </Tooltip>
@@ -944,7 +927,7 @@ export function StudyRelevanceTable({
                                         )
                                       }
                                       disabled={downloadingSingle.has(
-                                        report.CRGReportID
+                                        report.reportId
                                       )}
                                       className="h-6 w-6 p-0 flex items-center justify-center"
                                     >
@@ -976,11 +959,7 @@ export function StudyRelevanceTable({
             </Accordion>
 
             {/* Load More Button */}
-            <LoadMoreStudiesButton
-              currentBatchHash={currentBatchHash}
-              currentReportIndex={currentReportIndex}
-              currentStudiesCount={studies.length}
-            />
+            <LoadMoreStudiesButton/>
           </div>
         )}
       </div>
@@ -1072,22 +1051,18 @@ export function StudyRelevanceTable({
                     {selectedStudy.reports.length > 0 ? (
                       selectedStudy.reports.map((report, idx) => (
                         <div
-                          key={report.CRGReportID || idx}
+                          key={report.reportId || idx}
                           className="p-3.5 rounded-md border border-border/60 bg-muted/30 hover:bg-muted/50 transition-colors"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium leading-snug">
-                                {report.Title}
+                                {report.title}
                               </p>
                               <div className="flex items-center gap-3 mt-2">
-                                {report.CENTRALReportID && (
-                                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">
-                                    CENTRAL: {report.CENTRALReportID}
-                                  </code>
-                                )}
+          
                                 <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">
-                                  CRG: {report.CRGReportID}
+                                  CRG: {report.reportId}
                                 </code>
                               </div>
                             </div>
@@ -1101,7 +1076,7 @@ export function StudyRelevanceTable({
                                 )
                               }
                               disabled={downloadingSingle.has(
-                                report.CRGReportID
+                                report.reportId
                               )}
                               className="h-8 w-8 p-0 flex items-center justify-center shrink-0"
                             >
@@ -1125,7 +1100,7 @@ export function StudyRelevanceTable({
       </Sheet>
 
       {/* AI Reason Dialog */}
-      {selectedAIStudy && currentBatchHash !== undefined && currentReportIndex !== undefined && (
+      {selectedAIStudy && currentBatchHash !== undefined && currentReportId !== undefined && (
         <StudyAIReasonDialog
           open={reasonDialogOpen}
           onOpenChange={setReasonDialogOpen}
@@ -1133,14 +1108,14 @@ export function StudyRelevanceTable({
           classification={
             getStudyResult(
               currentBatchHash,
-              currentReportIndex,
+              currentReportId,
               selectedAIStudy.studyId
             )?.classification || "unsure"
           }
           reason={
             getStudyResult(
               currentBatchHash,
-              currentReportIndex,
+              currentReportId,
               selectedAIStudy.studyId
             )?.reason || "No reason available"
           }

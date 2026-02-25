@@ -8,12 +8,20 @@ export async function AppHeader() {
     headers: await headers(),
   });
 
-  const user = session?.user
+  const sessionUser = session?.user;
+
+  const roles: Role[] = sessionUser?.roles
+    ? Array.isArray(sessionUser.roles)
+      ? sessionUser.roles
+      : [sessionUser.roles]
+    : [];
+
+  const user = sessionUser
     ? {
-        name: session.user.name || "User",
-        email: session.user.email || "",
-        avatar: session.user.image || "",
-        roles: session.user.roles as Role[],
+        name: sessionUser.name || "User",
+        email: sessionUser.email || "",
+        avatar: sessionUser.image || "",
+        roles,
       }
     : null;
 

@@ -15,44 +15,12 @@ ModelName = Literal["gpt-5.2", "gpt-5", "gpt-5-mini", "gpt-4.1"]
 
 
 class ReportDto(BaseModel):
-    CENTRALReportID: int | None
-    CRGReportID: int
-    Title: str
-    Notes: str | None
-    ReportNumber: int
-    OriginalTitle: str | None
-    Authors: str | None
-    Journal: str | None
-    Year: int | None
-    Volume: str | None
-    Issue: str | None
-    Pages: str | None
-    Language: str | None
-    Abstract: str | None
-    CENTRALSubmissionStatus: str | None
-    CopyStatus: str | None
-    DatetoCENTRAL: str | None
-    Dateentered: str | None
-    DateEdited: str | None
-    Editors: str | None
-    Publisher: str | None
-    City: str | None
-    DupString: str
-    TypeofReportID: int | None
-    PublicationTypeID: int
-    Edition: str | None
-    Medium: str | None
-    StudyDesign: str | None
-    DOI: str | None
-    UDef3: str | None
-    ISBN: str | None
-    UDef5: str | None
-    PMID: str | None
-    TrialRegistrationID: str | None
-    UDef9: str | None
-    UDef10: str | None
-    UDef8: str | None
-    PDFLinks: str | None
+    reportId: int
+    year: int 
+    title: str
+    abstract: str | None
+    trialId: str | None
+    authors: list[str]
 
 
 class StudyDto(BaseModel):
@@ -68,7 +36,6 @@ class StudyDto(BaseModel):
     DateEntered: str | None
     Comparison: str | None
     CENTRALStudyID: int
-    DateToCENTRAL: str | None
     ISRCTN: str | None
     ShortName: str
     DateEdited: str | None

@@ -19,25 +19,17 @@ interface StudyDetailContentProps {
   reports: Array<{
     reportIndex: number;
     batchHash: string;
-    assignedStudyIds: number[];
-    CENTRALReportID?: number | null;
-    CRGReportID: number;
-    Title: string;
-    Abstract?: string;
-    Year?: number;
-    DatetoCENTRAL?: string;
-    Dateentered?: string;
-    NumberParticipants?: string | number;
-    Assigned?: boolean;
-    AssignedTo?: string;
+    assignedStudies: number[];
+    reportId: number;
+    title: string;
+    abstract?: string;
+    year?: number;
   }>;
-  loadingMore?: boolean;
   totalReports?: number;
 }
 
 export function StudyDetailContent({
   reports,
-  loadingMore,
   totalReports,
 }: StudyDetailContentProps) {
   const {
@@ -75,11 +67,11 @@ export function StudyDetailContent({
 
   // Handle report selection with "start" event - ONLY for explicit user clicks
   const handleReportSelect = useCallback(
-    (report: { reportIndex: number; CRGReportID: number }) => {
+    (report: { reportIndex: number; reportId: number }) => {
       setSelectedReportIndex(report.reportIndex);
       // Send "start" event when user explicitly clicks on a report
       void sendReportEvent(
-        report.CRGReportID,
+        report.reportId,
         "start",
         lastInteractionRef.current
       );
@@ -111,20 +103,19 @@ export function StudyDetailContent({
   // Preload similar studies for all reports with assigned studies to get study names
   useEffect(() => {
     reports.forEach((report) => {
-      if (report.assignedStudyIds && report.assignedStudyIds.length > 0) {
-        const key = buildReportKey(report.batchHash, report.reportIndex);
+      if (report.assignedStudies && report.assignedStudies.length > 0) {
+        const key = buildReportKey(report.batchHash, report.reportId);
         if (!similarStudiesByReport[key] && !similarStudiesLoading[key]) {
           void fetchSimilarStudiesForReport(
             report.batchHash,
-            report.reportIndex,
-            report.assignedStudyIds
+            report.reportId,
+            report.assignedStudies
           );
         }
         if (!assignedStudiesByReport[key] && !assignedStudiesLoading[key]) {
           void fetchAssignedStudiesForReport(
             report.batchHash,
-            report.reportIndex,
-            report.CRGReportID
+            report.reportId
           );
         }
       }
@@ -169,7 +160,7 @@ export function StudyDetailContent({
   const handleInactivityStop = useCallback(() => {
     if (currentReport) {
       void sendReportEvent(
-        currentReport.CRGReportID,
+        currentReport.reportId,
         "end",
         lastInteractionRef.current
       );
@@ -183,20 +174,19 @@ export function StudyDetailContent({
     }
     const key = buildReportKey(
       currentReport.batchHash,
-      currentReport.reportIndex
+      currentReport.reportId
     );
     if (!similarStudiesByReport[key]) {
       void fetchSimilarStudiesForReport(
         currentReport.batchHash,
-        currentReport.reportIndex,
-        currentReport.assignedStudyIds ?? []
+        currentReport.reportId,
+        currentReport.assignedStudies ?? []
       );
     }
     if (!assignedStudiesByReport[key]) {
       void fetchAssignedStudiesForReport(
         currentReport.batchHash,
-        currentReport.reportIndex,
-        currentReport.CRGReportID
+        currentReport.reportId
       );
     }
   }, [
@@ -213,7 +203,7 @@ export function StudyDetailContent({
     }
     const key = buildReportKey(
       currentReport.batchHash,
-      currentReport.reportIndex
+      currentReport.reportId
     );
     const similar = similarStudiesByReport[key] ?? [];
     const assigned = assignedStudiesByReport[key] ?? [];
@@ -244,7 +234,7 @@ export function StudyDetailContent({
     }
     const key = buildReportKey(
       currentReport.batchHash,
-      currentReport.reportIndex
+      currentReport.reportId
     );
     return (
       (similarStudiesLoading[key] ?? false) ||
@@ -272,7 +262,6 @@ export function StudyDetailContent({
             reports={reports}
             selectedReportIndex={selectedReportIndex ?? undefined}
             onReportSelect={handleReportSelect}
-            loadingMore={loadingMore}
             totalReports={totalReports}
             studyNamesById={studyNamesById}
           />
@@ -288,8 +277,7 @@ export function StudyDetailContent({
               studies={currentRelevanceStudies}
               loading={relevanceLoading}
               currentBatchHash={currentReport.batchHash}
-              currentReportIndex={currentReport.reportIndex}
-              currentReportCRGId={currentReport.CRGReportID}
+              currentReportId={currentReport.reportId}
               getLastInteraction={getLastInteraction}
             />
           ) : (

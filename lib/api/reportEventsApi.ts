@@ -9,12 +9,12 @@ export interface ReportEventPayload {
 /**
  * Sends a report event to track user interaction timing.
  * 
- * @param crgReportId - The CRG Report ID
+ * @param reportId - The Report ID
  * @param type - Either "start" (when opening a report) or "end" (when assigning a study)
  * @param lastInteraction - Timestamp of last user interaction (or null if no interaction tracking)
  */
 export async function sendReportEvent(
-  crgReportId: number,
+  reportId: number,
   event_type: ReportEventType,
   lastInteraction: string | null = null
 ): Promise<void> {
@@ -25,7 +25,7 @@ export async function sendReportEvent(
   };
 
   try {
-    const response = await fetch(`/api/meerkat/reports/${crgReportId}/events`, {
+    const response = await fetch(`/api/meerkat/reports/${reportId}/events`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -34,10 +34,10 @@ export async function sendReportEvent(
     });
 
     if (!response.ok) {
-      console.error(`Failed to send ${event_type} event for report ${crgReportId}`);
+      console.error(`Failed to send ${event_type} event for report ${reportId}`);
     }
   } catch (error) {
     // Log but don't throw - event tracking should not break the main flow
-    console.error(`Error sending ${event_type} event for report ${crgReportId}:`, error);
+    console.error(`Error sending ${event_type} event for report ${reportId}:`, error);
   }
 }

@@ -100,6 +100,22 @@ export const getReportData = (
     });
 }
 
+//get all report details for a batch
+export const getBatchReports = (
+  batch_hash: string,
+  config?: AxiosRequestConfig
+): Promise<ReportDetailDto[]> => {
+  return apiClient
+    .get<ReportDetailDto[]>(`/batches/${batch_hash}/reports`, config)
+    .then(response => {
+      return response.data;
+    })
+    .catch(error => {
+      console.error(`Error fetching reports for batch ${batch_hash}:`, error);
+      throw error;
+    });
+}
+
 //assign studies to a report
 export const assignStudiesToReport = (
   batch_hash: string,
@@ -172,5 +188,61 @@ export const getSimilarStudies = (
     });
 }
 
+export const getSimilarStudiesByReport = (
+  reportId: number,
+  params: GetSimilarStudiesParams = {},
+  config?: AxiosRequestConfig
+): Promise<SimilarStudiesResponseDto> => { 
+  const path = `/reports/${reportId}/similar_studies`;
+  const { params: configParams, ...restConfig } = config ?? {};
+  const requestParams = {
+    ...(configParams ?? {}),
+    ...params,
+  };
+  return apiClient.get<SimilarStudiesResponseDto>(path, {
+      ...restConfig,
+      params: requestParams,
+      paramsSerializer: { serialize: serializeParams }
+    })
+    .then(response => {
+      return response.data;
+    })
+    .catch(error => {
+      console.error(`Error fetching similar studies for report ${reportId}:`, error);
+      throw error;
+    });
+}
+
+//assign studies to a report
+export const assignStudiesToReportByReportId = (
+  report_id: number,
+  study_ids: number[],
+  config?: AxiosRequestConfig
+): Promise<void> => {
+  const path = `/batches/${report_id}/studies`;
+  const requestConfig = {
+    ...config,
+    params: { study_ids: study_ids },
+    paramsSerializer: { serialize: serializeParams } 
+  };
+  return apiClient.put(path, null, requestConfig).then(response => response.data);
+}
+
+//remove studies from a report
+export const removeStudiesFromReportByReportId = (
+  report_id: number,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+  const path = `/batches/${report_id}/studies`;
+  return apiClient
+    .delete(path, config)
+    .then(response => {
+      return;
+    })
+    .catch(error => {
+      console.error(`Error removing studies from report ${report_id}:`, error);
+      throw error;
+    });
+}
 
 //Endpoint to get studies related to a specific tag always gives server error 500 so not implemented yet

@@ -10,12 +10,19 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
     headers: await headers(),
   });
 
+  const rawRoles = session?.user?.roles;
+  const normalizedRoles: Role[] = Array.isArray(rawRoles)
+    ? rawRoles
+    : rawRoles
+    ? [rawRoles]
+    : [];
+
   const user = session?.user
     ? {
         name: session.user.name || "User",
         email: session.user.email || "",
         avatar: session.user.image || "",
-        roles: session.user.roles as Role[],
+        roles: normalizedRoles,
       }
     : null;
 

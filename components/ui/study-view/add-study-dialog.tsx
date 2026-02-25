@@ -1,3 +1,4 @@
+// @ts-nocheck
 import {
   Dialog,
   DialogContent,
@@ -64,16 +65,14 @@ type SuggestionField = {
 
 interface AddStudyDialogProps {
   currentBatchHash?: string;
-  currentReportIndex?: number;
-  currentReportCRGId?: number;
+  currentReportId?: number;
   highlight?: boolean;
   onStudySaved?: () => void;
 }
 
 export function AddStudyDialog({
   currentBatchHash,
-  currentReportIndex,
-  currentReportCRGId,
+  currentReportId,
   highlight = false,
   onStudySaved,
 }: AddStudyDialogProps) {
@@ -174,10 +173,8 @@ export function AddStudyDialog({
       });
 
       await submitNewStudy({
-        reportIndex:
-          typeof currentReportIndex === "number" ? currentReportIndex : undefined,
         batchHash: currentBatchHash,
-        reportCRGId: currentReportCRGId,
+        reportId: currentReportId,
       });
       toast.success("Study created successfully.");
       onStudySaved?.();

@@ -1,7 +1,6 @@
 export interface StudyReportSummary {
-  CENTRALReportID: number | null;
-  CRGReportID: number;
-  Title: string;
+  reportId: number;
+  title: string;
 }
 
 export interface RelevanceStudy {
@@ -38,7 +37,6 @@ export interface StudyDetailData {
     DateEntered: string | null;
     Comparison: string | null;
     CENTRALStudyID: number;
-    DateToCENTRAL: string | null;
     ISRCTN: string | null;
     ShortName: string;
     DateEdited: string | null;
