@@ -29,17 +29,9 @@ export interface GetSimilarTagsParams {
   k?: number;           
 }
 
-export interface SimilarStudiesResponseDto {
-  CRGStudyID: number[];
-  Relevance: number[];
-  ShortName: string[];
-  NumberParticipants: string[];
-  Duration: (string | null)[];
-  Comparison: (string | null)[];
-  Countries: string[];
-  DateEntered: string[];
-  DateEdited: string[];
-  StatusofStudy: string[];
+export interface SimilarStudyResponseDto {
+  relevance: number;
+  study: StudyDto;
 }
 
 export interface GetSimilarStudiesParams {
@@ -50,24 +42,16 @@ export interface GetSimilarStudiesParams {
 }
 
 export interface StudyDto {
-  StatusofStudy: string | null;
-  NumberParticipants: string | null;
-  TrialistContactDetails: string | null;
-  Countries: string | null;
-  CENTRALSubmissionStatus: string | null;
-  Duration: string | null;
-  Notes: string | null;
-  UDef4: string | null;
-  CRGStudyID: number;
-  DateEntered: string | null;
-  Comparison: string | null;
-  CENTRALStudyID: number;
-  ISRCTN: string | null;
-  ShortName: string;
-  DateEdited: string | null;
-  UDef6: string | null;
-  Search_Tagged: boolean;
-  TrialRegistrationID: string | null;
+  studyId: number;
+  shortName: string;
+  countries: string[];
+  numberParticipants: string | null;
+  duration: string | null;
+  comparison: string | null
+  trialId: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ReportDto {

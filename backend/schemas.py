@@ -22,27 +22,17 @@ class ReportDto(BaseModel):
     trialId: str | None
     authors: list[str]
 
-
 class StudyDto(BaseModel):
-    StatusofStudy: str | None
-    NumberParticipants: str | None
-    TrialistContactDetails: str | None
-    Countries: str | None
-    CENTRALSubmissionStatus: str | None
-    Duration: str | None
-    Notes: str | None
-    UDef4: str | None
-    CRGStudyID: int
-    DateEntered: str | None
-    Comparison: str | None
-    CENTRALStudyID: int
-    ISRCTN: str | None
-    ShortName: str
-    DateEdited: str | None
-    UDef6: str | None
-    Search_Tagged: bool
-    TrialRegistrationID: str | None
-
+    studyId: int
+    shortName: str
+    countries: list[str]
+    numberParticipants: str | None
+    duration: str | None
+    comparison: str | None
+    trialId: str | None
+    status: str
+    createdAt: str
+    updatedAt: str
 
 class PromptOverrides(BaseModel):
     background_prompt: str | None = None

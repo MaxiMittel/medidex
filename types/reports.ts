@@ -3,59 +3,22 @@ export interface StudyReportSummary {
   title: string;
 }
 
-export interface RelevanceStudy {
-  Linked: boolean;
-  CRGStudyID: number;
-  Relevance: number;
-  ShortName: string;
-  NumberParticipants: string | number | null;
-  Duration: string | null;
-  Comparison: string | null;
-  Countries?: string;
-  StatusofStudy?: string;
-  DateEntered?: string;
-  DateEdited?: string;
-  TrialistContactDetails?: string;
-  CENTRALSubmissionStatus?: string;
-  ISRCTN?: string;
-  Notes?: string;
-  UDef4?: string;
-  reports: StudyReportSummary[];
+export interface Study{
+  shortName: string;
+  studyId: number;
+  countries: string[];
+  numberParticipants: string | null;
+  duration: string | null;
+  comparison: string | null;
+  trialId: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface StudyDetailData {
-  studyInfo: {
-    StatusofStudy: string | null;
-    NumberParticipants: string | null;
-    TrialistContactDetails: string | null;
-    Countries: string | null;
-    CENTRALSubmissionStatus: string | null;
-    Duration: string | null;
-    Notes: string | null;
-    UDef4: string | null;
-    CRGStudyID: number;
-    DateEntered: string | null;
-    Comparison: string | null;
-    CENTRALStudyID: number;
-    ISRCTN: string | null;
-    ShortName: string;
-    DateEdited: string | null;
-    UDef6: string | null;
-    Search_Tagged: boolean;
-    TrialRegistrationID: string | null;
-  };
-  interventions: Array<{
-    id: number;
-    description: string;
-  }>;
-  conditions: Array<{
-    id: number;
-    description: string;
-  }>;
-  outcomes: Array<{
-    id: number;
-    description: string;
-  }>;
-  design: string[];
-  persons: string[];
+export interface RelevanceStudy {
+  isLinked: boolean;
+  relevance: number;
+  study: Study;
+  reports: StudyReportSummary[];
 }

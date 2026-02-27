@@ -101,7 +101,7 @@ def invoke_structured(state: EvalState, messages: list, schema: object):
 
 def get_study_by_id(studies: list[StudyDto], study_id: str) -> StudyDto | None:
     for study in studies:
-        if str(study.CRGStudyID) == study_id:
+        if str(study.studyId) == study_id:
             return study
     return None
 
@@ -179,7 +179,7 @@ def resolve_candidate_study_id(
         return token
 
     aliases: dict[str, set[str]] = {}
-    study_lookup = {str(study.CRGStudyID): study for study in studies}
+    study_lookup = {str(study.studyId): study for study in studies}
 
     def add_alias(alias_value: str | None, study_id: str) -> None:
         normalized = _normalize_identifier(alias_value)
@@ -195,9 +195,8 @@ def resolve_candidate_study_id(
         add_alias(item.get("short_name"), study_id)
         study = study_lookup.get(study_id)
         if study is not None:
-            add_alias(study.ShortName, study_id)
-            add_alias(study.TrialRegistrationID, study_id)
-            add_alias(study.ISRCTN, study_id)
+            add_alias(study.shortName, study_id)
+            add_alias(study.trialId, study_id)
 
     normalized_token = _normalize_identifier(token)
     mapped_ids = aliases.get(normalized_token, set())

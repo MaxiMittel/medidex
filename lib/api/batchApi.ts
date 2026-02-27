@@ -1,6 +1,6 @@
 import apiClient from "./apiClient";
 import { AxiosRequestConfig } from "axios";
-import {BatchDto, ReportDetailDto, SimilarTagDto, GetSimilarTagsParams, GetSimilarStudiesParams, SimilarStudiesResponseDto} from "../../types/apiDTOs";
+import {BatchDto, ReportDetailDto, SimilarTagDto, GetSimilarTagsParams, GetSimilarStudiesParams, SimilarStudyResponseDto} from "../../types/apiDTOs";
 import {serializeParams} from "./helpers";    
 
 //get all batches
@@ -172,9 +172,9 @@ export const getSimilarStudies = (
   report_index: number,
   params: GetSimilarStudiesParams = {},
   config?: AxiosRequestConfig
-): Promise<SimilarStudiesResponseDto> => { 
+): Promise<SimilarStudyResponseDto[]> => { 
   const path = `/batches/${batch_hash}/${report_index}/similar_studies`;
-  return apiClient.get<SimilarStudiesResponseDto>(path, {
+  return apiClient.get<SimilarStudyResponseDto[]>(path, {
       ...config,
       params: params,
       paramsSerializer: { serialize: serializeParams }
@@ -192,14 +192,14 @@ export const getSimilarStudiesByReport = (
   reportId: number,
   params: GetSimilarStudiesParams = {},
   config?: AxiosRequestConfig
-): Promise<SimilarStudiesResponseDto> => { 
+): Promise<SimilarStudyResponseDto[]> => { 
   const path = `/reports/${reportId}/similar_studies`;
   const { params: configParams, ...restConfig } = config ?? {};
   const requestParams = {
     ...(configParams ?? {}),
     ...params,
   };
-  return apiClient.get<SimilarStudiesResponseDto>(path, {
+  return apiClient.get<SimilarStudyResponseDto[]>(path, {
       ...restConfig,
       params: requestParams,
       paramsSerializer: { serialize: serializeParams }
@@ -214,26 +214,26 @@ export const getSimilarStudiesByReport = (
 }
 
 //assign studies to a report
-export const assignStudiesToReportByReportId = (
+export const assignStudyToReportByReportId = (
   report_id: number,
-  study_ids: number[],
+  study_id: number,
   config?: AxiosRequestConfig
 ): Promise<void> => {
-  const path = `/batches/${report_id}/studies`;
+  const path = `/reports/${report_id}/studies/${study_id}`;
   const requestConfig = {
     ...config,
-    params: { study_ids: study_ids },
     paramsSerializer: { serialize: serializeParams } 
   };
   return apiClient.put(path, null, requestConfig).then(response => response.data);
 }
 
 //remove studies from a report
-export const removeStudiesFromReportByReportId = (
+export const removeStudyFromReportByReportId = (
   report_id: number,
+  study_id: number,
   config?: AxiosRequestConfig
 ): Promise<void> => {
-  const path = `/batches/${report_id}/studies`;
+  const path = `/reports/${report_id}/studies/${study_id}`;
   return apiClient
     .delete(path, config)
     .then(response => {

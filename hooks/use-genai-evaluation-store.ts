@@ -2,7 +2,8 @@
 
 import { create } from "zustand";
 import { evaluateStudiesStream } from "@/lib/api/genaiStreamApi";
-import type { PromptOverrides, ReportDto, StreamEvent } from "@/types/apiDTOs";
+import type { PromptOverrides, ReportDto, StreamEvent, StudyDto } from "@/types/apiDTOs";
+import { RelevanceStudy } from "@/types/reports";
 
 export type AIClassification = "match" | "likely_match" | "unsure" | "not_match" | "very_likely";
 export type AIModel = "gpt-5.2" | "gpt-5" | "gpt-5-mini" | "gpt-4.1";
@@ -52,7 +53,7 @@ interface GenAIEvaluationStore {
   evaluateStream: (
     batchHash: string,
     report: ReportDto,
-    studies: any[],
+    studies: StudyDto[],
     options: { model?: AIModel; includePdf?: boolean; promptOverrides?: PromptOverrides },
     onStreamComplete?: () => void
   ) => () => void;
@@ -172,7 +173,7 @@ export const useGenAIEvaluationStore = create<GenAIEvaluationStore>((set, get) =
     });
   },
 
-  evaluateStream: (batchHash, report, studies, options, onStreamComplete) => {
+  evaluateStream: (batchHash : string, report : ReportDto, studies : StudyDto[], options, onStreamComplete) => {
     const { getReportKey, startEvaluation, addStudyResult, updateClassification, setEvaluationState, endEvaluation, streamCleanups } = get();
     const reportKey = getReportKey(batchHash, report.reportId);
 
@@ -183,33 +184,13 @@ export const useGenAIEvaluationStore = create<GenAIEvaluationStore>((set, get) =
 
     startEvaluation(reportKey, studies.length);
 
-    const studiesDto = studies.map((study) => ({
-      CRGStudyID: study.CRGStudyID,
-      ShortName: study.ShortName || "",
-      StatusofStudy: study.StatusofStudy || null,
-      NumberParticipants: study.NumberParticipants?.toString() || null,
-      Duration: study.Duration || null,
-      Comparison: study.Comparison || null,
-      Countries: study.Countries || null,
-      Notes: study.Notes || null,
-      TrialistContactDetails: study.TrialistContactDetails || null,
-      CENTRALSubmissionStatus: study.CENTRALSubmissionStatus || null,
-      UDef4: study.UDef4 || null,
-      DateEntered: study.DateEntered || null,
-      DateEdited: study.DateEdited || null,
-      CENTRALStudyID: 0,
-      ISRCTN: study.ISRCTN || null,
-      UDef6: null,
-      Search_Tagged: false,
-      TrialRegistrationID: study.TrialRegistrationID || null,
-    }));
 
     const reportDto = report;
 
     const cleanup = evaluateStudiesStream(
       {
         report: reportDto,
-        studies: studiesDto,
+        studies: studies,
         model: options.model || null,
         include_pdf: options.includePdf ?? null,
         prompt_overrides: options.promptOverrides || null,

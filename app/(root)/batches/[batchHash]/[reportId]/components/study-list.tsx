@@ -1,6 +1,6 @@
 import { StudyRelevanceTable } from "@/components/ui/study-view/study-relevance-table";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { SimilarStudiesResponseDto } from "@/types/apiDTOs";
+import type { SimilarStudyResponseDto } from "@/types/apiDTOs";
 import type { RelevanceStudy } from "@/types/reports";
 import { getSimilarStudiesByReport } from "@/lib/api/batchApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
@@ -16,46 +16,13 @@ interface StudyListProps {
 }
 
 const mapResponseToRelevanceStudies = (
-  response: SimilarStudiesResponseDto
+  response: SimilarStudyResponseDto[]
 ): RelevanceStudy[] => {
-  const lengths = [
-    response.CRGStudyID.length,
-    response.Relevance.length,
-    response.ShortName.length,
-    response.NumberParticipants.length,
-    response.Duration.length,
-    response.Comparison.length,
-    response.Countries.length,
-    response.DateEntered.length,
-    response.DateEdited.length,
-    response.StatusofStudy.length,
-  ];
-  const entryCount = Math.min(...lengths);
-  const studies: RelevanceStudy[] = [];
-
-  for (let index = 0; index < entryCount; index += 1) {
-    const countries = response.Countries[index];
-    const dateEntered = response.DateEntered[index];
-    const dateEdited = response.DateEdited[index];
-    const status = response.StatusofStudy[index];
-
-    studies.push({
-      Linked: false,
-      CRGStudyID: response.CRGStudyID[index],
-      Relevance: response.Relevance[index],
-      ShortName: response.ShortName[index],
-      NumberParticipants: response.NumberParticipants[index],
-      Duration: response.Duration[index],
-      Comparison: response.Comparison[index],
-      Countries: countries || undefined,
-      DateEntered: dateEntered || undefined,
-      DateEdited: dateEdited || undefined,
-      StatusofStudy: status || undefined,
-      reports: [],
-    });
-  }
-
-  return studies;
+  return response.map((study) => ({
+    ...study,
+    isLinked: false,
+    reports: [],
+  }));
 };
 
 export default async function StudyList({ params, searchParams }: StudyListProps) {

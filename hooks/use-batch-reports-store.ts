@@ -176,7 +176,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
           },
         };
       });
-      useReportStore.getState().updateAssignedStudies(reportId, updatedStudies);
+      useReportStore.getState().addAssignedStudy(reportId, studyId);
     } catch (error) {
       console.error("Failed to assign study to report:", error);
       throw error;
@@ -249,7 +249,7 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
           },
         };
       });
-      useReportStore.getState().updateAssignedStudies(reportId, updatedStudies);
+      useReportStore.getState().removeAssignedStudy(reportId, studyId);
     } catch (error) {
       console.error("Failed to unassign study from report:", error);
       throw error;

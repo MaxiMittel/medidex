@@ -13,11 +13,11 @@ def summarize_stream_event(event: dict) -> dict:
 
     def extract_study_info(value: object) -> dict:
         if isinstance(value, StudyDto):
-            return {"study_id": value.CRGStudyID, "short_name": value.ShortName}
+            return {"study_id": value.studyId, "short_name": value.shortName}
         if isinstance(value, dict):
             return {
-                "study_id": value.get("CRGStudyID"),
-                "short_name": value.get("ShortName"),
+                "study_id": value.get("studyId"),
+                "short_name": value.get("shortName"),
             }
         return {}
 

@@ -13,7 +13,7 @@ def build_user_payload(report: ReportDto, study: StudyDto) -> str:
         {
             "report": report_payload,
             "study": study_payload,
-            "study_short_name": study.ShortName,
+            "study_short_name": study.shortName,
         },
         ensure_ascii=True,
         separators=(",", ":"),
@@ -29,7 +29,7 @@ def build_likely_group_payload(
 
     Each candidate includes the original study + the initial reason.
     """
-    by_id = {str(study.CRGStudyID): study for study in studies}
+    by_id = {str(study.studyId): study for study in studies}
     payload_candidates: list[dict] = []
     for item in candidates:
         study_id = str(item.get("study_id", ""))
@@ -39,7 +39,7 @@ def build_likely_group_payload(
         payload_candidates.append(
             {
                 "study_id": study_id,
-                "short_name": study.ShortName,
+                "short_name": study.shortName,
                 "study": study.model_dump(),
                 "prior_reason": item.get("reason"),
             }
@@ -60,7 +60,7 @@ def build_likely_compare_payload(
 
     Each candidate includes prior and group-level reasons for context.
     """
-    by_id = {str(study.CRGStudyID): study for study in studies}
+    by_id = {str(study.studyId): study for study in studies}
     payload_candidates: list[dict] = []
     for item in candidates:
         study_id = str(item.get("study_id", ""))
@@ -70,7 +70,7 @@ def build_likely_compare_payload(
         payload_candidates.append(
             {
                 "study_id": study_id,
-                "short_name": study.ShortName,
+                "short_name": study.shortName,
                 "study": study.model_dump(),
                 "prior_reason": item.get("prior_reason"),
                 "group_reason": item.get("group_reason"),
@@ -94,7 +94,7 @@ def build_likely_review_payload(
 
     Includes the current likely study and previously reviewed likely history.
     """
-    by_id = {str(study.CRGStudyID): study for study in studies}
+    by_id = {str(study.studyId): study for study in studies}
     rejected_payload: list[dict] = []
     for item in rejected_likely:
         study_id = str(item.get("study_id", ""))
@@ -104,7 +104,7 @@ def build_likely_review_payload(
         rejected_payload.append(
             {
                 "study_id": study_id,
-                "short_name": study.ShortName,
+                "short_name": study.shortName,
                 "study": study.model_dump(),
                 "initial_reason": item.get("initial_reason"),
                 "review_reason": item.get("review_reason"),
@@ -115,8 +115,8 @@ def build_likely_review_payload(
             "report": report.model_dump(),
             "rejected_likely": rejected_payload,
             "current": {
-                "study_id": str(current_study.CRGStudyID),
-                "short_name": current_study.ShortName,
+                "study_id": str(current_study.studyId),
+                "short_name": current_study.shortName,
                 "study": current_study.model_dump(),
                 "prior_reason": prior_reason,
             },
@@ -137,7 +137,7 @@ def build_unsure_review_payload(
 
     Includes rejected likely-match history plus the current study and its prior reason.
     """
-    by_id = {str(study.CRGStudyID): study for study in studies}
+    by_id = {str(study.studyId): study for study in studies}
     rejected_payload: list[dict] = []
     for item in rejected_likely:
         study_id = str(item.get("study_id", ""))
@@ -147,7 +147,7 @@ def build_unsure_review_payload(
         rejected_payload.append(
             {
                 "study_id": study_id,
-                "short_name": study.ShortName,
+                "short_name": study.shortName,
                 "study": study.model_dump(),
                 "initial_reason": item.get("initial_reason"),
                 "review_reason": item.get("review_reason"),
@@ -158,8 +158,8 @@ def build_unsure_review_payload(
             "report": report.model_dump(),
             "rejected_likely": rejected_payload,
             "current": {
-                "study_id": str(current_study.CRGStudyID),
-                "short_name": current_study.ShortName,
+                "study_id": str(current_study.studyId),
+                "short_name": current_study.shortName,
                 "study": current_study.model_dump(),
                 "prior_reason": prior_reason,
             },
@@ -179,14 +179,14 @@ def build_summary_payload(
     very_likely: list[dict],
 ) -> str:
     """Serialize the full evaluation state for final summarization."""
-    by_id = {str(study.CRGStudyID): study for study in studies}
+    by_id = {str(study.studyId): study for study in studies}
 
     def attach_study(item: dict) -> dict:
         study_id = str(item.get("study_id", ""))
         study = by_id.get(study_id)
         return {
             "study_id": study_id,
-            "short_name": study.ShortName if study else None,
+            "short_name": study.shortName if study else None,
             "study": study.model_dump() if study else None,
             "decision": item.get("decision"),
             "reason": item.get("reason"),

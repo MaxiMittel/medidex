@@ -216,10 +216,6 @@ export function ReportsList({
 
               const isExpanded = expandedReports.has(report.report.reportId);
               const hasAbstract = report.report.abstract && report.report.abstract.length > 0;
-
-              if (report.report.reportId === 86169){
-                  console.log(report);
-              }
               
               return (
                 <div

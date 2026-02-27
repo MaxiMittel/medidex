@@ -24,12 +24,12 @@ SUMMARY_MATCH_EVAL_NOTE = (
 
 REASON_NOTE = "Always address studies by their short names."
 LIKELY_GROUP_ID_NOTE = (
-    "Return very_likely_study_ids using only candidate study_id values (CRG study IDs). "
+    "Return very_likely_study_ids using only candidate study_id values (Study IDs). "
     "Do not return trial registration IDs, short names, or free text in very_likely_study_ids. "
     "If none qualify, return an empty list."
 )
 LIKELY_COMPARE_ID_NOTE = (
-    "If decision is match, study_id must be exactly one candidate study_id (CRG study ID) from the payload. "
+    "If decision is match, study_id must be exactly one candidate study_id (Study ID) from the payload. "
     "Do not return trial registration IDs, short names, or free text in study_id."
 )
 

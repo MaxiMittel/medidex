@@ -33,19 +33,10 @@ export async function GET(
       { headers }
     );
 
-    const studies: RelevanceStudy[] = similar.CRGStudyID.map(
-      (studyId, idx) => ({
-        Linked: assignedStudies.includes(studyId),
-        CRGStudyID: studyId,
-        Relevance: Number(similar.Relevance[idx] ?? 0),
-        ShortName: similar.ShortName[idx] ?? "",
-        NumberParticipants: similar.NumberParticipants[idx] ?? null,
-        Duration: similar.Duration[idx] ?? null,
-        Comparison: similar.Comparison[idx] ?? null,
-        Countries: similar.Countries[idx] ?? "",
-        StatusofStudy: similar.StatusofStudy[idx] ?? "",
-        DateEntered: similar.DateEntered[idx] ?? "",
-        DateEdited: similar.DateEdited[idx] ?? "",
+    const studies: RelevanceStudy[] = similar.map(
+      (study) => ({
+        ...study,
+        isLinked: false,
         reports: [],
       })
     );

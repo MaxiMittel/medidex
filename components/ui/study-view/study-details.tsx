@@ -1,217 +1,293 @@
-"use client";
+"use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { 
-  Activity, 
-  Stethoscope, 
-  Target, 
-  Beaker,
-  Info,
-  UserRound,
-  CircleDashed,
-} from "lucide-react";
+import { useEffect, useState } from "react";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Separator } from "../separator";
+import { FileText, Download } from "lucide-react";
+import { StudyOverview } from "./study-details-overview";
+import { StudyAspects } from "./study-details-aspects";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { toast } from "sonner";
+import type { RelevanceStudy } from "@/types/reports";
 
-interface StudyDetailsProps {
-  interventions: Array<{
-    id: number;
-    description: string;
-  }>;
-  conditions: Array<{
-    id: number;
-    description: string;
-  }>;
-  outcomes: Array<{
-    id: number;
-    description: string;
-  }>;
-  design?: string[] | null;
-  persons?: string[] | null;
-  loading?: boolean;
-}
-
-const categoryConfig = {
-  interventions: {
-    icon: Beaker,
-    label: "Interventions",
-    accentClass: "text-blue-600 dark:text-blue-400",
-    bgClass: "bg-blue-50 dark:bg-blue-950/30",
-    borderClass: "border-l-blue-500",
-  },
-  conditions: {
-    icon: Stethoscope,
-    label: "Conditions",
-    accentClass: "text-rose-600 dark:text-rose-400",
-    bgClass: "bg-rose-50 dark:bg-rose-950/30",
-    borderClass: "border-l-rose-500",
-  },
-  outcomes: {
-    icon: Target,
-    label: "Outcomes",
-    accentClass: "text-emerald-600 dark:text-emerald-400",
-    bgClass: "bg-emerald-50 dark:bg-emerald-950/30",
-    borderClass: "border-l-emerald-500",
-  },
-  design: {
-    icon: Activity,
-    label: "Study Design",
-    accentClass: "text-amber-600 dark:text-amber-400",
-    bgClass: "bg-amber-50 dark:bg-amber-950/30",
-    borderClass: "border-l-amber-500",
-  },
-  persons: {
-    icon: UserRound,
-    label: "Persons",
-    accentClass: "text-violet-600 dark:text-violet-400",
-    bgClass: "bg-violet-50 dark:bg-violet-950/30",
-    borderClass: "border-l-violet-500",
-  },
+type ReportListItem = {
+  reportId: number;
+  title: string;
 };
 
-export function StudyDetails({ interventions, conditions, outcomes, design, persons, loading = false }: StudyDetailsProps) {
-  const designArray = design || [];
-  const personsArray = persons || [];
+const normalizeReports = (
+  items?: Array<{ reportId: number; title?: string | null }>
+): ReportListItem[] =>
+  (items ?? []).map((report) => ({
+    reportId: report.reportId,
+    title: report.title ?? `Report ${report.reportId}`,
+  }));
 
-  if (loading) {
-    return (
-      <Card className="border-none shadow-none py-0"> 
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2.5 text-base">
-            <div className="p-1.5 rounded-md bg-muted">
-              <Info className="h-4 w-4" />
-            </div>
-            Study Details
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mb-4"></div>
-            <p className="text-sm font-medium">Loading study details...</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+interface StudyDetailsProps {
+  study: RelevanceStudy | null;
+}
 
-  const renderCategoryItems = (
-    items: Array<{ id?: number; description?: string }> | string[],
-    category: keyof typeof categoryConfig,
-    emptyMessage: string
-  ) => {
-    const config = categoryConfig[category];
-    
-    if (items.length === 0) {
-      return (
-        <div className="flex items-center gap-3 py-6 px-4 text-muted-foreground">
-          <CircleDashed className="h-4 w-4 opacity-50" />
-          <p className="text-sm">{emptyMessage}</p>
-        </div>
-      );
+export function StudyDetails({ study }: StudyDetailsProps) {
+  const [reports, setReports] = useState<ReportListItem[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [reportsError, setReportsError] = useState<string | null>(null);
+  const [downloadingPdfs, setDownloadingPdfs] = useState<Set<number>>(new Set());
+  const [downloadingSingle, setDownloadingSingle] = useState<Set<number>>(
+    new Set()
+  );
+
+  useEffect(() => {
+    if (!study) {
+      setReports([]);
+      setReportsLoading(false);
+      setReportsError(null);
+      return;
     }
 
-    return (
-      <div className="space-y-2 py-3">
-        {items.map((item, index) => {
-          const text = typeof item === "string" ? item : item.description;
-          const key = typeof item === "string" ? index : item.id ?? index;
-          
-          return (
-            <div 
-              key={key} 
-              className={`p-3.5 rounded-md border-l-2 ${config.borderClass} ${config.bgClass} transition-colors`}
-            >
-              <p className="text-sm leading-relaxed">{text}</p>
-            </div>
+    let isActive = true;
+    const studyId = study.study.studyId;
+
+    setReports(normalizeReports(study.reports));
+    setReportsLoading(true);
+    setReportsError(null);
+
+    const fetchReports = async () => {
+      try {
+        const response = await fetch(
+          `/api/meerkat/studies/${studyId}/reports`
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to load reports");
+        }
+
+        const data: ReportListItem[] = await response.json();
+        if (!isActive) return;
+        setReports(normalizeReports(data));
+      } catch (error) {
+        if (!isActive) return;
+        const message =
+          error instanceof Error ? error.message : "Unable to load reports";
+        setReportsError(message);
+        toast.error(`Failed to load reports: ${message}`);
+      } finally {
+        if (!isActive) return;
+        setReportsLoading(false);
+      }
+    };
+
+    void fetchReports();
+
+    return () => {
+      isActive = false;
+    };
+  }, [study]);
+
+  if (!study) {
+    return null;
+  }
+
+  const studyInfo = study.study;
+  const studyId = studyInfo.studyId;
+  const studyShortName = studyInfo.shortName ?? "study";
+
+  const handleDownloadAllReportPdfs = async () => {
+    if (reports.length === 0) return;
+
+    setDownloadingPdfs(new Set([studyId]));
+    let successCount = 0;
+    let failureCount = 0;
+
+    try {
+      for (const report of reports) {
+        try {
+          const response = await fetch(
+            `/api/meerkat/reports/${report.reportId}/pdf`
           );
-        })}
-      </div>
-    );
+          if (!response.ok) {
+            throw new Error("Failed to download PDF");
+          }
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `${studyShortName}_Report_${report.reportId}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          successCount++;
+        } catch (error) {
+          failureCount++;
+          toast.error(
+            `Failed to download report ${report.reportId}: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`
+          );
+        }
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+
+      if (successCount > 0) {
+        toast.success(
+          `Downloaded ${successCount} PDF${
+            successCount > 1 ? "s" : ""
+          }${failureCount > 0 ? ` (${failureCount} failed)` : ""}`
+        );
+      }
+    } finally {
+      setDownloadingPdfs(new Set());
+    }
   };
 
-  const renderAccordionItem = (
-    value: string,
-    category: keyof typeof categoryConfig,
-    count: number,
-    children: React.ReactNode
-  ) => {
-    const config = categoryConfig[category];
-    const Icon = config.icon;
+  const handleDownloadSingleReportPdf = async (reportId: number) => {
+    setDownloadingSingle((prev) => {
+      const newSet = new Set(prev);
+      newSet.add(reportId);
+      return newSet;
+    });
 
-    return (
-      <AccordionItem value={value} className="border-b border-border/50 last:border-b-0">
-        <AccordionTrigger className="py-4 hover:no-underline hover:bg-muted/30 px-1 rounded-md transition-colors">
-          <div className="flex items-center gap-3">
-            <div className={`p-1.5 rounded-md ${config.bgClass}`}>
-              <Icon className={`h-4 w-4 ${config.accentClass}`} />
-            </div>
-            <span className="text-sm font-medium">{config.label}</span>
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs font-normal">
-              {count}
-            </Badge>
-          </div>
-        </AccordionTrigger>
-        <AccordionContent className="pb-2 pt-0 px-1">
-          {children}
-        </AccordionContent>
-      </AccordionItem>
-    );
+    try {
+      const response = await fetch(
+        `/api/meerkat/reports/${reportId}/pdf`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to download PDF");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${studyShortName}_Report_${reportId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success(`Downloaded report ${reportId}`);
+    } catch (error) {
+      toast.error(
+        `Failed to download report ${reportId}: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setDownloadingSingle((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(reportId);
+        return newSet;
+      });
+    }
   };
 
   return (
-    <Card className="border-none shadow-none py-0">
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2.5 text-base">
-          <div className="p-1.5 rounded-md bg-muted">
-            <Info className="h-4 w-4" />
+    <SheetContent
+      side="right"
+      className="w-full sm:max-w-2xl overflow-y-auto pb-8"
+    >
+      <>
+        <SheetHeader className="border-b border-border/60">
+          <SheetTitle>{studyShortName}</SheetTitle>
+        </SheetHeader>
+        <div className="mt-6 space-y-6">
+          <StudyOverview study={studyInfo} />
+
+          <Separator />
+
+          <StudyAspects study={studyInfo}
+          />
+
+          <Separator />
+
+          <div className="space-y-4 px-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold flex items-center gap-2.5">
+                <div className="p-1.5 rounded-md bg-muted">
+                  <FileText className="h-4 w-4" />
+                </div>
+                Reports
+                <Badge variant="secondary" className="text-xs font-normal">
+                  {reports.length}
+                </Badge>
+              </h3>
+              {reports.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadAllReportPdfs}
+                  disabled={
+                    reportsLoading ||
+                    downloadingPdfs.has(studyId)
+                  }
+                  className="flex items-center gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  {downloadingPdfs.has(studyId)
+                    ? "Downloading..."
+                    : "Download All PDFs"}
+                </Button>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              {reportsLoading && (
+                <div className="flex items-center gap-2 px-4 text-sm text-muted-foreground">
+                  <Spinner className="h-4 w-4" />
+                  <p>Loading reports…</p>
+                </div>
+              )}
+              {reportsError && (
+                <p className="px-4 text-sm text-destructive">{reportsError}</p>
+              )}
+              {reports.length > 0 ? (
+                reports.map((report) => (
+                  <div
+                    key={report.reportId}
+                    className="p-3.5 rounded-md border border-border/60 bg-muted/30 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium leading-snug">
+                          {report.title}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">
+                            Report ID: {report.reportId}
+                          </code>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          handleDownloadSingleReportPdf(report.reportId)
+                        }
+                        disabled={downloadingSingle.has(report.reportId)}
+                        className="h-8 w-8 p-0 flex items-center justify-center shrink-0"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                !reportsLoading &&
+                !reportsError && (
+                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                    <FileText className="h-8 w-8 mb-2 opacity-30" />
+                    <p className="text-sm">No reports available</p>
+                  </div>
+                )
+              )}
+            </div>
           </div>
-          Study Details
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0 px-4 pb-4">
-        <Accordion type="multiple" className="w-full">
-          {renderAccordionItem(
-            "interventions",
-            "interventions",
-            interventions.length,
-            renderCategoryItems(interventions, "interventions", "No interventions available")
-          )}
-
-          {renderAccordionItem(
-            "conditions",
-            "conditions",
-            conditions.length,
-            renderCategoryItems(conditions, "conditions", "No conditions available")
-          )}
-
-          {renderAccordionItem(
-            "outcomes",
-            "outcomes",
-            outcomes.length,
-            renderCategoryItems(outcomes, "outcomes", "No outcomes available")
-          )}
-
-          {renderAccordionItem(
-            "design",
-            "design",
-            designArray.length,
-            renderCategoryItems(designArray, "design", "No design information available")
-          )}
-
-          {renderAccordionItem(
-            "persons",
-            "persons",
-            personsArray.length,
-            renderCategoryItems(personsArray, "persons", "No persons information available")
-          )}
-        </Accordion>
-      </CardContent>
-    </Card>
+        </div>
+      </>
+    </SheetContent>
   );
 }
-

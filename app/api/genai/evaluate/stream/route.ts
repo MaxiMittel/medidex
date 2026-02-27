@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 const baseUrl = process.env.GENAI_API_URL;
 
 export async function POST(request: Request) {
-  console.log("Fecth stream");
   if (!baseUrl) {
     return NextResponse.json(
       { detail: "GENAI_API_URL is not configured" },

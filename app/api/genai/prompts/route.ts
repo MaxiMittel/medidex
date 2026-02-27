@@ -10,8 +10,6 @@ export async function GET() {
     );
   }
 
-  console.log("Fetch reports");
-
   const resp = await fetch(`${baseUrl}/prompts`, {
     headers: { "Content-Type": "application/json" },
     cache: "no-store",
