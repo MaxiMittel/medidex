@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
-import { assignStudyToReportByReportId, removeStudyFromReportByReportId } from "@/lib/api/batchApi";
+import { assignStudyToReportByReportId, removeStudyFromReportByReportId } from "@/lib/api/reportApi";
 
 export async function PUT(
   request: NextRequest,

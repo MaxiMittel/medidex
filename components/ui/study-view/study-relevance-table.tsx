@@ -38,7 +38,6 @@ import { StudyAIBadge } from "./study-ai-badge";
 import { StudyAIReasonDialog } from "./study-ai-reason-dialog";
 import { AiEvaluationProgress } from "./ai-evaluation-progress";
 import { AiEvaluationHistoryDialog } from "./ai-evaluation-history-dialog";
-import { parseComparisonString } from "@/lib/comparisonUtils";
 import { useReportStore } from "@/hooks/use-report-store";
 
 interface StudyRelevanceTableProps {
@@ -121,79 +120,11 @@ export function StudyRelevanceTable({
   const newStudySuggestion: NewStudySuggestion | undefined =
     suggestionEvent?.details?.new_study ? suggestionEvent.details.new_study : undefined;
 
-  /*const normalizedSuggestion = useMemo(() => {
-    if (!newStudySuggestion) return null;
-    const safe = (value: string | undefined) => (value ?? "").trim();
-    const normalizeChoice = (value: string, allowed: string[]) =>
-      allowed.includes(value) ? value : "";
-    const extractNumber = (value: string) => {
-      const match = value.match(/\d+/);
-      return match ? match[0] : "0";
-    };
-    const parseCountryValues = (value?: string) =>
-      value
-        ? value
-            .split(",")
-            .map((item) => item.trim())
-            .filter((item) => item.length > 0)
-        : [];
-
-    const normalizedCountries = parseCountryValues(newStudySuggestion.countries);
-    const countries =
-      normalizedCountries.length > 0 ? normalizedCountries : ["Unclear"];
-
-    return {
-      short_name: safe(newStudySuggestion.short_name),
-      status_of_study: normalizeChoice(safe(newStudySuggestion.status_of_study), [
-        "Closed",
-        "Stopped early",
-        "Open/Ongoing",
-        "Planned",
-      ]),
-      countries,
-      duration: safe(newStudySuggestion.duration) || "Uncertain",
-      number_of_participants: extractNumber(
-        safe(newStudySuggestion.number_of_participants)
-      ),
-      comparisonGroups: parseComparisonString(
-        safe(newStudySuggestion.comparison)
-      ),
-    };
-  }, [newStudySuggestion]);*/
+  
 
   const suggestionKey = newStudySuggestion
     ? `${reportKey}:${JSON.stringify(newStudySuggestion)}`
     : null;
-
-  //const suggestionDismissed = suggestionKey ? dismissedSuggestions.has(suggestionKey) : false;
-  //const shouldHighlightSuggestion = Boolean(suggestionKey) && !suggestionDismissed;
-
-  /*
-  useEffect(() => {
-    if (addStudyDialogOpen && !wasAddStudyDialogOpen.current) {
-      if (normalizedSuggestion && suggestionKey && !suggestionDismissed) {
-        setNewStudyForm(normalizedSuggestion);
-      }
-    }
-
-    if (!addStudyDialogOpen && wasAddStudyDialogOpen.current) {
-      if (suggestionKey) {
-        dismissSuggestion(suggestionKey);
-      }
-      resetNewStudyForm();
-    }
-
-    wasAddStudyDialogOpen.current = addStudyDialogOpen;
-  }, [
-    addStudyDialogOpen,
-    normalizedSuggestion,
-    resetNewStudyForm,
-    setNewStudyForm,
-    suggestionKey,
-    suggestionDismissed,
-    dismissSuggestion,
-  ]);
-  */
 
   useEffect(() => {
     const assignedStudyIds = new Set(currentReport?.assignedStudies ?? []);
@@ -216,9 +147,6 @@ export function StudyRelevanceTable({
         entry.study.studyId === studyId ? { ...entry, isLinked: linked } : entry
       )
     );
-    /*setSelectedStudy((prev) =>
-      prev && prev.study.studyId === studyId ? { ...prev, isLinked: linked } : prev
-    );*/
   };
 
   // Filter and sort studies
@@ -392,10 +320,9 @@ export function StudyRelevanceTable({
                     </Button>
                   )}
                   <AddStudyDialog
-                    currentBatchHash={currentBatchHash}
                     currentReportId={currentReportId}
                     suggestedValues={newStudySuggestion}
-                    onStudySaved={() => {
+                    onSaveStudy={() => {
                       if (suggestionKey) {
                         dismissSuggestion(suggestionKey);
                       }

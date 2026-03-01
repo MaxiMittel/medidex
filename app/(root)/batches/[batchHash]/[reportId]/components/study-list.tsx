@@ -2,7 +2,7 @@ import { StudyRelevanceTable } from "@/components/ui/study-view/study-relevance-
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SimilarStudyResponseDto } from "@/types/apiDTOs";
 import type { RelevanceStudy } from "@/types/reports";
-import { getSimilarStudiesByReport } from "@/lib/api/batchApi";
+import { getSimilarStudiesByReport } from "@/lib/api/reportApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
 interface StudyListProps {

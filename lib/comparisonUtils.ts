@@ -20,37 +20,6 @@ export const createComparisonGroup = (
   b: normalizeSide(overrides?.b),
 });
 
-const splitInterventions = (value?: string) =>
-  value
-    ? value
-        .split(/[,+]/)
-        .map((segment) => segment.trim())
-        .filter(Boolean)
-    : [];
-
-export const parseComparisonString = (value?: string | null): ComparisonGroup[] => {
-  if (!value) {
-    return [createComparisonGroup()];
-  }
-
-  const entries = value
-    .split(";")
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-
-  if (entries.length === 0) {
-    return [createComparisonGroup()];
-  }
-
-  return entries.map((entry) => {
-    const [left, right] = entry.split(/\s+vs\.?\s+/i);
-    return createComparisonGroup({
-      a: splitInterventions(left),
-      b: splitInterventions(right),
-    });
-  });
-};
-
 const serializeSide = (items: string[]) =>
   items
     .map((value) => value.trim())

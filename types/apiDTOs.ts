@@ -19,14 +19,14 @@ export interface ReportDetailDto {
 
 export interface SimilarTagDto {
   id: string;
-  keywords: string;
-  distance: number;
+  name: string;
+  score: number;
 }
 
 export interface GetSimilarTagsParams {
-  sources: string[];  
-  aspect?: string;      
-  k?: number;           
+  sources?: string[];
+  aspect?: string;
+  k?: number;
 }
 
 export interface SimilarStudyResponseDto {
