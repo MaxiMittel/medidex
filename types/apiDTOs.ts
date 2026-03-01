@@ -134,13 +134,23 @@ export interface EvaluateResponse {
   evaluation_new_study?: NewStudySuggestion | null;
 }
 
+export type StudyStatus = "Closed" | "Stopped early" | "Open/Ongoing" | "Planned";
+
+export type DurationUnit = "hours" | "days" | "weeks" | "months" | "years";
+
+export interface ComparisonGroup {
+  intervention: string[];
+  control: string[];
+}
+
 export interface NewStudySuggestion {
   short_name: string;
-  status_of_study: string;
-  countries: string;
-  duration: string;
-  number_of_participants: string;
-  comparison: string;
+  status_of_study: StudyStatus;
+  countries: string[];
+  duration_value: number;
+  duration_unit: DurationUnit;
+  number_of_participants: number;
+  comparison: ComparisonGroup[];
 }
 
 export type StreamEventNode =

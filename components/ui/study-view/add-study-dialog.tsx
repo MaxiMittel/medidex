@@ -1,4 +1,3 @@
-// @ts-nocheck
 import {
   Dialog,
   DialogContent,
@@ -18,7 +17,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
+//import {
+//  useBatchReportsStore,
+//  type NewStudyFormState,
+//} from "@/hooks/use-batch-reports-store";
 import {
   Popover,
   PopoverContent,
@@ -35,15 +37,20 @@ import {
 import { Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { COUNTRY_OPTIONS } from "./constants";
-import type {
-  ComparisonGroup,
-  ComparisonSideKey,
-} from "@/types/comparisons";
 import {
   createComparisonGroup,
   hasValidComparisonGroups,
 } from "@/lib/comparisonUtils";
 import { useCallback, useEffect, useState } from "react";
+import type {
+  DurationUnit,
+  NewStudySuggestion,
+  ComparisonGroup as SuggestedComparisonGroup,
+} from "@/types/apiDTOs";
+import type {
+  ComparisonGroup,
+  ComparisonSideKey,
+} from "@/types/comparisons";
 
 const cloneComparisonGroups = (
   groups?: ComparisonGroup[]
@@ -58,34 +65,116 @@ const cloneComparisonGroups = (
 
 const buildEmptyComparisonGroups = () => [createComparisonGroup()];
 
+const buildComparisonGroupsFromSuggestion = (
+  groups?: SuggestedComparisonGroup | SuggestedComparisonGroup[] | null
+): ComparisonGroup[] => {
+  if (!groups) {
+    return buildEmptyComparisonGroups();
+  }
+
+  const normalized = Array.isArray(groups) ? groups : [groups];
+  if (normalized.length === 0) {
+    return buildEmptyComparisonGroups();
+  }
+
+  return normalized.map((group) =>
+    createComparisonGroup({
+      a: [...(group?.intervention ?? [])],
+      b: [...(group?.control ?? [])],
+    })
+  );
+};
+
 type SuggestionField = {
   groupId: string;
   side: ComparisonSideKey;
 };
 
+type StudyDurationUnit = DurationUnit | "Uncertain";
+
+//type CountriesInput = string[] | string | null | undefined;
+
+/*const normalizeCountriesInput = (input: CountriesInput): string[] => {
+  if (!input) {
+    return [];
+  }
+
+  if (Array.isArray(input)) {
+    if (input.length > 1 && input.every((entry) => entry.trim().length <= 1)) {
+      return normalizeCountriesInput(input.join(""));
+    }
+    return input
+      .map((country) => country.trim())
+      .filter((country) => country.length > 0);
+  }
+
+  return input
+    .split(",")
+    .map((country) => country.trim())
+    .filter((country) => country.length > 0);
+};*/
+
+/*const suggestionToFormState = (
+  suggestion?: NewStudySuggestion
+): Partial<NewStudyFormState> | null => {
+  if (!suggestion) {
+    return null;
+  }
+
+  const countries = suggestion.countries;
+  const durationText =
+    suggestion.duration_unit === undefined
+      ? "Uncertain"
+      : suggestion.duration_value && suggestion.duration_unit
+        ? `${suggestion.duration_value} ${suggestion.duration_unit}`
+        : "";
+
+  return {
+    short_name: suggestion.short_name ?? "",
+    status_of_study: suggestion.status_of_study ?? "",
+    countries,
+    duration: durationText,
+    number_of_participants: suggestion.number_of_participants
+      ? String(suggestion.number_of_participants)
+      : "",
+    comparisonGroups: buildComparisonGroupsFromSuggestion(
+      suggestion.comparison
+    ),
+  } satisfies Partial<NewStudyFormState>;
+};*/
+
 interface AddStudyDialogProps {
   currentBatchHash?: string;
   currentReportId?: number;
-  highlight?: boolean;
+  suggestedValues?: NewStudySuggestion;
+  //highlight?: boolean;
   onStudySaved?: () => void;
 }
 
 export function AddStudyDialog({
   currentBatchHash,
   currentReportId,
-  highlight = false,
+  suggestedValues,
+  //highlight = false,
   onStudySaved,
 }: AddStudyDialogProps) {
-  const [durationValue, setDurationValue] = useState("");
-  const [durationUnit, setDurationUnit] = useState("");
-  const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
-  const [countryOpen, setCountryOpen] = useState(false);
   const [shortName, setShortName] = useState("");
   const [statusOfStudy, setStatusOfStudy] = useState("");
+  const [durationValue, setDurationValue] = useState("");
+  const [durationUnit, setDurationUnit] = useState<StudyDurationUnit | undefined>(
+    undefined
+  );
+  const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [numberOfParticipants, setNumberOfParticipants] = useState("");
+
+  const [countryOpen, setCountryOpen] = useState(false);
+
+  const highlight = Boolean(suggestedValues);
+
   const [comparisonGroups, setComparisonGroups] = useState<ComparisonGroup[]>(
     buildEmptyComparisonGroups()
   );
+
   const [comparisonDrafts, setComparisonDrafts] = useState<
     Record<string, Record<ComparisonSideKey, string>>
   >({});
@@ -96,7 +185,10 @@ export function AddStudyDialog({
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
-  const {
+
+  const [addStudyDialogOpen, setAddStudyDialogOpen] = useState(false);
+  
+  /*const {
     addStudyDialogOpen,
     setAddStudyDialogOpen,
     newStudyForm,
@@ -104,23 +196,56 @@ export function AddStudyDialog({
     resetNewStudyForm,
     submitNewStudy,
     creatingStudy,
-  } = useBatchReportsStore();
+  } = useBatchReportsStore();*/
+
   const resetLocalFormState = useCallback(() => {
-    setShortName("");
-    setStatusOfStudy("");
-    setSelectedCountries([]);
-    setDurationValue("");
-    setDurationUnit("");
-    setNumberOfParticipants("");
-    setComparisonGroups(buildEmptyComparisonGroups());
+    if (suggestedValues) {
+      console.log(suggestedValues);
+      setShortName(suggestedValues.short_name ?? "");
+      setStatusOfStudy(suggestedValues.status_of_study ?? "");
+      setSelectedCountries(suggestedValues.countries);
+      setDurationValue(
+        suggestedValues.duration_value
+          ? String(suggestedValues.duration_value)
+          : ""
+      );
+      setDurationUnit(suggestedValues.duration_unit);
+      setNumberOfParticipants(
+        suggestedValues.number_of_participants
+          ? String(suggestedValues.number_of_participants)
+          : ""
+      );
+      setComparisonGroups(
+        buildComparisonGroupsFromSuggestion(suggestedValues.comparison)
+      );
+    } else {
+      setShortName("");
+      setStatusOfStudy("");
+      setSelectedCountries([]);
+      setDurationValue("");
+      setDurationUnit(undefined);
+      setNumberOfParticipants("");
+      setComparisonGroups(buildEmptyComparisonGroups());
+    }
     setComparisonDrafts({});
     setActiveSuggestionField(null);
     setSuggestionQuery("");
     setSuggestions([]);
     setIsFetchingSuggestions(false);
     setSuggestionError(null);
-  }, []);
+  }, [suggestedValues]);
+
   useEffect(() => {
+    if (!addStudyDialogOpen) {
+      resetLocalFormState();
+      return;
+    }
+  }, [
+    addStudyDialogOpen,
+    resetLocalFormState,
+  ]);
+
+  /*useEffect(() => {
     if (!addStudyDialogOpen) {
       resetLocalFormState();
       return;
@@ -128,21 +253,17 @@ export function AddStudyDialog({
 
     setShortName(newStudyForm.short_name || "");
     setStatusOfStudy(newStudyForm.status_of_study || "");
-    setSelectedCountries(
-      newStudyForm.countries && newStudyForm.countries.length > 0
-        ? [...newStudyForm.countries]
-        : []
-    );
+    setSelectedCountries(newStudyForm.countries);
     const parts = (newStudyForm.duration || "").split(" ");
     if (parts.length === 2 && !Number.isNaN(Number(parts[0]))) {
       setDurationValue(parts[0]);
-      setDurationUnit(parts[1]);
+      setDurationUnit(parts[1] as StudyDurationUnit);
     } else if (newStudyForm.duration?.toLowerCase() === "uncertain") {
       setDurationValue("");
-      setDurationUnit("uncertain");
+      setDurationUnit("Uncertain");
     } else {
       setDurationValue("");
-      setDurationUnit("");
+      setDurationUnit(undefined);
     }
     setNumberOfParticipants(newStudyForm.number_of_participants || "");
     setComparisonGroups(
@@ -152,9 +273,19 @@ export function AddStudyDialog({
     addStudyDialogOpen,
     newStudyForm,
     resetLocalFormState,
-  ]);
+  ]);*/
 
-  const handleAddStudySubmit = async (
+  /*useEffect(() => {
+    if (!suggestedValues || addStudyDialogOpen) {
+      return;
+    }
+    const formState = suggestionToFormState(suggestedValues);
+    if (formState) {
+      setNewStudyForm(formState);
+    }
+  }, [addStudyDialogOpen, setNewStudyForm, suggestedValues]);*/
+
+  /*const handleAddStudySubmit = async (
     event: React.FormEvent<HTMLFormElement>
   ) => {
     event.preventDefault();
@@ -183,12 +314,21 @@ export function AddStudyDialog({
         error instanceof Error ? error.message : "Failed to create study."
       );
     }
+  };*/
+
+  const handleAddStudySubmit = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
   };
 
-  const handleDurationChange = (value: string, unit: string) => {
-    if (unit === "uncertain") {
+  const handleDurationChange = (
+    value: string,
+    unit: StudyDurationUnit | undefined
+  ) => {
+    if (unit === "Uncertain") {
       setDurationValue("");
-      setDurationUnit("uncertain");
+      setDurationUnit("Uncertain");
       return;
     }
 
@@ -201,25 +341,6 @@ export function AddStudyDialog({
       previous.includes(country)
         ? previous.filter((entry) => entry !== country)
         : [...previous, country]
-    );
-  };
-
-  const updateComparisonValue = (
-    groupId: string,
-    side: ComparisonSideKey,
-    index: number,
-    value: string
-  ) => {
-    setComparisonGroups((previous) =>
-      previous.map((group) => {
-        if (group.id !== groupId) return group;
-        const updatedSide = [...group[side]];
-        updatedSide[index] = value;
-        return {
-          ...group,
-          [side]: updatedSide,
-        };
-      })
     );
   };
 
@@ -318,7 +439,7 @@ export function AddStudyDialog({
     setIsFetchingSuggestions(true);
     try {
       const response = await fetch(
-        "/api/meerkat/intervention-suggestions",
+        "/api/meerkat/interventions/",
         {
           method: "POST",
           headers: {
@@ -399,11 +520,48 @@ export function AddStudyDialog({
             </div>
           ))}
         </div>
+        {isSuggestionFieldActive(group.id, side) && (
+          <div className="space-y-1 text-xs">
+            {isFetchingSuggestions && (
+              <p className="text-muted-foreground">Loading suggestions...</p>
+            )}
+            {suggestionError && (
+              <p className="text-destructive">{suggestionError}</p>
+            )}
+            {!isFetchingSuggestions && !suggestionError && suggestions.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {suggestions.map((item) => (
+                  <Button
+                    key={`${group.id}-${side}-suggestion-${item}`}
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => {
+                      appendComparisonValue(group.id, side, item);
+                      setComparisonDraft(group.id, side, "");
+                    }}
+                  >
+                    {item}
+                  </Button>
+                ))}
+              </div>
+            )}
+            {!isFetchingSuggestions &&
+              !suggestionError &&
+              suggestions.length === 0 &&
+              suggestionQuery && (
+                <p className="text-muted-foreground">
+                  No suggestions for "{suggestionQuery}".
+                </p>
+              )}
+          </div>
+        )}
       </div>
   );
 
   const computedDuration =
-    durationUnit === "uncertain"
+    durationUnit === "Uncertain"
       ? "Uncertain"
       : durationValue && durationUnit
         ? `${durationValue} ${durationUnit}`
@@ -411,6 +569,8 @@ export function AddStudyDialog({
   const normalizedCountry =
     selectedCountries.length > 0 ? selectedCountries.join(", ") : "Unclear";
   const comparisonValid = hasValidComparisonGroups(comparisonGroups);
+
+  const creatingStudy = false;
 
   const isSubmitDisabled =
     creatingStudy ||
@@ -521,22 +681,23 @@ export function AddStudyDialog({
                 onChange={(event) =>
                   handleDurationChange(event.target.value, durationUnit)
                 }
-                disabled={durationUnit === "uncertain"}
-                required={durationUnit !== "uncertain"}
+                disabled={durationUnit === "Uncertain"}
+                required={durationUnit !== "Uncertain"}
               />
             </div>
             <div className="space-y-2">
               <Label>Unit</Label>
               <Select
-                value={durationUnit}
+                value={durationUnit ?? undefined}
                 onValueChange={(value) =>
-                  handleDurationChange(durationValue, value)
+                  handleDurationChange(durationValue, value as StudyDurationUnit)
                 }
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Unit" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="hours">hours</SelectItem>
                   <SelectItem value="days">days</SelectItem>
                   <SelectItem value="weeks">weeks</SelectItem>
                   <SelectItem value="months">months</SelectItem>
@@ -615,8 +776,8 @@ export function AddStudyDialog({
               type="button"
               variant="ghost"
               onClick={() => {
-                resetLocalFormState();
-                resetNewStudyForm();
+                //resetLocalFormState();
+                //resetNewStudyForm();
                 setAddStudyDialogOpen(false);
               }}
               disabled={creatingStudy}

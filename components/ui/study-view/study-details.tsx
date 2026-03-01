@@ -42,6 +42,8 @@ export function StudyDetails({ study }: StudyDetailsProps) {
     new Set()
   );
 
+  console.log("clicked");
+
   useEffect(() => {
     if (!study) {
       setReports([]);
@@ -184,6 +186,8 @@ export function StudyDetails({ study }: StudyDetailsProps) {
       });
     }
   };
+
+  console.log("start rendering");
 
   return (
     <SheetContent

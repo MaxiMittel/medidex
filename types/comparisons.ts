@@ -1,7 +1,7 @@
 export type ComparisonSideKey = "a" | "b";
 
-export interface ComparisonGroup {
+export type ComparisonGroup = {
   id: string;
   a: string[];
   b: string[];
-}
+};

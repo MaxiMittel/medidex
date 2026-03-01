@@ -4,8 +4,30 @@ import { create } from "zustand";
 import type {
   BatchDto,
   ReportDetailDto,
+  StudyDto,
 } from "../types/apiDTOs";
 import { useReportStore } from "./use-report-store";
+import type { ComparisonGroup } from "@/types/comparisons";
+import { createComparisonGroup, formatComparisonGroups } from "@/lib/comparisonUtils";
+import { createStudy } from "@/lib/api/studiesApi";
+
+export type NewStudyFormState = {
+  short_name: string;
+  status_of_study: string;
+  countries: string[];
+  duration: string;
+  number_of_participants: string;
+  comparisonGroups: ComparisonGroup[];
+};
+
+const createInitialNewStudyForm = (): NewStudyFormState => ({
+  short_name: "",
+  status_of_study: "",
+  countries: [],
+  duration: "",
+  number_of_participants: "",
+  comparisonGroups: [createComparisonGroup()],
+});
 
 export interface BatchReportsState {
   batches: BatchDto[];
@@ -29,11 +51,27 @@ export interface BatchReportsState {
     reportId: number,
     studyId: number
   ) => Promise<void>;
+  addStudyDialogOpen: boolean;
+  newStudyForm: NewStudyFormState;
+  creatingStudy: boolean;
+  setAddStudyDialogOpen: (open: boolean) => void;
+  updateNewStudyForm: <K extends keyof NewStudyFormState>(
+    field: K,
+    value: NewStudyFormState[K]
+  ) => void;
+  resetNewStudyForm: () => void;
+  setNewStudyForm: (form: Partial<NewStudyFormState>) => void;
+  submitNewStudy: (options?: SubmitNewStudyOptions) => Promise<StudyDto>;
 }
 
 type BatchReportsEntry = {
   order: number[];
   map: Record<number, ReportDetailDto>;
+};
+
+type SubmitNewStudyOptions = {
+  batchHash?: string;
+  reportId?: number;
 };
 
 const buildReportsCollection = (reports: ReportDetailDto[]): BatchReportsEntry =>
@@ -53,6 +91,9 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
   loading: false,
   loadingReports: false,
   error: undefined,
+  addStudyDialogOpen: false,
+  newStudyForm: createInitialNewStudyForm(),
+  creatingStudy: false,
   setBatches: (batches: BatchDto[]) => {
     if (get().batches.length === 0) {
       set({ batches });
@@ -253,6 +294,65 @@ export const useBatchReportsStore = create<BatchReportsState>((set, get) => ({
     } catch (error) {
       console.error("Failed to unassign study from report:", error);
       throw error;
+    }
+  },
+  setAddStudyDialogOpen: (open: boolean) => {
+    set({ addStudyDialogOpen: open });
+  },
+  updateNewStudyForm: (field, value) => {
+    set((state) => ({
+      newStudyForm: {
+        ...state.newStudyForm,
+        [field]: value,
+      },
+    }));
+  },
+  setNewStudyForm: (form) => {
+    set((state) => ({
+      newStudyForm: {
+        ...state.newStudyForm,
+        ...form,
+      },
+    }));
+  },
+  resetNewStudyForm: () => {
+    set({ newStudyForm: createInitialNewStudyForm() });
+  },
+  submitNewStudy: async (options = {}) => {
+    const { newStudyForm } = get();
+    const trimmedCountries = newStudyForm.countries
+      .map((country) => country.trim())
+      .filter(Boolean);
+    const parsedParticipants = Number(newStudyForm.number_of_participants);
+
+    const payload = {
+      short_name: newStudyForm.short_name.trim(),
+      status_of_study: newStudyForm.status_of_study.trim(),
+      countries: trimmedCountries.length > 0 ? trimmedCountries : ["Unclear"],
+      duration: newStudyForm.duration || "Uncertain",
+      number_of_participants: Number.isFinite(parsedParticipants)
+        ? parsedParticipants
+        : 0,
+      comparison: formatComparisonGroups(newStudyForm.comparisonGroups),
+    };
+
+    set({ creatingStudy: true });
+    try {
+      const createdStudy = await createStudy(payload);
+      if (options.batchHash && typeof options.reportId === "number") {
+        await get().assignStudyToReport(
+          options.batchHash,
+          options.reportId,
+          createdStudy.studyId
+        );
+      }
+      set({
+        newStudyForm: createInitialNewStudyForm(),
+        addStudyDialogOpen: false,
+      });
+      return createdStudy;
+    } finally {
+      set({ creatingStudy: false });
     }
   },
 }));

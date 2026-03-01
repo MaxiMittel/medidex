@@ -70,62 +70,64 @@ class UnsureReviewOutput(BaseModel):
     decision: Literal["match", "unsure", "not_match"]
     reason: str
 
+class Comparison(BaseModel):
+    intervention: list[str]
+    control: list[str]
 
 class NewStudySuggestion(BaseModel):
     short_name: str
-    status_of_study: str
-    countries: str
-    duration: str
-    number_of_participants: str
-    comparison: str
+    status_of_study: Literal["Closed", "Stopped early", "Open/Ongoing", "Planned"]
+    countries: list[str]
+    duration_value: int
+    duration_unit: Literal["hours", "days", "weeks", "months", "years"]
+    number_of_participants: int
+    comparison: list[Comparison]
 
-    @field_validator("countries")
-    @classmethod
-    def validate_countries(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            return ""
-        if value not in set(COUNTRY_OPTIONS):
-            raise ValueError("Invalid country value.")
-        return value
+    #@field_validator("countries")
+    #@classmethod
+    #def validate_countries(cls, value: list[str]) -> list[str]:
+    #    value = value.strip()
+    #    if not value:
+    #        return ""
+    #    if value not in set(COUNTRY_OPTIONS):
+    #        raise ValueError("Invalid country value.")
+    #    return value
 
-    @field_validator("duration")
-    @classmethod
-    def validate_duration(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            return ""
-        if value == DURATION_UNCERTAIN_VALUE:
-            return value
-        parts = value.split(" ")
-        if len(parts) != 2:
-            raise ValueError("Invalid duration format.")
-        number, unit = parts
-        if not number.isdigit():
-            raise ValueError("Invalid duration number.")
-        if unit not in set(DURATION_UNITS):
-            raise ValueError("Invalid duration unit.")
-        return value
+    #@field_validator("duration")
+    #@classmethod
+    #def validate_duration(cls, value: str) -> str:
+    #    value = value.strip()
+    #    if not value:
+    #        return ""
+    #    if value == DURATION_UNCERTAIN_VALUE:
+    #        return value
+    #    parts = value.split(" ")
+    #    if len(parts) != 2:
+    #        raise ValueError("Invalid duration format.")
+     #   number, unit = parts
+     #   if not number.isdigit():
+    #      raise ValueError("Invalid duration number.")
+    #    if unit not in set(DURATION_UNITS):
+    #        raise ValueError("Invalid duration unit.")
+    #    return value
 
-    @field_validator("number_of_participants")
-    @classmethod
-    def validate_participants(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            return ""
-        if not value.isdigit():
-            raise ValueError("Invalid number_of_participants.")
-        return value
+    #@field_validator("number_of_participants")
+    #@classmethod
+    #def validate_participants(cls, value: str) -> str:
+    #    value = value.strip()
+    #    if not value:
+    #        return ""
+    #    if not value.isdigit():
+    #        raise ValueError("Invalid number_of_participants.")
+    #    return value
 
-    @field_validator("status_of_study")
-    @classmethod
-    def validate_status(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            return ""
-        if value not in set(STATUS_OF_STUDY_OPTIONS):
-            raise ValueError("Invalid status_of_study.")
-        return value
+    #@field_validator("status_of_study")
+    #@classmethod
+    #def validate_status(cls, value: str) -> str:
+    #    value = value.strip()
+    #    if value not in set(STATUS_OF_STUDY_OPTIONS):
+    #        raise ValueError("Invalid status_of_study.")
+    #    return value
 
 
 class SummaryOutput(BaseModel):

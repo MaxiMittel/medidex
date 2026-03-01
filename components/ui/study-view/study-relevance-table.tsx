@@ -43,11 +43,8 @@ import { useReportStore } from "@/hooks/use-report-store";
 
 interface StudyRelevanceTableProps {
   studies: RelevanceStudy[];
-  onLinkedChange?: (studyId: number, linked: boolean) => void;
-  onStudySelect?: (studyId: number | null) => void;
   currentBatchHash?: string;
   currentReportId?: number;
-  getLastInteraction?: () => string | null;
 }
 
 const formatParticipantCount = (value?: string | null) => {
@@ -61,11 +58,8 @@ const formatParticipantCount = (value?: string | null) => {
 
 export function StudyRelevanceTable({
   studies,
-  onLinkedChange,
-  onStudySelect,
   currentBatchHash,
   currentReportId,
-  getLastInteraction,
 }: StudyRelevanceTableProps) {
   
   const [resolvedStudies, setResolvedStudies] = useState<RelevanceStudy[]>([]);
@@ -103,7 +97,7 @@ export function StudyRelevanceTable({
     studyName: string;
   } | null>(null);
   const [hasEvaluated, setHasEvaluated] = useState(false);
-  const wasAddStudyDialogOpen = useRef(false);
+  //const wasAddStudyDialogOpen = useRef(false);
   const [progressCollapsedByReport, setProgressCollapsedByReport] = useState<Record<string, boolean>>({});
 
   const summaryEvent = useMemo(
@@ -127,7 +121,7 @@ export function StudyRelevanceTable({
   const newStudySuggestion: NewStudySuggestion | undefined =
     suggestionEvent?.details?.new_study ? suggestionEvent.details.new_study : undefined;
 
-  const normalizedSuggestion = useMemo(() => {
+  /*const normalizedSuggestion = useMemo(() => {
     if (!newStudySuggestion) return null;
     const safe = (value: string | undefined) => (value ?? "").trim();
     const normalizeChoice = (value: string, allowed: string[]) =>
@@ -165,14 +159,14 @@ export function StudyRelevanceTable({
         safe(newStudySuggestion.comparison)
       ),
     };
-  }, [newStudySuggestion]);
+  }, [newStudySuggestion]);*/
 
-  const suggestionKey = normalizedSuggestion
-    ? `${reportKey}:${JSON.stringify(normalizedSuggestion)}`
+  const suggestionKey = newStudySuggestion
+    ? `${reportKey}:${JSON.stringify(newStudySuggestion)}`
     : null;
 
-  const suggestionDismissed = suggestionKey ? dismissedSuggestions.has(suggestionKey) : false;
-  const shouldHighlightSuggestion = Boolean(suggestionKey) && !suggestionDismissed;
+  //const suggestionDismissed = suggestionKey ? dismissedSuggestions.has(suggestionKey) : false;
+  //const shouldHighlightSuggestion = Boolean(suggestionKey) && !suggestionDismissed;
 
   /*
   useEffect(() => {
@@ -222,10 +216,9 @@ export function StudyRelevanceTable({
         entry.study.studyId === studyId ? { ...entry, isLinked: linked } : entry
       )
     );
-    setSelectedStudy((prev) =>
+    /*setSelectedStudy((prev) =>
       prev && prev.study.studyId === studyId ? { ...prev, isLinked: linked } : prev
-    );
-    onLinkedChange?.(studyId, linked);
+    );*/
   };
 
   // Filter and sort studies
@@ -344,21 +337,9 @@ export function StudyRelevanceTable({
   const handleStudyClick = (study: RelevanceStudy) => {
     setSelectedStudy(study);
     setIsSheetOpen(true);
-    onStudySelect?.(study.study.studyId);
     // Fetch detailed study information
     //void fetchStudyDetails(stuy.CRGStudyID);
   };
-
-  const handleStudyCardKeyDown = (
-    event: KeyboardEvent<HTMLDivElement>,
-    study: RelevanceStudy
-  ) => {
-    if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
-      event.preventDefault();
-      handleStudyClick(study);
-    }
-  };
-
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -413,7 +394,7 @@ export function StudyRelevanceTable({
                   <AddStudyDialog
                     currentBatchHash={currentBatchHash}
                     currentReportId={currentReportId}
-                    highlight={shouldHighlightSuggestion}
+                    suggestedValues={newStudySuggestion}
                     onStudySaved={() => {
                       if (suggestionKey) {
                         dismissSuggestion(suggestionKey);
@@ -487,17 +468,16 @@ export function StudyRelevanceTable({
           <div className="space-y-3">
             {/* Studies list */}
               {filteredStudies.map((study) => {
-                console.log(study)
                 const isLinked = study.isLinked;
                 const relevancePercentage = (study.relevance * 100).toFixed(1);
 
                 return (
                       <div
+                        key={study.study.studyId}
                         role="button"
                         tabIndex={0}
                         aria-label={`View details for ${study.study.shortName}`}
                         onClick={() => handleStudyClick(study)}
-                        onKeyDown={(event) => handleStudyCardKeyDown(event, study)}
                         className="p-4 mb-2 bg-card hover:bg-muted/50 rounded-lg relative w-full max-w-full overflow-hidden transition-all duration-200 border border-border/60 hover:border-border group-hover:shadow-sm flex items-center gap-4"
                       >
                         {/* Left indicator bar with relevance color */}
@@ -632,9 +612,6 @@ export function StudyRelevanceTable({
         open={isSheetOpen}
         onOpenChange={(open) => {
           setIsSheetOpen(open);
-          if (!open) {
-            onStudySelect?.(null);
-          }
         }}
       >
         <StudyDetails study={selectedStudy}>

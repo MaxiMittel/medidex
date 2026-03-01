@@ -117,6 +117,7 @@ STATUS_OF_STUDY_OPTIONS = [
 DURATION_UNCERTAIN_VALUE = "Uncertain"
 
 DURATION_UNITS = [
+    "hours",
     "days",
     "weeks",
     "months",

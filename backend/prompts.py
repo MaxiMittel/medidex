@@ -35,7 +35,6 @@ LIKELY_COMPARE_ID_NOTE = (
 
 from .constants import (
     COUNTRY_OPTIONS,
-    DURATION_UNCERTAIN_VALUE,
     DURATION_UNITS,
     STATUS_OF_STUDY_OPTIONS,
 )
@@ -50,17 +49,19 @@ SUGGEST_NEW_STUDY_PROMPT = (
     "If a field is unknown, return an empty string for that field. "
     f"Allowed status_of_study values: {_STATUS_OPTIONS_TEXT}. "
     f"Allowed countries values: {_COUNTRY_OPTIONS_TEXT}. "
-    f"duration must be '{DURATION_UNCERTAIN_VALUE}' or '<number> <unit>' where unit is {_DURATION_UNITS_TEXT}, or empty. "
+    f"duration_value must be 'None' if uncertain or 'integer'."
+    f"duration_unit is one out of {_DURATION_UNITS_TEXT}. If not available convert it to the closest unit for example 30 minutes -> 0.5 hours"
     "number_of_participants must be a numeric string. "
     "Example output: "
     "{"
     "\"new_study\":{"
     "\"short_name\":\"Zhang 2025\","
     "\"status_of_study\":\"Planned\","
-    "\"countries\":\"Unclear\","
-    "\"duration\":\"3 months\","
-    "\"number_of_participants\":\"600\","
-    "\"comparison\":\"Group psychological counseling vs usual care\""
+    "\"countries\":[\"Unclear\"],"
+    "\"duration_value\":3,"
+    "\"duration_unit\": \"months\,"
+    "\"number_of_participants\":600,"
+    "\"comparison\":[{\"intervention\": [\"Cognitive behavioural therapy\", \"Apriprozol\"], \"control\":[\"Treatment as usual\"]}]"
     "}"
     "}"
 )
