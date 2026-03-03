@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
 import { useReportStore } from "@/hooks/use-report-store";
 import { ReportDetailDto } from "../../../types/apiDTOs";
+import { useDetailsSheet } from "@/app/context/details-sheet-context";
 
 interface ReportsListProps {
   reports: ReportDetailDto[];
@@ -50,6 +51,8 @@ export function ReportsList({
   const evaluationsByReport = useGenAIEvaluationStore((state) => state.evaluationsByReport);
   const runningEvaluations = useGenAIEvaluationStore((state) => state.runningEvaluations);
   const storedReports = useReportStore((state) => state.reports);
+
+  const {openWithStudyId} = useDetailsSheet()
 
   const navigateToReport = useCallback(
     (reportId: number) => {
@@ -104,6 +107,14 @@ export function ReportsList({
       return newSet;
     });
   };
+
+  const handleStudyBadgeClick = useCallback(
+    (event: React.MouseEvent, studyId: number) => {
+      event.stopPropagation();
+      openWithStudyId(studyId);
+    },
+    []
+  );
 
   const handleDownloadPdf = async (reportId: number, title: string, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -290,7 +301,8 @@ export function ReportsList({
                           <Badge 
                             key={studyId}
                             variant="destructive"
-                            className="text-xs font-mono"
+                            className="text-xs font-mono cursor-pointer"
+                            onClick={(event) => handleStudyBadgeClick(event, studyId)}
                           >
                             {studyId}
                           </Badge>

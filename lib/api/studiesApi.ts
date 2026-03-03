@@ -1,16 +1,7 @@
-import { StudyDto , ReportDto, InterventionDto, ConditionDto, OutcomeDto , GetPersonsResponseDto } from "../../types/apiDTOs";
+import { StudyDto, StudyCreateDto , ReportDto, InterventionDto, ConditionDto, OutcomeDto , GetPersonsResponseDto } from "../../types/apiDTOs";
 import { serializeParams } from "./helpers";
 import apiClient from "./apiClient";
 import { AxiosRequestConfig } from "axios";
-
-export interface CreateStudyPayload {
-  short_name: string;
-  status_of_study: string;
-  countries: string[];
-  duration: string;
-  number_of_participants: number;
-  comparison: string;
-}
 
 export const getStudies = (
   study_ids: number[],
@@ -33,6 +24,28 @@ export const getStudies = (
     })
     .catch(error => {
       console.error('Error fetching studies:', error);
+      throw error;
+    });
+}
+
+export const getStudyById = (
+  studyId: number,
+  config?: AxiosRequestConfig
+): Promise<StudyDto> => {
+  const path = `/studies/${studyId}`;
+
+  const requestConfig = {
+    ...config,
+    paramsSerializer: {
+      serialize: serializeParams,
+    },
+  };
+  return apiClient.get<StudyDto>(path, requestConfig)
+    .then(response => {
+      return response.data;
+    })
+    .catch(error => {
+      console.error('Error fetching study:', error);
       throw error;
     });
 }
@@ -199,7 +212,7 @@ export const getStudiesForReport = (
 };
 
 export const createStudy = (
-  payload: CreateStudyPayload,
+  payload: StudyCreateDto,
   config?: AxiosRequestConfig
 ): Promise<StudyDto> => {
   return apiClient

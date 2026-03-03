@@ -20,8 +20,7 @@ const mapResponseToRelevanceStudies = (
 ): RelevanceStudy[] => {
   return response.map((study) => ({
     ...study,
-    isLinked: false,
-    reports: [],
+    isLinked: false
   }));
 };
 

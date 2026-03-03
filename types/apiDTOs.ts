@@ -43,16 +43,18 @@ export interface GetSimilarStudiesParams {
 
 export interface StudyDto {
   studyId: number;
+  status: string;
   shortName: string;
   countries: string[];
   numberParticipants: string | null;
   duration: string | null;
   comparison: string | null
   trialId: string | null;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | undefined;
+  updatedAt: string | undefined;
 }
+
+export type StudyCreateDto = Omit<StudyDto, "studyId" | "createdAt" | "updatedAt">;
 
 export interface ReportDto {
   reportId: number;

@@ -1,3 +1,5 @@
+"use client"
+
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +13,6 @@ interface BatchListProps {
 
 export function BatchList({ batches }: BatchListProps) {
   const router = useRouter();
-  //const { selectBatch, setBatches } = useBatchReportsStore();
 
   // Hydrate the store with server-fetched batches
   /*useEffect(() => {
@@ -22,7 +23,7 @@ export function BatchList({ batches }: BatchListProps) {
 
   const handleBatchClick = (batchHash: string) => {
     //selectBatch(batchHash);
-    router.push(`/reports/batches/${batchHash}`);
+    router.push(`/batches/${batchHash}`);
   };
 
   const formatDate = (dateString: string) => {

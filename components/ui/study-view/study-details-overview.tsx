@@ -1,6 +1,6 @@
 "use client";
 
-import { Study } from "@/types/reports";
+import { StudyDto } from "@/types/apiDTOs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 interface StudyOverviewProps{
-  study : Study
+  study : StudyDto
 }
 
 const metricConfig = {

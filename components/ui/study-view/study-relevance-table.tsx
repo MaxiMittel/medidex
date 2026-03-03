@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, type KeyboardEvent } from "react";
+import { useState, useMemo, useEffect, useCallback} from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -33,12 +33,13 @@ import { LoadMoreStudiesButton } from "./load-more-studies-button";
 import { sendReportEvent } from "@/lib/api/reportEventsApi";
 import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
 import type { AIModel } from "@/hooks/use-genai-evaluation-store";
-import type { NewStudySuggestion, PromptOverrides } from "@/types/apiDTOs";
+import type { NewStudySuggestion, PromptOverrides, StudyDto, StudyCreateDto } from "@/types/apiDTOs";
 import { StudyAIBadge } from "./study-ai-badge";
 import { StudyAIReasonDialog } from "./study-ai-reason-dialog";
 import { AiEvaluationProgress } from "./ai-evaluation-progress";
 import { AiEvaluationHistoryDialog } from "./ai-evaluation-history-dialog";
 import { useReportStore } from "@/hooks/use-report-store";
+import { useDetailsSheet } from "@/app/context/details-sheet-context";
 
 interface StudyRelevanceTableProps {
   studies: RelevanceStudy[];
@@ -63,8 +64,8 @@ export function StudyRelevanceTable({
   
   const [resolvedStudies, setResolvedStudies] = useState<RelevanceStudy[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStudy, setSelectedStudy] = useState<RelevanceStudy | null>(null);
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  //const [selectedStudy, setSelectedStudy] = useState<RelevanceStudy | null>(null);
+  //const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const getReport = useReportStore((state) => state.getReport);
   const addAssignedStudies = useReportStore((state) => state.addAssignedStudy);
@@ -72,6 +73,8 @@ export function StudyRelevanceTable({
   const currentReport = useReportStore((state) =>
     currentReportId !== undefined ? state.reports[currentReportId] : undefined
   );
+
+  const {openWithStudyItem } = useDetailsSheet()
 
   const results = useGenAIEvaluationStore((state) => state.results);
   const evaluationsByReport = useGenAIEvaluationStore((state) => state.evaluationsByReport);
@@ -126,6 +129,110 @@ export function StudyRelevanceTable({
     ? `${reportKey}:${JSON.stringify(newStudySuggestion)}`
     : null;
 
+  const markStudyLinkedState = useCallback((studyId: number, linked: boolean) => {
+    setResolvedStudies((prev) =>
+      prev.map((entry) =>
+        entry.study.studyId === studyId ? { ...entry, isLinked: linked } : entry
+      )
+    );
+  }, []);
+
+  const handleLinkedChange = useCallback(
+    async (study: StudyDto, checked: boolean) => {
+      if (currentReportId === undefined) {
+        return;
+      }
+
+      if (checked) {
+        try {
+          await addAssignedStudies(currentReportId, study.studyId);
+          markStudyLinkedState(study.studyId, true);
+          toast.success("Report assigned to study");
+        } catch (error) {
+          toast.error(
+            `Failed to link study: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`
+          );
+          throw error;
+        }
+      } else {
+        try {
+          await removeAssignedStudies(currentReportId, study.studyId);
+          markStudyLinkedState(study.studyId, false);
+          toast.success("Report unassigned from study");
+        } catch (error) {
+          toast.error(
+            `Failed to unlink study: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`
+          );
+          throw error;
+        }
+      }
+    },
+    [
+      currentReportId,
+      addAssignedStudies,
+      removeAssignedStudies,
+      markStudyLinkedState,
+    ]
+  );
+
+  const handleSaveNewStudy = useCallback(
+    async (payload: StudyCreateDto) => {
+      if (currentReportId === undefined) {
+        throw new Error("Select a report before adding a new study.");
+      }
+
+      const response = await fetch(`/api/meerkat/reports/${currentReportId}/studies`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      let responseBody: unknown = null;
+      const contentType = response.headers.get("Content-Type") ?? "";
+      if (contentType.includes("application/json")) {
+        try {
+          responseBody = await response.json();
+        } catch (error) {
+          console.error("Failed to parse new study response payload", error);
+        }
+      }
+
+      if (!response.ok) {
+        const errorMessage =
+          responseBody &&
+          typeof responseBody === "object" &&
+          responseBody !== null &&
+          "error" in responseBody &&
+          typeof (responseBody as { error?: string }).error === "string"
+            ? (responseBody as { error: string }).error
+            : "Failed to create study.";
+        throw new Error(errorMessage);
+      }
+
+      const createdStudy =
+        responseBody && typeof responseBody === "object"
+          ? (responseBody as StudyDto)
+          : null;
+
+      if (!createdStudy || typeof createdStudy.studyId !== "number") {
+        throw new Error("Invalid study response payload.");
+      }
+
+      await handleLinkedChange(createdStudy, true);
+
+      if (suggestionKey) {
+        dismissSuggestion(suggestionKey);
+      }
+    },
+    [currentReportId, suggestionKey, dismissSuggestion, handleLinkedChange]
+  );
+
   useEffect(() => {
     const assignedStudyIds = new Set(currentReport?.assignedStudies ?? []);
     setResolvedStudies(
@@ -140,14 +247,6 @@ export function StudyRelevanceTable({
   useEffect(() => {
     setAiDialogOpen(false);
   }, [currentBatchHash, currentReportId]);
-
-  const markStudyLinkedState = (studyId: number, linked: boolean) => {
-    setResolvedStudies((prev) =>
-      prev.map((entry) =>
-        entry.study.studyId === studyId ? { ...entry, isLinked: linked } : entry
-      )
-    );
-  };
 
   // Filter and sort studies
   const filteredStudies = useMemo(() => {
@@ -165,8 +264,7 @@ export function StudyRelevanceTable({
     }
 
     return filtered.sort((a, b) => {
-      const linkedDiff = Number(b.isLinked) - Number(a.isLinked);
-      return linkedDiff !== 0 ? linkedDiff : b.relevance - a.relevance;
+      return b.relevance - a.relevance;
     });
   }, [resolvedStudies, searchQuery]);
 
@@ -216,37 +314,6 @@ export function StudyRelevanceTable({
     setReasonDialogOpen(true);
   };
 
-  const handleLinkedChange = async (study: RelevanceStudy, checked: boolean) => {
-    if (currentReportId === undefined) {
-      return;
-    }
-    if (checked) {
-      try {
-        await addAssignedStudies(currentReportId, study.study.studyId);
-        markStudyLinkedState(study.study.studyId, true);
-        toast.success(`Report assigned to study`);
-      } catch (error) {
-        toast.error(
-          `Failed to link study: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`
-        );
-      }
-    } else {
-      try {
-        await removeAssignedStudies(currentReportId, study.study.studyId);
-        markStudyLinkedState(study.study.studyId, false);
-        toast.success(`Report unassigned from study`);
-      } catch (error) {
-        toast.error(
-          `Failed to unlink study: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`
-        );
-      }
-    }
-  };
-
   const getRelevanceColor = (relevance: number) => {
     if (relevance >= 0.9) return "bg-emerald-500";
     if (relevance >= 0.7) return "bg-blue-500";
@@ -263,8 +330,8 @@ export function StudyRelevanceTable({
 
 
   const handleStudyClick = (study: RelevanceStudy) => {
-    setSelectedStudy(study);
-    setIsSheetOpen(true);
+    openWithStudyItem(study.study)
+    //setIsSheetOpen(true);
     // Fetch detailed study information
     //void fetchStudyDetails(stuy.CRGStudyID);
   };
@@ -322,11 +389,7 @@ export function StudyRelevanceTable({
                   <AddStudyDialog
                     currentReportId={currentReportId}
                     suggestedValues={newStudySuggestion}
-                    onSaveStudy={() => {
-                      if (suggestionKey) {
-                        dismissSuggestion(suggestionKey);
-                      }
-                    }}
+                    onSaveStudy={handleSaveNewStudy}
                   />
                 </>
           </div>
@@ -426,7 +489,7 @@ export function StudyRelevanceTable({
                                         checked={isLinked}
                                         onCheckedChange={(checked) =>
                                           handleLinkedChange(
-                                            study,
+                                            study.study,
                                             checked as boolean
                                           )
                                         }
@@ -533,18 +596,6 @@ export function StudyRelevanceTable({
           </div>
         )}
       </div>
-
-      {/* Sheet for Study Details */}
-      <Sheet
-        open={isSheetOpen}
-        onOpenChange={(open) => {
-          setIsSheetOpen(open);
-        }}
-      >
-        <StudyDetails study={selectedStudy}>
-
-        </StudyDetails>
-      </Sheet>
 
       {/* AI Reason Dialog */}
       {selectedAIStudy && currentBatchHash !== undefined && currentReportId !== undefined && (

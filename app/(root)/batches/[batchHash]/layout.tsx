@@ -1,20 +1,32 @@
-import { Suspense } from "react";
-import LayoutProps from "next";
-import ReportList, { ReportListSkeleton } from "./components/report-list";
-import ReportStudyView from './components/report-study-view';
+"use client";
 
-export default async function ReportColumn({ params, children }: LayoutProps<"/batches/[batchHash]">) {
-    const { batchHash } = await params;
+import { type ReactNode } from "react";
+import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
+import ReportList from "./components/report-list";
+import { DetailsSheetProvider } from "@/app/context/details-sheet-context";
+import StudySheet from "./study-sheet";
+
+interface ReportColumnProps {
+    children: ReactNode;
+}
+
+export default function ReportColumn({ children }: ReportColumnProps) {
 
     return (
-        <ReportStudyView
-            left=
-            {
-                <Suspense fallback={<ReportListSkeleton />}>
-                    <ReportList batchHash={batchHash} />
-                </Suspense>
-            }
-            right={children}
-        />
+        <DetailsSheetProvider>
+            <PanelGroup direction="horizontal" className="h-full">
+                <Panel defaultSize={40} minSize={25} className="border-r bg-background min-w-0">
+                    <ReportList/>
+                </Panel>
+
+                <PanelResizeHandle className="w-1 bg-border hover:bg-primary transition-colors cursor-col-resize" />
+
+                <Panel defaultSize={60} minSize={35} className="min-w-0">
+                    {children}
+                </Panel>
+            </PanelGroup>
+            <StudySheet></StudySheet>
+
+        </DetailsSheetProvider>
     );
 }

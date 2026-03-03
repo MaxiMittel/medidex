@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createStudy, type CreateStudyPayload } from "@/lib/api/studiesApi";
+import { createStudy } from "@/lib/api/studiesApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
+import { StudyCreateDto, StudyDto } from "@/types/apiDTOs";
 
 export async function PUT(request: NextRequest) {
-  let body: Partial<CreateStudyPayload>;
+  let body: Partial<StudyDto>;
   try {
     body = await request.json();
   } catch {
@@ -13,13 +14,13 @@ export async function PUT(request: NextRequest) {
     );
   }
 
-  const requiredFields: Array<keyof CreateStudyPayload> = [
-    "short_name",
-    "status_of_study",
+  const requiredFields: Array<keyof StudyDto> = [
+    "shortName",
+    "status",
     "comparison",
     "countries",
     "duration",
-    "number_of_participants",
+    "numberParticipants",
   ];
 
   const missing = requiredFields.filter((field) => {
@@ -27,7 +28,7 @@ export async function PUT(request: NextRequest) {
     if (field === "countries") {
       return !Array.isArray(value) || value.length === 0;
     }
-    if (field === "number_of_participants") {
+    if (field === "numberParticipants") {
       return typeof value !== "number" || Number.isNaN(value);
     }
     return typeof value !== "string" || value.trim().length === 0;
@@ -40,9 +41,9 @@ export async function PUT(request: NextRequest) {
     );
   }
 
-  const payload: CreateStudyPayload = {
-    short_name: body.short_name!.trim(),
-    status_of_study: body.status_of_study!.trim(),
+  const payload: StudyCreateDto = {
+    shortName: body.shortName!.trim(),
+    status: body.status!.trim(),
     comparison: body.comparison!.trim(),
     duration: body.duration!.trim(),
     countries: Array.isArray(body.countries)
@@ -50,7 +51,8 @@ export async function PUT(request: NextRequest) {
           .map((country) => (typeof country === "string" ? country.trim() : ""))
           .filter(Boolean)
       : [],
-    number_of_participants: Number(body.number_of_participants),
+    numberParticipants: body.numberParticipants ?? null,
+    trialId: null, //TODO
   };
 
   if (payload.countries.length === 0) {

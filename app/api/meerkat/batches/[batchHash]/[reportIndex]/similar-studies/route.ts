@@ -17,9 +17,8 @@ export async function GET(
 
   // Parse assignedStudies from query (?assignedStudies=1,2,3)
   const url = new URL(request.url);
-  const assignedIdsParam = url.searchParams.get("assignedStudies");
-  const assignedStudies =
-    assignedIdsParam?.split(",").map((id) => Number(id)).filter(Boolean) ?? [];
+  //const assignedIdsParam = url.searchParams.get("assignedStudies");
+  //const assignedStudies = assignedIdsParam?.split(",").map((id) => Number(id)).filter(Boolean) ?? [];
   
   const limitParam = url.searchParams.get("limit");
   const limit = limitParam ? Number(limitParam) : 10;

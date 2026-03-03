@@ -41,7 +41,7 @@ import { useCallback, useEffect, useState } from "react";
 import type {
   DurationUnit,
   NewStudySuggestion,
-  StudyDto,
+  StudyCreateDto,
   ComparisonGroup as SuggestedComparisonGroup,
 } from "@/types/apiDTOs";
 import type {
@@ -82,8 +82,16 @@ type StudyDurationUnit = DurationUnit | "Uncertain";
 interface AddStudyDialogProps {
   currentReportId?: number;
   suggestedValues?: NewStudySuggestion;
-  onSaveStudy: (values: StudyDto) => Promise<void>;
+  onSaveStudy: (values: StudyCreateDto) => Promise<void>;
 }
+
+const buildComparisonPayload = (groups: ComparisonGroup[]) =>
+  groups
+    .map((group) => ({
+      intervention: group.a.map((value) => value.trim()).filter(Boolean),
+      control: group.b.map((value) => value.trim()).filter(Boolean),
+    }))
+    .filter((group) => group.intervention.length > 0 && group.control.length > 0);
 export function AddStudyDialog({
   currentReportId,
   suggestedValues,
@@ -115,6 +123,7 @@ export function AddStudyDialog({
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
 
   const [addStudyDialogOpen, setAddStudyDialogOpen] = useState(false);
+  const [creatingStudy, setCreatingStudy] = useState(false);
 
   const resetLocalFormState = useCallback(() => {
     if (suggestedValues) {
@@ -229,12 +238,61 @@ export function AddStudyDialog({
   ) => {
     event.preventDefault();
 
+    if (!currentReportId) {
+      toast.error("Select a report before adding a study.");
+      return;
+    }
+
+    const participantsValue = Number(numberOfParticipants);
+    if (Number.isNaN(participantsValue)) {
+      toast.error("Enter a valid number of participants.");
+      return;
+    }
+
+    const normalizedDuration =
+      durationUnit === "Uncertain"
+        ? "Uncertain"
+        : durationUnit && durationValue.trim()
+          ? `${durationValue.trim()} ${durationUnit}`
+          : "";
+
+    if (!normalizedDuration) {
+      toast.error("Provide a duration value and unit, or mark it as Uncertain.");
+      return;
+    }
+
+    const comparisonPayload = buildComparisonPayload(comparisonGroups);
+    if (comparisonPayload.length === 0) {
+      toast.error("Add at least one comparison with both sides populated.");
+      return;
+    }
+
+    const normalizedCountries =
+      selectedCountries.length > 0
+        ? selectedCountries.map((country) => country.trim()).filter(Boolean)
+        : ["Unclear"];
+
+    const payload: StudyCreateDto = {
+      shortName: shortName.trim(),
+      status: statusOfStudy.trim(),
+      countries: normalizedCountries,
+      duration: normalizedDuration,
+      numberParticipants: String(participantsValue),
+      comparison: JSON.stringify(comparisonPayload),
+      trialId: null, //TODO
+    };
+
+    setCreatingStudy(true);
     try {
-      //await onSaveStudy(payload);
+      await onSaveStudy(payload);
+      toast.success("New study created and linked to the report.");
+      setAddStudyDialogOpen(false);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to save study."
       );
+    } finally {
+      setCreatingStudy(false);
     }
   };
 
@@ -333,7 +391,6 @@ export function AddStudyDialog({
 
     return (
       <div className="space-y-2">
-        <div className="text-sm font-semibold leading-tight">{placeholderLabel}</div>
         <Popover
           open={isSuggestionFieldActive(group.id, side)}
           onOpenChange={(open) => {
@@ -488,8 +545,6 @@ export function AddStudyDialog({
   const normalizedCountry =
     selectedCountries.length > 0 ? selectedCountries.join(", ") : "Unclear";
   const comparisonValid = hasValidComparisonGroups(comparisonGroups);
-
-  const creatingStudy = false;
 
   const isSubmitDisabled =
     creatingStudy ||
@@ -666,7 +721,7 @@ export function AddStudyDialog({
                     }}
                   >
                     {renderComparisonSideInputs(group, "Intervention", "a")}
-                    <div className="text-xs font-semibold text-muted-foreground flex items-center justify-center self-center mt-8">
+                    <div className="text-xs font-semibold text-muted-foreground flex items-center justify-center mt-2">
                       vs.
                     </div>
                     {renderComparisonSideInputs(group, "Control", "b")}
@@ -683,7 +738,6 @@ export function AddStudyDialog({
                       </Button>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">Press enter to add interventions and controls.</p>
                 </div>
               ))}
             </div>

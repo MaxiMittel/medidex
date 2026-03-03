@@ -1,6 +1,6 @@
 import apiClient from "./apiClient";
 import { AxiosRequestConfig } from "axios";
-import { SimilarTagDto, SimilarStudyResponseDto, GetSimilarStudiesParams, GetSimilarTagsParams} from "../../types/apiDTOs";
+import { SimilarTagDto, SimilarStudyResponseDto, GetSimilarStudiesParams, GetSimilarTagsParams, StudyDto} from "../../types/apiDTOs";
 import {serializeParams} from "./helpers";    
 
 export const getSimilarStudiesByReport = (
@@ -56,6 +56,26 @@ export const removeStudyFromReportByReportId = (
     })
     .catch(error => {
       console.error(`Error removing studies from report ${reportId}:`, error);
+      throw error;
+    });
+}
+
+//create and assign a brand-new study to a report
+export const assignNewStudyToReportByReportId = (
+  reportId: number,
+  study: StudyDto,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+    console.log("Study");
+    console.log(study);
+  const path = `/reports/${reportId}/studies`;
+  return apiClient
+    .post(path, study, config)
+    .then(response => {
+      return response.data;
+    })
+    .catch(error => {
+      console.error(`Error assigning new study to report ${reportId}:`, error);
       throw error;
     });
 }

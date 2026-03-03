@@ -8,13 +8,13 @@ import {
 } from "@/components/ui/sheet";
 import { Separator } from "../separator";
 import { FileText, Download } from "lucide-react";
-import { StudyOverview } from "./study-details-overview";
-import { StudyAspects } from "./study-details-aspects";
+import { StudyOverview } from "@/components/ui/study-view/study-details-overview";
+import { StudyAspects } from "@/components/ui/study-view/study-details-aspects";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import type { RelevanceStudy } from "@/types/reports";
+import { StudyDto } from "@/types/apiDTOs";
 
 type ReportListItem = {
   reportId: number;
@@ -30,7 +30,7 @@ const normalizeReports = (
   }));
 
 interface StudyDetailsProps {
-  study: RelevanceStudy | null;
+  study: StudyDto | null;
 }
 
 export function StudyDetails({ study }: StudyDetailsProps) {
@@ -42,9 +42,13 @@ export function StudyDetails({ study }: StudyDetailsProps) {
     new Set()
   );
 
-  console.log("clicked");
+  console.log("Init");
+  console.log(study);
 
   useEffect(() => {
+    console.log("Use effect");
+    console.log(study);
+    console.log(study?.studyId);
     if (!study) {
       setReports([]);
       setReportsLoading(false);
@@ -53,16 +57,19 @@ export function StudyDetails({ study }: StudyDetailsProps) {
     }
 
     let isActive = true;
-    const studyId = study.study.studyId;
+    const studyId = study.studyId;
+    
+    console.log(studyId);
 
-    setReports(normalizeReports(study.reports));
     setReportsLoading(true);
     setReportsError(null);
 
     const fetchReports = async () => {
       try {
+        console.log("Fetch " +studyId);
         const response = await fetch(
-          `/api/meerkat/studies/${studyId}/reports`
+          `/api/meerkat/studies/${studyId}/reports`,
+          { cache: "no-store" }
         );
 
         if (!response.ok) {
@@ -95,9 +102,8 @@ export function StudyDetails({ study }: StudyDetailsProps) {
     return null;
   }
 
-  const studyInfo = study.study;
-  const studyId = studyInfo.studyId;
-  const studyShortName = studyInfo.shortName ?? "study";
+  const studyId = study.studyId;
+  const studyShortName = study.shortName ?? "study";
 
   const handleDownloadAllReportPdfs = async () => {
     if (reports.length === 0) return;
@@ -110,7 +116,8 @@ export function StudyDetails({ study }: StudyDetailsProps) {
       for (const report of reports) {
         try {
           const response = await fetch(
-            `/api/meerkat/reports/${report.reportId}/pdf`
+            `/api/meerkat/reports/${report.reportId}/pdf`,
+            { cache: "no-store" }
           );
           if (!response.ok) {
             throw new Error("Failed to download PDF");
@@ -157,7 +164,8 @@ export function StudyDetails({ study }: StudyDetailsProps) {
 
     try {
       const response = await fetch(
-        `/api/meerkat/reports/${reportId}/pdf`
+        `/api/meerkat/reports/${reportId}/pdf`,
+        { cache: "no-store" }
       );
       if (!response.ok) {
         throw new Error("Failed to download PDF");
@@ -187,8 +195,6 @@ export function StudyDetails({ study }: StudyDetailsProps) {
     }
   };
 
-  console.log("start rendering");
-
   return (
     <SheetContent
       side="right"
@@ -199,11 +205,11 @@ export function StudyDetails({ study }: StudyDetailsProps) {
           <SheetTitle>{studyShortName}</SheetTitle>
         </SheetHeader>
         <div className="mt-6 space-y-6">
-          <StudyOverview study={studyInfo} />
+          <StudyOverview study={study} />
 
           <Separator />
 
-          <StudyAspects study={studyInfo}
+          <StudyAspects study={study}
           />
 
           <Separator />
@@ -240,9 +246,15 @@ export function StudyDetails({ study }: StudyDetailsProps) {
 
             <div className="space-y-2">
               {reportsLoading && (
-                <div className="flex items-center gap-2 px-4 text-sm text-muted-foreground">
-                  <Spinner className="h-4 w-4" />
-                  <p>Loading reports…</p>
+                <div className="px-4">
+                  <div className="space-y-2 rounded-md border border-border/60 bg-muted/30 p-3.5">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-6 w-6 rounded-md" />
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                    <Skeleton className="h-3 w-full" />
+                  </div>
                 </div>
               )}
               {reportsError && (
