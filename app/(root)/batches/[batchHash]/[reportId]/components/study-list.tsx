@@ -42,13 +42,11 @@ export default async function StudyList({ params, searchParams }: StudyListProps
   const studies = mapResponseToRelevanceStudies(response);
 
   return (
-    <div className="h-full flex flex-col min-w-0 overflow-hidden p-4 md:px-8">
-        <StudyRelevanceTable
+    <StudyRelevanceTable
           studies={studies}
           currentBatchHash={batchHash}
           currentReportId={reportIdNumber}
         />
-    </div>
   );
 }
 

@@ -1,3 +1,4 @@
+import axios from "axios";
 import { NextRequest, NextResponse } from "next/server";
 import { getBatchReports } from "@/lib/api/batchApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
@@ -20,6 +21,12 @@ export async function GET(
     const reports = await getBatchReports(batchHash, { headers });
     return NextResponse.json(reports);
   } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      const payload =
+        error.response.data ?? { error: "Batch reports not found." };
+      return NextResponse.json(payload, { status: 404 });
+    }
+
     console.error("Unexpected error while fetching batch reports:", error);
     return NextResponse.json(
       { error: "Unexpected error while fetching batch reports." },

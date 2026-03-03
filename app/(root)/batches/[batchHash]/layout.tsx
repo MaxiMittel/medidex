@@ -1,32 +1,46 @@
-"use client";
-
 import { type ReactNode } from "react";
-import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
-import ReportList from "./components/report-list";
-import { DetailsSheetProvider } from "@/app/context/details-sheet-context";
-import StudySheet from "./study-sheet";
+import axios from "axios";
+import { notFound } from "next/navigation";
+import { ReportDetailDto } from "@/types/apiDTOs";
+import { ReportColumnClient } from "./components/report-column-client";
+import { getBatchReports as fetchBatchReports } from "@/lib/api/batchApi";
+import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
 interface ReportColumnProps {
     children: ReactNode;
+    params: Promise<{
+        batchHash: string;
+    }>;
 }
 
-export default function ReportColumn({ children }: ReportColumnProps) {
+async function getBatchReports(batchHash: string): Promise<ReportDetailDto[]> {
+    const headers = await getMeerkatHeaders();
+
+    try {
+        const reports = await fetchBatchReports(batchHash, { headers });
+        return reports ?? [];
+    } catch (error) {
+        if (axios.isAxiosError(error) && error.response?.status === 404) {
+            notFound();
+        }
+
+        throw new Error("Failed to load batch reports.");
+    }
+}
+
+export default async function ReportColumn({ children, params }: ReportColumnProps) {
+    const resolvedParams = await params;
+    const batchHash = resolvedParams?.batchHash;
+
+    if (!batchHash) {
+        notFound();
+    }
+
+    const reports = await getBatchReports(batchHash);
 
     return (
-        <DetailsSheetProvider>
-            <PanelGroup direction="horizontal" className="h-full">
-                <Panel defaultSize={55} minSize={25} className="border-r bg-background min-w-0">
-                    <ReportList/>
-                </Panel>
-
-                <PanelResizeHandle className="w-1 bg-border hover:bg-primary transition-colors cursor-col-resize" />
-
-                <Panel defaultSize={45} minSize={35} className="min-w-0">
-                    {children}
-                </Panel>
-            </PanelGroup>
-            <StudySheet></StudySheet>
-
-        </DetailsSheetProvider>
+        <ReportColumnClient batchHash={batchHash} reports={reports}>
+            {children}
+        </ReportColumnClient>
     );
 }

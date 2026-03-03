@@ -59,10 +59,8 @@ export function StudyRelevanceTable({
   currentReportId,
 }: StudyRelevanceTableProps) {
   
-  const [resolvedStudies, setResolvedStudies] = useState<RelevanceStudy[]>([]);
+  const [resolvedStudies, setResolvedStudies] = useState<RelevanceStudy[]>(() => [...studies]);
   const [searchQuery, setSearchQuery] = useState("");
-  //const [selectedStudy, setSelectedStudy] = useState<RelevanceStudy | null>(null);
-  //const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const getReport = useReportStore((state) => state.getReport);
   const addAssignedStudies = useReportStore((state) => state.addAssignedStudy);
@@ -329,13 +327,10 @@ export function StudyRelevanceTable({
 
   const handleStudyClick = (study: RelevanceStudy) => {
     openWithStudyItem(study.study)
-    //setIsSheetOpen(true);
-    // Fetch detailed study information
-    //void fetchStudyDetails(stuy.CRGStudyID);
   };
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col pt-5">
       <AIMatchSettingsDialog
         open={aiDialogOpen}
         onOpenChange={setAiDialogOpen}
@@ -346,11 +341,11 @@ export function StudyRelevanceTable({
       />
 
       {/* Header - Sticky */}
-      <div className="shrink-0 space-y-4 pb-4">
+      <div className="px-4 pb-4 border-b border-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-1.5 rounded-md bg-primary/10">
-              <Sparkles className="h-4 w-4 text-primary" />
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-6 w-6 text-primary" />
             </div>
             <h2 className="text-lg font-semibold">Relevant Studies</h2>
             <Badge variant="secondary" className="text-xs font-normal">
@@ -394,24 +389,29 @@ export function StudyRelevanceTable({
         </div>
 
         {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, ID, comparison, or participants..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-          {searchQuery && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
-              onClick={() => setSearchQuery("")}
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          )}
+        <div className="mt-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, ID, comparison, or participants..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-8"
+              />
+              {searchQuery && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -439,22 +439,23 @@ export function StudyRelevanceTable({
       />
 
       {/* Scrollable Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        {filteredStudies.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <div className="p-3 rounded-full bg-muted mb-4">
-              <FileText className="h-6 w-6 opacity-50" />
+      <div className="flex-1 min-h-0 overflow-y-auto px-4">
+        <div className="pt-3 pb-4">
+          {filteredStudies.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <div className="p-3 rounded-full bg-muted mb-4">
+                <FileText className="h-6 w-6 opacity-50" />
+              </div>
+              <p className="text-sm font-medium">No studies found</p>
+              <p className="text-xs mt-1">
+                {searchQuery
+                  ? "Try adjusting your search query"
+                  : "No relevant studies available"}
+              </p>
             </div>
-            <p className="text-sm font-medium">No studies found</p>
-            <p className="text-xs mt-1">
-              {searchQuery
-                ? "Try adjusting your search query"
-                : "No relevant studies available"}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {/* Studies list */}
+          ) : (
+            <div className="space-y-3">
+              {/* Studies list */}
               {filteredStudies.map((study) => {
                 const isLinked = study.isLinked;
                 const relevancePercentage = (study.relevance * 100).toFixed(1);
@@ -604,6 +605,7 @@ export function StudyRelevanceTable({
           </div>
         )}
       </div>
+    </div>
 
       {/* AI Reason Dialog */}
       {selectedAIStudy && currentBatchHash !== undefined && currentReportId !== undefined && (

@@ -5,11 +5,10 @@ import {
   FileText,
   Calendar,
   Users,
-  Search,
   Download,
   Loader2,
-  AlertCircle,
-  CheckCircle2,
+  Sparkles,
+  Search,
   X,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
@@ -17,6 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -240,7 +240,7 @@ export function ReportsList({
     <div className="h-full flex flex-col pt-5">
       <div className="px-4 pb-4 border-b border-border">
         <div className="flex items-center gap-2">
-          <FileText className="h-5 w-5 text-primary" />
+          <FileText className="h-6 w-6 text-primary" />
           <h2 className="text-xl font-semibold">Reports</h2>
           <span className="text-sm text-muted-foreground">
             ({filteredReports.length})
@@ -249,61 +249,74 @@ export function ReportsList({
         </div>
 
         <div className="mt-4 space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search reports..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search reports..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-8"
+              />
+              {searchQuery && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
-              Filter:
-            </span>
-            <div className="flex gap-1">
-              <Button
-                variant={assignmentFilter === "all" ? "default" : "outline"}
-                size="sm"
-                className="h-7 text-xs px-3"
-                onClick={() => setAssignmentFilter("all")}
-              >
-                All
-              </Button>
-              <Button
-                variant={assignmentFilter === "assigned" ? "default" : "outline"}
-                size="sm"
-                className="h-7 text-xs px-3"
-                onClick={() => setAssignmentFilter("assigned")}
-              >
-                Assigned
-              </Button>
-              <Button
-                variant={
-                  assignmentFilter === "unassigned" ? "default" : "outline"
-                }
-                size="sm"
-                className="h-7 text-xs px-3"
-                onClick={() => setAssignmentFilter("unassigned")}
-              >
-                Unassigned
-              </Button>
-              <Button
-                variant={assignmentFilter === "newStudy" ? "default" : "outline"}
-                size="sm"
-                className="h-7 text-xs px-3"
-                onClick={() => setAssignmentFilter("newStudy")}
-              >
-                New
-              </Button>
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                Filter:
+              </span>
+              <div className="flex gap-1">
+                <Button
+                  variant={assignmentFilter === "all" ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 text-xs px-3"
+                  onClick={() => setAssignmentFilter("all")}
+                >
+                  All
+                </Button>
+                <Button
+                  variant={assignmentFilter === "assigned" ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 text-xs px-3"
+                  onClick={() => setAssignmentFilter("assigned")}
+                >
+                  Assigned
+                </Button>
+                <Button
+                  variant={
+                    assignmentFilter === "unassigned" ? "default" : "outline"
+                  }
+                  size="sm"
+                  className="h-7 text-xs px-3"
+                  onClick={() => setAssignmentFilter("unassigned")}
+                >
+                  Unassigned
+                </Button>
+                <Button
+                  variant={assignmentFilter === "newStudy" ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 text-xs px-3"
+                  onClick={() => setAssignmentFilter("newStudy")}
+                >
+                  New
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <ScrollArea className="flex-1 h-0 px-4">
+      <ScrollArea className="flex-1 h-0" viewportClassName="px-4 overflow-visible">
         <div className="space-y-3 pt-3 pb-4">
           {filteredReports.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
@@ -322,22 +335,30 @@ export function ReportsList({
               const hasAbstract = report.report.abstract && report.report.abstract.length > 0;
               const isSelected = selectedReportId === report.report.reportId;
               const isExpanded = isSelected && hasAbstract;
+              const reportKey = `${batchHash}-${report.report.reportId}`;
+              const isRunningEvaluation = runningEvaluations.includes(reportKey);
+              const reportResults = storeResults[reportKey];
+              const resultCount = reportResults ? Object.keys(reportResults).length : 0;
               
               return (
                 <div
                   ref={isSelected ? selectedCardRef : undefined}
                   key={report.report.reportId || idx}
-                  className={`rounded-lg border bg-card hover:border-primary/20 transition-all overflow-hidden first:mt-3 scroll-mt-4 ${
+                  className={`relative rounded-lg border bg-card hover:border-primary/20 transition-all first:mt-3 scroll-mt-4 ${
                     isSelected
                       ? "border-primary bg-primary/5 outline outline-2 outline-primary/40"
-                      : ""
-                  }`}
+                      : ""}`}
                 >
                   {/* Report Content */}
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex-1 min-w-0" onClick={() => navigateToReport(report.report.reportId)}>
                         <h3 className="text-sm font-semibold leading-snug mb-2.5 text-foreground">
+                          {isRunningEvaluation ? (
+                            <Spinner className="mr-1 inline h-3 w-3 text-primary" />
+                          ) : resultCount > 0 ? (
+                            <Sparkles className="mr-1 inline h-3 w-3" />
+                          ) : null}
                           {report.report.title}
                         </h3>
                         <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground mb-2">
@@ -417,42 +438,6 @@ export function ReportsList({
                         })}
                       </div>
                     )}
-
-                    {(() => {
-                      const reportKey = `${batchHash}-${report.report.reportId}`;
-                      const evalState = evaluationsByReport[reportKey] || null;
-                      const isRunning = runningEvaluations.includes(reportKey);
-                      const reportResults = storeResults[reportKey];
-                      const resultCount = reportResults ? Object.keys(reportResults).length : 0;
-
-                      if (isRunning) {
-                        return (
-                          <div className="flex items-center gap-1.5 text-xs text-blue-600 mt-2">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          </div>
-                        );
-                      }
-
-                      if (evalState?.error) {
-                        return (
-                          <div className="flex items-center gap-1.5 text-xs text-red-600 mt-2">
-                            <AlertCircle className="h-3 w-3" />
-                            <span>AI: Error</span>
-                          </div>
-                        );
-                      }
-
-                      if (resultCount > 0) {
-                        return (
-                          <div className="flex items-center gap-1.5 text-xs text-green-600 mt-2">
-                            <CheckCircle2 className="h-3 w-3" />
-                            <span>AI: {resultCount} results</span>
-                          </div>
-                        );
-                      }
-
-                      return null;
-                    })()}
                   </div>
 
                   {/* Expanded Abstract */}
