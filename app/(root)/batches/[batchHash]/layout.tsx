@@ -15,13 +15,13 @@ export default function ReportColumn({ children }: ReportColumnProps) {
     return (
         <DetailsSheetProvider>
             <PanelGroup direction="horizontal" className="h-full">
-                <Panel defaultSize={40} minSize={25} className="border-r bg-background min-w-0">
+                <Panel defaultSize={55} minSize={25} className="border-r bg-background min-w-0">
                     <ReportList/>
                 </Panel>
 
                 <PanelResizeHandle className="w-1 bg-border hover:bg-primary transition-colors cursor-col-resize" />
 
-                <Panel defaultSize={60} minSize={35} className="min-w-0">
+                <Panel defaultSize={45} minSize={35} className="min-w-0">
                     {children}
                 </Panel>
             </PanelGroup>

@@ -1,8 +1,11 @@
-import { ReportDetailDto } from "@/types/apiDTOs"
+import { ReportDetailDto, StudyDto } from "@/types/apiDTOs"
 import {create} from "zustand"
 
 const getReportStudyPath = (reportId: number, studyId: number) =>
     `/api/meerkat/reports/${reportId}/studies/${studyId}`
+
+const hasStudyById = (studies: StudyDto[] = [], studyId: number) =>
+    studies.some((candidate) => candidate.studyId === studyId)
 
 const ensureSuccess = async (response: Response, action: string) => {
     if (response.ok) {
@@ -42,7 +45,7 @@ type ReportState = {
     reports: Record<number, ReportDetailDto>
     setReports: (reports: ReportDetailDto[]) => void
     getReport: (reportId: number) => ReportDetailDto
-    addAssignedStudy: (reportId: number, studyId: number) => Promise<void>
+    addAssignedStudy: (reportId: number, study: StudyDto) => Promise<void>
     removeAssignedStudy: (reportId: number, studyId: number) => Promise<void>
 }
 
@@ -63,16 +66,16 @@ export const useReportStore = create<ReportState>((set, get) => ({
         return report
     },
 
-    addAssignedStudy: async (reportId, studyId) => {
+    addAssignedStudy: async (reportId, study) => {
         const report = get().reports[reportId]
         if (!report) {
             throw new Error(`Report ${reportId} not available`)
         }
         const currentStudies = report.assignedStudies ?? []
-        if (currentStudies.includes(studyId)) {
+        if (hasStudyById(currentStudies, study.studyId)) {
             return
         }
-        await assignStudyViaApi(reportId, studyId)
+        await assignStudyViaApi(reportId, study.studyId)
         set((state) => {
             const updatedReport = state.reports[reportId]
             if (!updatedReport) {
@@ -84,7 +87,7 @@ export const useReportStore = create<ReportState>((set, get) => ({
                     ...state.reports,
                     [reportId]: {
                         ...updatedReport,
-                        assignedStudies: [...nextStudies, studyId],
+                        assignedStudies: [...nextStudies, study],
                     },
                 },
             }
@@ -97,7 +100,7 @@ export const useReportStore = create<ReportState>((set, get) => ({
             throw new Error(`Report ${reportId} not available`)
         }
         const currentStudies = report.assignedStudies ?? []
-        if (!currentStudies.includes(studyId)) {
+        if (!hasStudyById(currentStudies, studyId)) {
             return
         }
         await removeStudyViaApi(reportId, studyId)
@@ -112,7 +115,7 @@ export const useReportStore = create<ReportState>((set, get) => ({
                     [reportId]: {
                         ...updatedReport,
                         assignedStudies: (updatedReport.assignedStudies ?? []).filter(
-                            (id) => id !== studyId,
+                            (item) => item.studyId !== studyId,
                         ),
                     },
                 },

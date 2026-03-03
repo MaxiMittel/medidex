@@ -1,15 +1,11 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback} from "react";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import type { RelevanceStudy } from "@/types/reports";
-import {
-  Sheet,
-} from "@/components/ui/sheet";
 import {
   Tooltip,
   TooltipContent,
@@ -24,9 +20,10 @@ import {
   X,
   Sparkles,
   CheckCircle2,
+  Plus,
+  Link,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
-import { StudyDetails } from "./study-details";
 import { AddStudyDialog } from "./add-study-dialog";
 import { AIMatchSettingsDialog } from "./ai-match-settings-dialog";
 import { LoadMoreStudiesButton } from "./load-more-studies-button";
@@ -83,7 +80,6 @@ export function StudyRelevanceTable({
   const canStartEvaluation = useGenAIEvaluationStore((state) => state.canStartEvaluation);
   const getRunningEvaluationsCount = useGenAIEvaluationStore((state) => state.getRunningEvaluationsCount);
   const getStudyResult = useGenAIEvaluationStore((state) => state.getStudyResult);
-  const dismissedSuggestions = useGenAIEvaluationStore((state) => state.dismissedSuggestions);
   const dismissSuggestion = useGenAIEvaluationStore((state) => state.dismissSuggestion);
 
   const reportKey = currentBatchHash ? `${currentBatchHash}-${currentReportId}` : "";
@@ -145,7 +141,7 @@ export function StudyRelevanceTable({
 
       if (checked) {
         try {
-          await addAssignedStudies(currentReportId, study.studyId);
+          await addAssignedStudies(currentReportId, study);
           markStudyLinkedState(study.studyId, true);
           toast.success("Report assigned to study");
         } catch (error) {
@@ -234,7 +230,9 @@ export function StudyRelevanceTable({
   );
 
   useEffect(() => {
-    const assignedStudyIds = new Set(currentReport?.assignedStudies ?? []);
+    const assignedStudyIds = new Set(
+      (currentReport?.assignedStudies ?? []).map((assigned) => assigned.studyId)
+    );
     setResolvedStudies(
       studies.map((study) => ({
         ...study,
@@ -481,28 +479,38 @@ export function StudyRelevanceTable({
                           onClick={(e) => e.stopPropagation()}
                           className="h-full flex items-center justify-center"
                         >
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className="p-1">
-                                      <Checkbox
-                                        checked={isLinked}
-                                        onCheckedChange={(checked) =>
-                                          handleLinkedChange(
-                                            study.study,
-                                            checked as boolean
-                                          )
-                                        }
-                                        className="data-[state=checked]:bg-primary h-7 w-7"
-                                      />
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    {isLinked ? "Unlink study" : "Link study"}
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </div>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  aria-pressed={isLinked}
+                                  aria-label={isLinked ? "Study linked" : "Link study"}
+                                  disabled={isLinked}
+                                  onClick={() => {
+                                    if (!isLinked) {
+                                      void handleLinkedChange(study.study, true);
+                                    }
+                                  }}
+                                  className={`p-1 rounded-full transition-colors ${
+                                    isLinked
+                                      ? "text-primary/70 cursor-default"
+                                      : "text-muted-foreground/60 hover:text-primary"
+                                  }`}
+                                >
+                                  {isLinked ? (
+                                    <Link className="h-6 w-6" />
+                                  ) : (
+                                    <Plus className="h-6 w-6" />
+                                  )}
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {isLinked ? "Already linked" : "Link study"}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
 
                         <div className="flex flex-col gap-3">
                             {/* Top row: Checkbox, Short Name, and details indicator */}

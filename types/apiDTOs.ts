@@ -14,7 +14,7 @@ export interface BatchDto {
 
 export interface ReportDetailDto {
   report: ReportDto;
-  assignedStudies: number[];
+  assignedStudies: StudyDto[];
 }
 
 export interface SimilarTagDto {
@@ -60,9 +60,11 @@ export interface ReportDto {
   reportId: number;
   year: number;
   title: string;
+  authors: string[];
   abstract: string | null;
   trialId: string | null;
-  authors: string[];
+  createdAt: string | undefined;
+  updatedAt: string | undefined;
 }
 
 export interface InterventionDto {
