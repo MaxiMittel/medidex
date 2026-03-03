@@ -11,7 +11,7 @@ interface StudyListProps {
     reportId: string;
   };
   searchParams: {
-    k?: string | string[];
+    k?: string;
   };
 }
 
@@ -27,12 +27,8 @@ const mapResponseToRelevanceStudies = (
 export default async function StudyList({ params, searchParams }: StudyListProps) {
 
   const { batchHash, reportId } = await params;
+  const { k } = await searchParams;
   const reportIdNumber = Number(reportId);
-  const requestedK = Array.isArray(searchParams?.k)
-    ? searchParams.k[0]
-    : searchParams?.k;
-  const parsedK = Number(requestedK);
-  const k = Number.isFinite(parsedK) && parsedK > 0 ? parsedK : 10;
 
   const headers = await getMeerkatHeaders();
   const response = await getSimilarStudiesByReport(reportIdNumber, undefined, {

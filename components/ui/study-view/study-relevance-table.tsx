@@ -329,6 +329,21 @@ export function StudyRelevanceTable({
     openWithStudyItem(study.study)
   };
 
+  const progressMessage = evalState?.isStreaming
+    ? (evalState?.currentMessage ||
+       (evalState?.streamMessages && evalState.streamMessages.length > 0
+         ? evalState.streamMessages[evalState.streamMessages.length - 1]?.message
+         : null) ||
+       null)
+    : (summaryEvent?.message ||
+       evalState?.currentMessage ||
+       (evalState?.streamMessages && evalState.streamMessages.length > 0
+         ? evalState.streamMessages[evalState.streamMessages.length - 1]?.message
+         : null) ||
+       null);
+
+  const shouldShowProgress = (evalState?.isStreaming ?? false) || Boolean(progressMessage);
+
   return (
     <div className="h-full flex flex-col pt-5">
       <AIMatchSettingsDialog
@@ -415,28 +430,19 @@ export function StudyRelevanceTable({
         </div>
       </div>
 
-      <AiEvaluationProgress
-        message={
-          evalState?.isStreaming
-            ? (evalState?.currentMessage ||
-               (evalState?.streamMessages && evalState.streamMessages.length > 0
-                 ? evalState.streamMessages[evalState.streamMessages.length - 1]?.message
-                 : null) ||
-               null)
-            : (summaryEvent?.message ||
-               evalState?.currentMessage ||
-               (evalState?.streamMessages && evalState.streamMessages.length > 0
-                 ? evalState.streamMessages[evalState.streamMessages.length - 1]?.message
-                 : null) ||
-               null)
-        }
-        isStreaming={evalState?.isStreaming ?? false}
-        hasSummary={Boolean(summaryEvent?.message)}
-        collapsed={progressCollapsedByReport[reportKey] ?? false}
-        onCollapsedChange={(collapsed) => {
-          setProgressCollapsedByReport(prev => ({ ...prev, [reportKey]: collapsed }));
-        }}
-      />
+      {shouldShowProgress ? (
+        <div className="px-4 pt-4">
+          <AiEvaluationProgress
+            message={progressMessage}
+            isStreaming={evalState?.isStreaming ?? false}
+            hasSummary={Boolean(summaryEvent?.message)}
+            collapsed={progressCollapsedByReport[reportKey] ?? false}
+            onCollapsedChange={(collapsed) => {
+              setProgressCollapsedByReport(prev => ({ ...prev, [reportKey]: collapsed }));
+            }}
+          />
+        </div>
+      ) : null}
 
       {/* Scrollable Content */}
       <div className="flex-1 min-h-0 overflow-y-auto px-4">

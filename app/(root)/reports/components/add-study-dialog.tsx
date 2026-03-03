@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
 import {
   Popover,
   PopoverContent,
@@ -32,87 +33,62 @@ import {
 import { Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { COUNTRY_OPTIONS } from "./constants";
+import type {
+  ComparisonGroup,
+  ComparisonSideKey,
+} from "@/types/comparisons";
 import {
   createComparisonGroup,
   hasValidComparisonGroups,
 } from "@/lib/comparisonUtils";
 import { useCallback, useEffect, useState } from "react";
-import type {
-  DurationUnit,
-  NewStudySuggestion,
-  StudyCreateDto,
-  ComparisonGroup as SuggestedComparisonGroup,
-} from "@/types/apiDTOs";
-import type {
-  ComparisonGroup,
-  ComparisonSideKey,
-} from "@/types/comparisons";
 
-const SUGGESTION_DISPLAY_LIMIT = 8;
+const cloneComparisonGroups = (
+  groups?: ComparisonGroup[]
+): ComparisonGroup[] =>
+  groups && groups.length > 0
+    ? groups.map((group) => ({
+        id: group.id,
+        a: [...group.a],
+        b: [...group.b],
+      }))
+    : [createComparisonGroup()];
+
 const buildEmptyComparisonGroups = () => [createComparisonGroup()];
-
-const buildComparisonGroupsFromSuggestion = (
-  groups?: SuggestedComparisonGroup | SuggestedComparisonGroup[] | null
-): ComparisonGroup[] => {
-  if (!groups) {
-    return buildEmptyComparisonGroups();
-  }
-
-  const normalized = Array.isArray(groups) ? groups : [groups];
-  if (normalized.length === 0) {
-    return buildEmptyComparisonGroups();
-  }
-
-  return normalized.map((group) =>
-    createComparisonGroup({
-      a: [...(group?.intervention ?? [])],
-      b: [...(group?.control ?? [])],
-    })
-  );
-};
 
 type SuggestionField = {
   groupId: string;
   side: ComparisonSideKey;
 };
 
-type StudyDurationUnit = DurationUnit | "Uncertain";
-
 interface AddStudyDialogProps {
+  currentBatchHash?: string;
+  //currentReportIndex?: number;
   currentReportId?: number;
-  suggestedValues?: NewStudySuggestion;
-  onSaveStudy: (values: StudyCreateDto) => Promise<void>;
+  highlight?: boolean;
+  onStudySaved?: () => void;
 }
 
-const buildComparisonPayload = (groups: ComparisonGroup[]) =>
-  groups
-    .map((group) => ({
-      intervention: group.a.map((value) => value.trim()).filter(Boolean),
-      control: group.b.map((value) => value.trim()).filter(Boolean),
-    }))
-    .filter((group) => group.intervention.length > 0 && group.control.length > 0);
 export function AddStudyDialog({
+  currentBatchHash,
+  //currentReportIndex,
   currentReportId,
-  suggestedValues,
-  onSaveStudy,
+  highlight = false,
+  onStudySaved,
 }: AddStudyDialogProps) {
+  const [durationValue, setDurationValue] = useState("");
+  const [durationUnit, setDurationUnit] = useState("");
+  const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
+  const [countryOpen, setCountryOpen] = useState(false);
   const [shortName, setShortName] = useState("");
   const [statusOfStudy, setStatusOfStudy] = useState("");
-  const [durationValue, setDurationValue] = useState("");
-  const [durationUnit, setDurationUnit] = useState<StudyDurationUnit | undefined>(
-    undefined
-  );
-  const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [numberOfParticipants, setNumberOfParticipants] = useState("");
-
-  const [countryOpen, setCountryOpen] = useState(false);
-
-  const highlight = Boolean(suggestedValues);
-
   const [comparisonGroups, setComparisonGroups] = useState<ComparisonGroup[]>(
     buildEmptyComparisonGroups()
   );
-
+  const [comparisonDrafts, setComparisonDrafts] = useState<
+    Record<string, Record<ComparisonSideKey, string>>
+  >({});
   const [activeSuggestionField, setActiveSuggestionField] = useState<
     SuggestionField | null
   >(null);
@@ -120,179 +96,104 @@ export function AddStudyDialog({
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
-
-  const [addStudyDialogOpen, setAddStudyDialogOpen] = useState(false);
-  const [creatingStudy, setCreatingStudy] = useState(false);
-
+  const {
+    addStudyDialogOpen,
+    setAddStudyDialogOpen,
+    newStudyForm,
+    setNewStudyForm,
+    resetNewStudyForm,
+    submitNewStudy,
+    creatingStudy,
+  } = useBatchReportsStore();
   const resetLocalFormState = useCallback(() => {
-    if (suggestedValues) {
-      console.log(suggestedValues);
-      setShortName(suggestedValues.short_name ?? "");
-      setStatusOfStudy(suggestedValues.status_of_study ?? "");
-      setSelectedCountries(suggestedValues.countries);
-      setDurationValue(
-        suggestedValues.duration_value
-          ? String(suggestedValues.duration_value)
-          : ""
-      );
-      setDurationUnit(suggestedValues.duration_unit);
-      setNumberOfParticipants(
-        suggestedValues.number_of_participants
-          ? String(suggestedValues.number_of_participants)
-          : ""
-      );
-      setComparisonGroups(
-        buildComparisonGroupsFromSuggestion(suggestedValues.comparison)
-      );
-    } else {
-      setShortName("");
-      setStatusOfStudy("");
-      setSelectedCountries([]);
-      setDurationValue("");
-      setDurationUnit(undefined);
-      setNumberOfParticipants("");
-      setComparisonGroups(buildEmptyComparisonGroups());
-    }
+    setShortName("");
+    setStatusOfStudy("");
+    setSelectedCountries([]);
+    setDurationValue("");
+    setDurationUnit("");
+    setNumberOfParticipants("");
+    setComparisonGroups(buildEmptyComparisonGroups());
+    setComparisonDrafts({});
     setActiveSuggestionField(null);
     setSuggestionQuery("");
     setSuggestions([]);
     setIsFetchingSuggestions(false);
     setSuggestionError(null);
-  }, [suggestedValues]);
-
+  }, []);
   useEffect(() => {
     if (!addStudyDialogOpen) {
       resetLocalFormState();
       return;
     }
+
+    setShortName(newStudyForm.short_name || "");
+    setStatusOfStudy(newStudyForm.status_of_study || "");
+    setSelectedCountries(
+      newStudyForm.countries && newStudyForm.countries.length > 0
+        ? [...newStudyForm.countries]
+        : []
+    );
+    const parts = (newStudyForm.duration || "").split(" ");
+    if (parts.length === 2 && !Number.isNaN(Number(parts[0]))) {
+      setDurationValue(parts[0]);
+      setDurationUnit(parts[1]);
+    } else if (newStudyForm.duration?.toLowerCase() === "uncertain") {
+      setDurationValue("");
+      setDurationUnit("uncertain");
+    } else {
+      setDurationValue("");
+      setDurationUnit("");
+    }
+    setNumberOfParticipants(newStudyForm.number_of_participants || "");
+    setComparisonGroups(
+      cloneComparisonGroups(newStudyForm.comparisonGroups)
+    );
   }, [
     addStudyDialogOpen,
+    newStudyForm,
     resetLocalFormState,
   ]);
-
-  useEffect(() => {
-    if (!addStudyDialogOpen) return;
-
-    if (!currentReportId) {
-      setSuggestionError("Select a report to load intervention suggestions.");
-      setSuggestions([]);
-      setIsFetchingSuggestions(false);
-      return;
-    }
-
-    const controller = new AbortController();
-
-    const loadInterventionTags = async () => {
-      setIsFetchingSuggestions(true);
-      setSuggestionError(null);
-
-      try {
-        const response = await fetch(
-          `/api/meerkat/reports/${currentReportId}/similar-studies/tags`,
-          { signal: controller.signal }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to load intervention tags.");
-        }
-
-        const data = await response.json();
-        const parsedSuggestions = Array.isArray(data)
-          ? data
-              .map((entry: { name?: string } | string | null) => {
-                if (typeof entry === "string") return entry;
-                if (entry && typeof entry === "object" && typeof entry.name === "string") {
-                  return entry.name;
-                }
-                return null;
-              })
-              .filter((entry): entry is string => Boolean(entry))
-          : [];
-
-        setSuggestions(Array.from(new Set(parsedSuggestions)));
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        setSuggestionError(
-          error instanceof Error
-            ? error.message
-            : "Failed to load intervention tags."
-        );
-        setSuggestions([]);
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsFetchingSuggestions(false);
-        }
-      }
-    };
-
-    loadInterventionTags();
-
-    return () => {
-      controller.abort();
-    };
-  }, [addStudyDialogOpen, currentReportId]);
 
   const handleAddStudySubmit = async (
     event: React.FormEvent<HTMLFormElement>
   ) => {
     event.preventDefault();
+    if (creatingStudy) return;
 
-    if (!currentReportId) {
-      toast.error("Select a report before adding a study.");
-      return;
-    }
-
-    const participantsValue = Number(numberOfParticipants);
-    if (Number.isNaN(participantsValue)) {
-      toast.error("Enter a valid number of participants.");
-      return;
-    }
-
-    const normalizedDuration =
-      durationUnit === "Uncertain"
-        ? "Uncertain"
-        : durationUnit && durationValue.trim()
-          ? `${durationValue.trim()} ${durationUnit}`
-          : "";
-
-    if (!normalizedDuration) {
-      toast.error("Provide a duration value and unit, or mark it as Uncertain.");
-      return;
-    }
-
-    const comparisonPayload = buildComparisonPayload(comparisonGroups);
-    if (comparisonPayload.length === 0) {
-      toast.error("Add at least one comparison with both sides populated.");
-      return;
-    }
-
-    const normalizedCountries =
-      selectedCountries.length > 0
-        ? selectedCountries.map((country) => country.trim()).filter(Boolean)
-        : ["Unclear"];
-
-    const payload: StudyCreateDto = {
-      shortName: shortName.trim(),
-      status: statusOfStudy.trim(),
-      countries: normalizedCountries,
-      duration: normalizedDuration,
-      numberParticipants: String(participantsValue),
-      comparison: JSON.stringify(comparisonPayload),
-      trialId: null, //TODO
-    };
-
-    setCreatingStudy(true);
     try {
-      await onSaveStudy(payload);
-      toast.success("New study created and linked to the report.");
-      setAddStudyDialogOpen(false);
+      const payloadCountries =
+        selectedCountries.length > 0 ? [...selectedCountries] : ["Unclear"];
+      setNewStudyForm({
+        short_name: shortName,
+        status_of_study: statusOfStudy,
+        countries: payloadCountries,
+        duration: computedDuration,
+        number_of_participants: numberOfParticipants,
+        comparisonGroups,
+      });
+
+      await submitNewStudy({
+        batchHash: currentBatchHash,
+        reportId: currentReportId,
+      });
+      toast.success("Study created successfully.");
+      onStudySaved?.();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to save study."
+        error instanceof Error ? error.message : "Failed to create study."
       );
-    } finally {
-      setCreatingStudy(false);
     }
+  };
+
+  const handleDurationChange = (value: string, unit: string) => {
+    if (unit === "uncertain") {
+      setDurationValue("");
+      setDurationUnit("uncertain");
+      return;
+    }
+
+    setDurationValue(value);
+    setDurationUnit(unit);
   };
 
   const toggleCountrySelection = (country: string) => {
@@ -300,6 +201,25 @@ export function AddStudyDialog({
       previous.includes(country)
         ? previous.filter((entry) => entry !== country)
         : [...previous, country]
+    );
+  };
+
+  const updateComparisonValue = (
+    groupId: string,
+    side: ComparisonSideKey,
+    index: number,
+    value: string
+  ) => {
+    setComparisonGroups((previous) =>
+      previous.map((group) => {
+        if (group.id !== groupId) return group;
+        const updatedSide = [...group[side]];
+        updatedSide[index] = value;
+        return {
+          ...group,
+          [side]: updatedSide,
+        };
+      })
     );
   };
 
@@ -333,6 +253,25 @@ export function AddStudyDialog({
     );
   };
 
+  const getComparisonDraft = (
+    groupId: string,
+    side: ComparisonSideKey
+  ) => comparisonDrafts[groupId]?.[side] ?? "";
+
+  const setComparisonDraft = (
+    groupId: string,
+    side: ComparisonSideKey,
+    value: string
+  ) => {
+    setComparisonDrafts((previous) => ({
+      ...previous,
+      [groupId]: {
+        ...previous[groupId],
+        [side]: value,
+      },
+    }));
+  };
+
   const appendComparisonValue = (
     groupId: string,
     side: ComparisonSideKey,
@@ -360,158 +299,87 @@ export function AddStudyDialog({
     activeSuggestionField?.groupId === groupId &&
     activeSuggestionField?.side === side;
 
+  const fetchComparisonSuggestions = async (
+    query: string,
+    groupId: string,
+    side: ComparisonSideKey
+  ) => {
+    const trimmedQuery = query.trim();
+    setActiveSuggestionField({ groupId, side });
+    setSuggestionQuery(trimmedQuery);
+    setSuggestionError(null);
+
+    if (!trimmedQuery) {
+      setSuggestions([]);
+      setIsFetchingSuggestions(false);
+      return;
+    }
+
+    setIsFetchingSuggestions(true);
+    try {
+      const response = await fetch(
+        "/api/meerkat/intervention-suggestions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ query: trimmedQuery, side }),
+        }
+      );
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(
+          message || "Unable to load intervention suggestions." 
+        );
+      }
+      const data = await response.json();
+      const fetched = Array.isArray(data?.suggestions) ? data.suggestions : [];
+      setSuggestions(fetched);
+    } catch (error) {
+      setSuggestions([]);
+      setSuggestionError(
+        error instanceof Error
+          ? error.message
+          : "Failed to load intervention suggestions."
+      );
+    } finally {
+      setIsFetchingSuggestions(false);
+    }
+  };
+
+  const handleComparisonDraftKeyDown = (
+    event: React.KeyboardEvent<HTMLInputElement>,
+    groupId: string,
+    side: ComparisonSideKey
+  ) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+
+    const draftValue = getComparisonDraft(groupId, side);
+    appendComparisonValue(groupId, side, draftValue);
+    setComparisonDraft(groupId, side, "");
+    void fetchComparisonSuggestions(draftValue, groupId, side);
+  };
+
   const renderComparisonSideInputs = (
     group: ComparisonGroup,
     placeholderLabel: string,
     side: ComparisonSideKey
-  ) => {
-    const trimmedQuery = suggestionQuery.trim();
-    const normalizedQuery = trimmedQuery.toLowerCase();
-    const filteredSuggestions = normalizedQuery
-      ? suggestions.filter((item) =>
-          item.toLowerCase().includes(normalizedQuery)
-        )
-      : suggestions;
-    const displayedSuggestions = filteredSuggestions.slice(
-      0,
-      SUGGESTION_DISPLAY_LIMIT
-    );
-    const suggestionsCapped =
-      filteredSuggestions.length > displayedSuggestions.length;
-    const canAddCustomValue =
-      Boolean(trimmedQuery) &&
-      !suggestions.some((item) => item.toLowerCase() === normalizedQuery);
-    const selectionSummary =
-      group[side].length > 0
-        ? `${group[side].length} ${placeholderLabel}${
-            group[side].length > 1 ? "s" : ""
-          } added`
-        : `Select ${placeholderLabel.toLowerCase()}`;
-
-    return (
-      <div className="space-y-2">
-        <Popover
-          open={isSuggestionFieldActive(group.id, side)}
-          onOpenChange={(open) => {
-            if (open) {
-              setActiveSuggestionField({ groupId: group.id, side });
-              setSuggestionQuery("");
-            } else if (isSuggestionFieldActive(group.id, side)) {
-              setActiveSuggestionField(null);
-              setSuggestionQuery("");
-            }
-          }}
-        >
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              role="combobox"
-              aria-expanded={isSuggestionFieldActive(group.id, side)}
-              aria-label={`Select ${placeholderLabel}`}
-              className="w-full justify-between"
-            >
-              <span className="truncate text-left text-muted-foreground">
-                {selectionSummary}
-              </span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            align="start"
-            className="w-[min(420px,calc(100vw-3rem))] max-w-screen-sm overflow-hidden p-0"
-            sideOffset={6}
-          >
-            <Command className="w-full min-w-[320px] text-xs">
-              <CommandList className="max-h-[280px] overflow-y-auto">
-                {isFetchingSuggestions ? (
-                  <CommandEmpty className="py-4 text-muted-foreground">
-                    Loading suggestions...
-                  </CommandEmpty>
-                ) : suggestionError ? (
-                  <CommandEmpty className="py-4 text-destructive">
-                    {suggestionError}
-                  </CommandEmpty>
-                ) : (
-                  <>
-                    {canAddCustomValue && (
-                      <CommandGroup heading="Custom value">
-                        <CommandItem
-                          key={`${group.id}-${side}-custom-${trimmedQuery}`}
-                          value={trimmedQuery}
-                          onSelect={() => {
-                            appendComparisonValue(group.id, side, trimmedQuery);
-                            setSuggestionQuery("");
-                          }}
-                        >
-                          Add "{trimmedQuery}"
-                        </CommandItem>
-                      </CommandGroup>
-                    )}
-                    {filteredSuggestions.length > 0 ? (
-                      <CommandGroup heading="Suggestions">
-                        {displayedSuggestions.map((item) => {
-                          const normalizedItem = item.toLowerCase();
-                          const matchIndex = group[side].findIndex(
-                            (entry) => entry.toLowerCase() === normalizedItem
-                          );
-                          const isSelected = matchIndex !== -1;
-
-                          return (
-                            <CommandItem
-                              key={`${group.id}-${side}-suggestion-${item}`}
-                              value={item}
-                              aria-pressed={isSelected}
-                              onSelect={() => {
-                                if (isSelected) {
-                                  removeInterventionField(group.id, side, matchIndex);
-                                  return;
-                                }
-
-                                appendComparisonValue(group.id, side, item);
-                                if (isSuggestionFieldActive(group.id, side)) {
-                                  setSuggestionQuery("");
-                                }
-                              }}
-                              className="flex items-center gap-2"
-                            >
-                              <span className="flex-1 truncate text-left">{item}</span>
-                              <Check
-                                className={`h-4 w-4 text-primary transition-opacity ${
-                                  isSelected ? "opacity-100" : "opacity-0"
-                                }`}
-                              />
-                            </CommandItem>
-                          );
-                        })}
-                        {suggestionsCapped && (
-                          <CommandItem disabled className="text-muted-foreground">
-                            Refine search to see more results
-                          </CommandItem>
-                        )}
-                      </CommandGroup>
-                    ) : (
-                      <CommandEmpty className="py-4 text-muted-foreground">
-                        {suggestions.length === 0
-                          ? "No intervention suggestions available."
-                          : suggestionQuery
-                            ? `No suggestions for "${suggestionQuery}".`
-                            : "No intervention suggestions available."}
-                      </CommandEmpty>
-                    )}
-                  </>
-                )}
-              </CommandList>
-              <div className="border-t border-border/40 bg-muted/40 p-2">
-                <CommandInput
-                  value={suggestionQuery}
-                  onValueChange={(value) => setSuggestionQuery(value)}
-                  placeholder={`Search ${placeholderLabel.toLowerCase()}...`}
-                  className="h-8"
-                />
-              </div>
-            </Command>
-          </PopoverContent>
-        </Popover>
+  ) => (
+    <div className="space-y-2">
+        <div className="text-sm font-semibold leading-tight">{placeholderLabel}</div>
+        <Input
+          placeholder={`Search ${placeholderLabel.toLowerCase()}...`}
+          value={getComparisonDraft(group.id, side)}
+          onChange={(event) =>
+            setComparisonDraft(group.id, side, event.target.value)
+          }
+          onKeyDown={(event) =>
+            handleComparisonDraftKeyDown(event, group.id, side)
+          }
+          spellCheck={false}
+        />
         <div className="space-y-2 mt-1">
           {group[side].map((value, index) => (
             <div
@@ -532,11 +400,10 @@ export function AddStudyDialog({
           ))}
         </div>
       </div>
-    );
-  };
+  );
 
   const computedDuration =
-    durationUnit === "Uncertain"
+    durationUnit === "uncertain"
       ? "Uncertain"
       : durationValue && durationUnit
         ? `${durationValue} ${durationUnit}`
@@ -660,29 +527,30 @@ export function AddStudyDialog({
                 type="number"
                 min="0"
                 value={durationValue}
-                onChange={(event) => setDurationValue(event.target.value)}
-                disabled={durationUnit === "Uncertain"}
-                required={durationUnit !== "Uncertain"}
+                onChange={(event) =>
+                  handleDurationChange(event.target.value, durationUnit)
+                }
+                disabled={durationUnit === "uncertain"}
+                required={durationUnit !== "uncertain"}
               />
             </div>
             <div className="space-y-2">
               <Label>Unit</Label>
               <Select
-                value={durationUnit ?? undefined}
+                value={durationUnit}
                 onValueChange={(value) =>
-                  setDurationUnit(value as StudyDurationUnit | undefined)
+                  handleDurationChange(durationValue, value)
                 }
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Unit" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="hours">hours</SelectItem>
                   <SelectItem value="days">days</SelectItem>
                   <SelectItem value="weeks">weeks</SelectItem>
                   <SelectItem value="months">months</SelectItem>
                   <SelectItem value="years">years</SelectItem>
-                  <SelectItem value="Uncertain">Uncertain</SelectItem>
+                  <SelectItem value="uncertain">Uncertain</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -729,7 +597,7 @@ export function AddStudyDialog({
                     }}
                   >
                     {renderComparisonSideInputs(group, "Intervention", "a")}
-                    <div className="text-xs font-semibold text-muted-foreground flex items-center justify-center mt-2">
+                    <div className="text-xs font-semibold text-muted-foreground flex items-center justify-center self-center mt-8">
                       vs.
                     </div>
                     {renderComparisonSideInputs(group, "Control", "b")}
@@ -746,6 +614,7 @@ export function AddStudyDialog({
                       </Button>
                     )}
                   </div>
+                  <p className="text-xs text-muted-foreground">Press enter to add interventions and controls.</p>
                 </div>
               ))}
             </div>
@@ -755,8 +624,8 @@ export function AddStudyDialog({
               type="button"
               variant="ghost"
               onClick={() => {
-                //resetLocalFormState();
-                //resetNewStudyForm();
+                resetLocalFormState();
+                resetNewStudyForm();
                 setAddStudyDialogOpen(false);
               }}
               disabled={creatingStudy}

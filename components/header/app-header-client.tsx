@@ -27,7 +27,7 @@ export function AppHeaderClient({ user }: AppHeaderClientProps) {
       <div className="flex h-full w-full items-center justify-between px-4">
         {/* Left side - Logo */}
         <div className="flex items-center">
-          <Link href="/" className="flex items-center">
+          <Link href="/" className="flex items-center cursor-pointer">
             <Image
               src="/images/logo.svg"
               alt="Medidex"

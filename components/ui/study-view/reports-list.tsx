@@ -122,7 +122,7 @@ export function ReportsList({
       if (!batchHash) {
         return;
       }
-      router.push(`/batches/${batchHash}/${reportId}?k=5`);
+      router.push(`/batches/${batchHash}/${reportId}?k=10`);
     },
     [batchHash, router]
   );
@@ -170,6 +170,16 @@ export function ReportsList({
       openWithStudyId(studyId);
     },
     []
+  );
+
+  const handleCardKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>, reportId: number) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        navigateToReport(reportId);
+      }
+    },
+    [navigateToReport]
   );
 
   const handleOpenRemoveDialog = useCallback((event: React.MouseEvent, report: ReportDto, study: StudyDto) => {
@@ -317,7 +327,7 @@ export function ReportsList({
       </div>
 
       <ScrollArea className="flex-1 h-0" viewportClassName="px-4 overflow-visible">
-        <div className="space-y-3 pt-3 pb-4">
+        <div className="space-y-3 pb-4">
           {filteredReports.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -344,7 +354,12 @@ export function ReportsList({
                 <div
                   ref={isSelected ? selectedCardRef : undefined}
                   key={report.report.reportId || idx}
-                  className={`relative rounded-lg border bg-card hover:border-primary/20 transition-all first:mt-3 scroll-mt-4 ${
+                  role="button"
+                  tabIndex={0}
+                  aria-selected={isSelected}
+                  onClick={() => navigateToReport(report.report.reportId)}
+                  onKeyDown={(event) => handleCardKeyDown(event, report.report.reportId)}
+                  className={`relative rounded-lg border bg-card hover:border-primary/20 transition-all first:mt-3 scroll-mt-4 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60 ${
                     isSelected
                       ? "border-primary bg-primary/5 outline outline-2 outline-primary/40"
                       : ""}`}
@@ -352,7 +367,7 @@ export function ReportsList({
                   {/* Report Content */}
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="flex-1 min-w-0" onClick={() => navigateToReport(report.report.reportId)}>
+                      <div className="flex-1 min-w-0">
                         <h3 className="text-sm font-semibold leading-snug mb-2.5 text-foreground">
                           {isRunningEvaluation ? (
                             <Spinner className="mr-1 inline h-3 w-3 text-primary" />
