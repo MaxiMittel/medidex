@@ -47,7 +47,7 @@ def run_evaluation(
     model: str | None,
     include_pdf: bool,
 ) -> EvaluateResponse:
-    logger.info("run_evaluation: reports=%s studies=%s", report.CRGReportID, len(studies))
+    logger.info("run_evaluation: reports=%s studies=%s", report.reportId, len(studies))
     initial_state = build_initial_state(
         report,
         studies,

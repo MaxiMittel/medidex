@@ -5,7 +5,6 @@ from typing import Any, Literal, TypedDict
 from pydantic import BaseModel, field_validator
 
 from .constants import (
-    CENTRAL_SUBMISSION_STATUS_OPTIONS,
     COUNTRY_OPTIONS,
     DURATION_UNCERTAIN_VALUE,
     DURATION_UNITS,
@@ -16,67 +15,24 @@ ModelName = Literal["gpt-5.2", "gpt-5", "gpt-5-mini", "gpt-4.1"]
 
 
 class ReportDto(BaseModel):
-    CENTRALReportID: int | None
-    CRGReportID: int
-    Title: str
-    Notes: str | None
-    ReportNumber: int
-    OriginalTitle: str | None
-    Authors: str | None
-    Journal: str | None
-    Year: int | None
-    Volume: str | None
-    Issue: str | None
-    Pages: str | None
-    Language: str | None
-    Abstract: str | None
-    CENTRALSubmissionStatus: str | None
-    CopyStatus: str | None
-    DatetoCENTRAL: str | None
-    Dateentered: str | None
-    DateEdited: str | None
-    Editors: str | None
-    Publisher: str | None
-    City: str | None
-    DupString: str
-    TypeofReportID: int | None
-    PublicationTypeID: int
-    Edition: str | None
-    Medium: str | None
-    StudyDesign: str | None
-    DOI: str | None
-    UDef3: str | None
-    ISBN: str | None
-    UDef5: str | None
-    PMID: str | None
-    TrialRegistrationID: str | None
-    UDef9: str | None
-    UDef10: str | None
-    UDef8: str | None
-    PDFLinks: str | None
-
+    reportId: int
+    year: int 
+    title: str
+    abstract: str | None
+    trialId: str | None
+    authors: list[str]
 
 class StudyDto(BaseModel):
-    StatusofStudy: str | None
-    NumberParticipants: str | None
-    TrialistContactDetails: str | None
-    Countries: str | None
-    CENTRALSubmissionStatus: str | None
-    Duration: str | None
-    Notes: str | None
-    UDef4: str | None
-    CRGStudyID: int
-    DateEntered: str | None
-    Comparison: str | None
-    CENTRALStudyID: int
-    DateToCENTRAL: str | None
-    ISRCTN: str | None
-    ShortName: str
-    DateEdited: str | None
-    UDef6: str | None
-    Search_Tagged: bool
-    TrialRegistrationID: str | None
-
+    studyId: int
+    shortName: str
+    countries: list[str]
+    numberParticipants: str | None
+    duration: str | None
+    comparison: str | None
+    trialId: str | None
+    status: str
+    createdAt: str
+    updatedAt: str
 
 class PromptOverrides(BaseModel):
     background_prompt: str | None = None
@@ -114,73 +70,64 @@ class UnsureReviewOutput(BaseModel):
     decision: Literal["match", "unsure", "not_match"]
     reason: str
 
+class Comparison(BaseModel):
+    intervention: list[str]
+    control: list[str]
 
 class NewStudySuggestion(BaseModel):
     short_name: str
-    status_of_study: str
-    countries: str
-    central_submission_status: str
-    duration: str
-    number_of_participants: str
-    comparison: str
+    status_of_study: Literal["Closed", "Stopped early", "Open/Ongoing", "Planned"]
+    countries: list[str]
+    duration_value: int
+    duration_unit: Literal["hours", "days", "weeks", "months", "years"]
+    number_of_participants: int
+    comparison: list[Comparison]
 
-    @field_validator("countries")
-    @classmethod
-    def validate_countries(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            return ""
-        if value not in set(COUNTRY_OPTIONS):
-            raise ValueError("Invalid country value.")
-        return value
+    #@field_validator("countries")
+    #@classmethod
+    #def validate_countries(cls, value: list[str]) -> list[str]:
+    #    value = value.strip()
+    #    if not value:
+    #        return ""
+    #    if value not in set(COUNTRY_OPTIONS):
+    #        raise ValueError("Invalid country value.")
+    #    return value
 
-    @field_validator("duration")
-    @classmethod
-    def validate_duration(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            return ""
-        if value == DURATION_UNCERTAIN_VALUE:
-            return value
-        parts = value.split(" ")
-        if len(parts) != 2:
-            raise ValueError("Invalid duration format.")
-        number, unit = parts
-        if not number.isdigit():
-            raise ValueError("Invalid duration number.")
-        if unit not in set(DURATION_UNITS):
-            raise ValueError("Invalid duration unit.")
-        return value
+    #@field_validator("duration")
+    #@classmethod
+    #def validate_duration(cls, value: str) -> str:
+    #    value = value.strip()
+    #    if not value:
+    #        return ""
+    #    if value == DURATION_UNCERTAIN_VALUE:
+    #        return value
+    #    parts = value.split(" ")
+    #    if len(parts) != 2:
+    #        raise ValueError("Invalid duration format.")
+     #   number, unit = parts
+     #   if not number.isdigit():
+    #      raise ValueError("Invalid duration number.")
+    #    if unit not in set(DURATION_UNITS):
+    #        raise ValueError("Invalid duration unit.")
+    #    return value
 
-    @field_validator("number_of_participants")
-    @classmethod
-    def validate_participants(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            return ""
-        if not value.isdigit():
-            raise ValueError("Invalid number_of_participants.")
-        return value
+    #@field_validator("number_of_participants")
+    #@classmethod
+    #def validate_participants(cls, value: str) -> str:
+    #    value = value.strip()
+    #    if not value:
+    #        return ""
+    #    if not value.isdigit():
+    #        raise ValueError("Invalid number_of_participants.")
+    #    return value
 
-    @field_validator("status_of_study")
-    @classmethod
-    def validate_status(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            return ""
-        if value not in set(STATUS_OF_STUDY_OPTIONS):
-            raise ValueError("Invalid status_of_study.")
-        return value
-
-    @field_validator("central_submission_status")
-    @classmethod
-    def validate_central_submission_status(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            return ""
-        if value not in set(CENTRAL_SUBMISSION_STATUS_OPTIONS):
-            raise ValueError("Invalid central_submission_status.")
-        return value
+    #@field_validator("status_of_study")
+    #@classmethod
+    #def validate_status(cls, value: str) -> str:
+    #    value = value.strip()
+    #    if value not in set(STATUS_OF_STUDY_OPTIONS):
+    #        raise ValueError("Invalid status_of_study.")
+    #    return value
 
 
 class SummaryOutput(BaseModel):

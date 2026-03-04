@@ -1,5 +1,6 @@
 "use client";
 
+import { StudyDto } from "@/types/apiDTOs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -8,31 +9,12 @@ import {
   Users, 
   Clock, 
   CheckCircle2,
-  AlertCircle,
-  Mail,
   Calendar,
   Hash,
 } from "lucide-react";
 
-interface StudyOverviewProps {
-  study: {
-    ShortName: string;
-    StatusofStudy: string;
-    CENTRALSubmissionStatus: string;
-    TrialistContactDetails: string;
-    NumberParticipants: string;
-    Countries: string;
-    Duration: string;
-    Comparison: string;
-    ISRCTN: string;
-    Notes: string;
-    UDef4: string;
-    DateEntered?: string;
-    DateEdited?: string;
-    TrialRegistrationID?: string;
-    CENTRALStudyID?: number;
-    CRGStudyID?: number;
-  };
+interface StudyOverviewProps{
+  study : StudyDto
 }
 
 const metricConfig = {
@@ -60,25 +42,16 @@ const metricConfig = {
 };
 
 export function StudyOverview({ study }: StudyOverviewProps) {
-  const countries = study.Countries.split("//").filter(Boolean);
+  const countries = study.countries.filter(Boolean);
   
   const statusVariant = {
-    "Completed": "default" as const,
-    "Active": "default" as const,
-    "Ongoing": "default" as const,
-    "Recruiting": "secondary" as const,
-    "Terminated": "destructive" as const,
-    "Pending": "secondary" as const,
-  }[study.StatusofStudy] || "secondary" as const;
+    "Closed": "default" as const,
+    "Stopped early": "destructive" as const,
+    "Open/Ongoing": "default" as const,
+    "Planned": "secondary" as const,
+  }[study.status] || "secondary" as const;
 
-  const submissionVariant = {
-    "Approved": "default" as const,
-    "In Progress": "secondary" as const,
-    "Pending": "secondary" as const,
-    "Rejected": "destructive" as const,
-  }[study.CENTRALSubmissionStatus] || "secondary" as const;
-
-  const hasTrialIds = study.ISRCTN || study.TrialRegistrationID;
+  const hasTrialIds = study.trialId !== null;
 
   return (
     <Card className="border-none shadow-none py-0">
@@ -91,10 +64,7 @@ export function StudyOverview({ study }: StudyOverviewProps) {
             Study Overview
           </CardTitle>
           <div className="flex gap-2 flex-wrap justify-end">
-            <Badge variant={statusVariant}>{study.StatusofStudy}</Badge>
-            <Badge variant={submissionVariant}>
-              {study.CENTRALSubmissionStatus}
-            </Badge>
+            <Badge variant={statusVariant}>{study.status}</Badge>
           </div>
         </div>
       </CardHeader>
@@ -106,7 +76,7 @@ export function StudyOverview({ study }: StudyOverviewProps) {
               <Users className={`h-4 w-4 ${metricConfig.participants.accentClass}`} />
               <span className="text-xs text-muted-foreground font-medium">Participants</span>
             </div>
-            <p className="text-lg font-semibold">{study.NumberParticipants || "-"}</p>
+            <p className="text-lg font-semibold">{study.numberParticipants || "-"}</p>
           </div>
           
           <div className={`flex flex-col gap-1.5 p-3.5 rounded-md border-l-2 ${metricConfig.duration.borderClass} ${metricConfig.duration.bgClass}`}>
@@ -114,7 +84,7 @@ export function StudyOverview({ study }: StudyOverviewProps) {
               <Clock className={`h-4 w-4 ${metricConfig.duration.accentClass}`} />
               <span className="text-xs text-muted-foreground font-medium">Duration</span>
             </div>
-            <p className="text-lg font-semibold">{study.Duration || "-"}</p>
+            <p className="text-lg font-semibold">{study.duration || "-"}</p>
           </div>
           
           <div className={`flex flex-col gap-1.5 p-3.5 rounded-md border-l-2 ${metricConfig.countries.borderClass} ${metricConfig.countries.bgClass}`}>
@@ -146,7 +116,7 @@ export function StudyOverview({ study }: StudyOverviewProps) {
         )}
 
         {/* Comparison */}
-        {study.Comparison && (
+        {study.comparison && (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div className="p-1 rounded bg-violet-50 dark:bg-violet-950/30">
@@ -154,12 +124,12 @@ export function StudyOverview({ study }: StudyOverviewProps) {
               </div>
               <span className="text-sm font-medium">Comparison</span>
             </div>
-            <p className="text-sm text-muted-foreground pl-6 leading-relaxed">{study.Comparison}</p>
+            <p className="text-sm text-muted-foreground pl-6 leading-relaxed">{study.comparison}</p>
           </div>
         )}
 
         {/* Trial IDs */}
-        {hasTrialIds && (
+        {study.trialId !== null && (
           <div className="space-y-2.5">
             <div className="flex items-center gap-2">
               <div className="p-1 rounded bg-cyan-50 dark:bg-cyan-950/30">
@@ -168,37 +138,15 @@ export function StudyOverview({ study }: StudyOverviewProps) {
               <span className="text-sm font-medium">Trial Identifiers</span>
             </div>
             <div className="grid grid-cols-2 gap-2.5 pl-6">
-              {study.ISRCTN && (
-                <div className="p-2.5 rounded-md bg-muted/50 border border-border/50">
-                  <p className="text-xs text-muted-foreground mb-1">ISRCTN Number</p>
-                  <code className="text-xs font-mono">{study.ISRCTN}</code>
-                </div>
-              )}
-              {study.TrialRegistrationID && (
-                <div className="p-2.5 rounded-md bg-muted/50 border border-border/50">
-                  <p className="text-xs text-muted-foreground mb-1">Trial Registration ID</p>
-                  <code className="text-xs font-mono">{study.TrialRegistrationID}</code>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Contact */}
-        {study.TrialistContactDetails && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="p-1 rounded bg-rose-50 dark:bg-rose-950/30">
-                <Mail className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
+              <div className="p-2.5 rounded-md bg-muted/50 border border-border/50">
+                <code className="text-xs font-mono">{study.trialId}</code>
               </div>
-              <span className="text-sm font-medium">Trialist Contact</span>
             </div>
-            <p className="text-sm text-muted-foreground pl-6">{study.TrialistContactDetails}</p>
           </div>
         )}
 
         {/* Dates */}
-        {(study.DateEntered || study.DateEdited) && (
+        {(study.createdAt || study.updatedAt) && (
           <div className="space-y-2.5">
             <div className="flex items-center gap-2">
               <div className="p-1 rounded bg-slate-100 dark:bg-slate-800/50">
@@ -207,30 +155,19 @@ export function StudyOverview({ study }: StudyOverviewProps) {
               <span className="text-sm font-medium">Timeline</span>
             </div>
             <div className="grid grid-cols-2 gap-2.5 pl-6">
-              {study.DateEntered && (
+              {study.createdAt && (
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-muted-foreground">Entered:</span>
-                  <span className="font-medium">{new Date(study.DateEntered).toLocaleDateString()}</span>
+                  <span className="font-medium">{new Date(study.createdAt).toLocaleDateString()}</span>
                 </div>
               )}
-              {study.DateEdited && (
+              {study.updatedAt && (
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-muted-foreground">Edited:</span>
-                  <span className="font-medium">{new Date(study.DateEdited).toLocaleDateString()}</span>
+                  <span className="font-medium">{new Date(study.updatedAt).toLocaleDateString()}</span>
                 </div>
               )}
             </div>
-          </div>
-        )}
-
-        {/* Notes */}
-        {study.Notes && (
-          <div className="p-3.5 rounded-md border border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              <span className="text-sm font-medium">Notes</span>
-            </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">{study.Notes}</p>
           </div>
         )}
       </CardContent>

@@ -17,7 +17,9 @@ export async function PATCH(
     headers: await headers(),
   });
 
-  if (!session?.roles.includes(Role.ADMIN)) {
+  const isAdmin = session?.user?.roles?.includes(Role.ADMIN);
+
+  if (!isAdmin) {
     return NextResponse.json(
       { error: "Unauthorized" },
       { status: 403 }

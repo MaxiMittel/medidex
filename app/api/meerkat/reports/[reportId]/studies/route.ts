@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStudiesForReport, getReportsByStudyId } from "@/lib/api/studiesApi";
+import { getStudiesForReport } from "@/lib/api/studiesApi";
+import { assignNewStudyToReportByReportId } from "@/lib/api/reportApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
-import type { StudyReportSummary } from "@/types/reports";
-import type { StudyDto } from "@/types/apiDTOs";
-
-export interface AssignedStudyWithReports extends StudyDto {
-  reports: StudyReportSummary[];
-}
+import { StudyDto } from "@/types/apiDTOs";
 
 export async function GET(
   request: NextRequest,
@@ -32,34 +28,7 @@ export async function GET(
       date_to: date_to || undefined,
     }, { headers });
 
-    // Enrich each study with its associated reports
-    const enriched: AssignedStudyWithReports[] = await Promise.all(
-      studies.map(async (study) => {
-        let relatedReports: StudyReportSummary[] = [];
-        try {
-          const reports = await getReportsByStudyId(study.CRGStudyID, undefined, {
-            headers,
-          });
-          relatedReports = reports.map((report) => ({
-            CENTRALReportID: report.CENTRALReportID ?? null,
-            CRGReportID: report.CRGReportID,
-            Title: report.Title,
-          }));
-        } catch (error) {
-          console.error(
-            `Failed fetching reports for study ${study.CRGStudyID}`,
-            error
-          );
-        }
-
-        return {
-          ...study,
-          reports: relatedReports,
-        };
-      })
-    );
-
-    return NextResponse.json(enriched);
+    return NextResponse.json(studies);
   } catch (error) {
     console.error(
       `Unexpected error while fetching studies for report ${reportId}:`,
@@ -67,6 +36,61 @@ export async function GET(
     );
     return NextResponse.json(
       { error: "Unexpected error while fetching studies for report." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ reportId: string }> }
+) {
+  const { reportId } = await params;
+
+  if (!reportId) {
+    return NextResponse.json(
+      { error: "Missing report id." },
+      { status: 400 }
+    );
+  }
+
+  let studyPayload: StudyDto | undefined;
+  try {
+    studyPayload = await request.json();
+  } catch (error) {
+    console.error("Invalid study payload.", error);
+    return NextResponse.json(
+      { error: "Invalid study payload." },
+      { status: 400 }
+    );
+  }
+
+  if (!studyPayload) {
+    return NextResponse.json(
+      { error: "Missing study payload." },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const headers = await getMeerkatHeaders();
+    const createdStudy = await assignNewStudyToReportByReportId(
+      Number(reportId),
+      studyPayload,
+      { headers }
+    );
+
+    return NextResponse.json(
+      createdStudy ?? { success: true },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error(
+      `Unexpected error while creating a study for report ${reportId}:`,
+      error
+    );
+    return NextResponse.json(
+      { error: "Unexpected error while assigning study to report." },
       { status: 500 }
     );
   }

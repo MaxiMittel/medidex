@@ -12,50 +12,26 @@ export interface BatchDto {
   assigned: number;
 }
 
-export interface VectorDto {
-  model_id: string;
-  embedding: number[];
-  author_embedding: number[];
-  participants: number[];
-  intervention: number[];
-  condition: number[];
-  outcome: number[];
-}
-
 export interface ReportDetailDto {
-  title: string;
-  abstract: string | null;
-  crgreportid: number;
-  authors: string[];
-  trial_id: string | null;
-  vectors: VectorDto;
-  assigned_studies: number[];
-  year: number | null;
+  report: ReportDto;
+  assignedStudies: StudyDto[];
 }
 
 export interface SimilarTagDto {
   id: string;
-  keywords: string;
-  distance: number;
+  name: string;
+  score: number;
 }
 
 export interface GetSimilarTagsParams {
-  sources: string[];  
-  aspect?: string;      
-  k?: number;           
+  sources?: string[];
+  aspect?: string;
+  k?: number;
 }
 
-export interface SimilarStudiesResponseDto {
-  CRGStudyID: number[];
-  Relevance: number[];
-  ShortName: string[];
-  NumberParticipants: string[];
-  Duration: (string | null)[];
-  Comparison: (string | null)[];
-  Countries: string[];
-  DateEntered: string[];
-  DateEdited: string[];
-  StatusofStudy: string[];
+export interface SimilarStudyResponseDto {
+  relevance: number;
+  study: StudyDto;
 }
 
 export interface GetSimilarStudiesParams {
@@ -66,66 +42,29 @@ export interface GetSimilarStudiesParams {
 }
 
 export interface StudyDto {
-  StatusofStudy: string | null;
-  NumberParticipants: string | null;
-  TrialistContactDetails: string | null;
-  Countries: string | null;
-  CENTRALSubmissionStatus: string | null;
-  Duration: string | null;
-  Notes: string | null;
-  UDef4: string | null;
-  CRGStudyID: number;
-  DateEntered: string | null;
-  Comparison: string | null;
-  CENTRALStudyID: number;
-  DateToCENTRAL: string | null;
-  ISRCTN: string | null;
-  ShortName: string;
-  DateEdited: string | null;
-  UDef6: string | null;
-  Search_Tagged: boolean;
-  TrialRegistrationID: string | null;
+  studyId: number;
+  status: string;
+  shortName: string;
+  countries: string[];
+  numberParticipants: string | null;
+  duration: string | null;
+  comparison: string | null
+  trialId: string | null;
+  createdAt: string | undefined;
+  updatedAt: string | undefined;
 }
 
+export type StudyCreateDto = Omit<StudyDto, "studyId" | "createdAt" | "updatedAt">;
+
 export interface ReportDto {
-  CENTRALReportID: number | null;
-  CRGReportID: number;
-  Title: string;
-  Notes: string | null;
-  ReportNumber: number;
-  OriginalTitle: string | null;
-  Authors: string | null;
-  Journal: string | null;
-  Year: number | null;
-  Volume: string | null;
-  Issue: string | null;
-  Pages: string | null;
-  Language: string | null;
-  Abstract: string | null;
-  CENTRALSubmissionStatus: string | null;
-  CopyStatus: string | null;
-  DatetoCENTRAL: string | null;
-  Dateentered: string | null;
-  DateEdited: string | null;
-  Editors: string | null;
-  Publisher: string | null;
-  City: string | null;
-  DupString: string;
-  TypeofReportID: number | null;
-  PublicationTypeID: number;
-  Edition: string | null;
-  Medium: string | null;
-  StudyDesign: string | null;
-  DOI: string | null;
-  UDef3: string | null;
-  ISBN: string | null;
-  UDef5: string | null;
-  PMID: string | null;
-  TrialRegistrationID: string | null;
-  UDef9: string | null;
-  UDef10: string | null;
-  UDef8: string | null;
-  PDFLinks: string | null; 
+  reportId: number;
+  year: number;
+  title: string;
+  authors: string[];
+  abstract: string | null;
+  trialId: string | null;
+  createdAt: string | undefined;
+  updatedAt: string | undefined;
 }
 
 export interface InterventionDto {
@@ -199,14 +138,23 @@ export interface EvaluateResponse {
   evaluation_new_study?: NewStudySuggestion | null;
 }
 
+export type StudyStatus = "Closed" | "Stopped early" | "Open/Ongoing" | "Planned";
+
+export type DurationUnit = "hours" | "days" | "weeks" | "months" | "years";
+
+export interface ComparisonGroup {
+  intervention: string[];
+  control: string[];
+}
+
 export interface NewStudySuggestion {
   short_name: string;
-  status_of_study: string;
-  countries: string;
-  central_submission_status: string;
-  duration: string;
-  number_of_participants: string;
-  comparison: string;
+  status_of_study: StudyStatus;
+  countries: string[];
+  duration_value: number;
+  duration_unit: DurationUnit;
+  number_of_participants: number;
+  comparison: ComparisonGroup[];
 }
 
 export type StreamEventNode =

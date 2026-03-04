@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
 
 interface UploadFile {
   id: string;
@@ -26,7 +25,6 @@ export function UploadSection(props: UploadSectionProps) {
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { fetchBatches } = useBatchReportsStore();
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
@@ -93,6 +91,11 @@ export function UploadSection(props: UploadSectionProps) {
       const response = await fetch("/api/meerkat/batches/upload", {
         method: "POST",
         body: formData,
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
       });
 
       if (!response.ok) {
@@ -116,7 +119,7 @@ export function UploadSection(props: UploadSectionProps) {
       );
 
       // Refresh batches list
-      await fetchBatches();
+      //await fetchBatches();
 
       // Trigger callback to reload batch management
       if (onUploadSuccess) {

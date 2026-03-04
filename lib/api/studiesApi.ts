@@ -1,17 +1,7 @@
-import { StudyDto , ReportDto, InterventionDto, ConditionDto, OutcomeDto , GetPersonsResponseDto } from "../../types/apiDTOs";
+import { StudyDto, StudyCreateDto , ReportDto, InterventionDto, ConditionDto, OutcomeDto , GetPersonsResponseDto } from "../../types/apiDTOs";
 import { serializeParams } from "./helpers";
 import apiClient from "./apiClient";
 import { AxiosRequestConfig } from "axios";
-
-export interface CreateStudyPayload {
-  short_name: string;
-  status_of_study: string;
-  countries: string[];
-  central_submission_status: string;
-  duration: string;
-  number_of_participants: number;
-  comparison: string;
-}
 
 export const getStudies = (
   study_ids: number[],
@@ -38,19 +28,41 @@ export const getStudies = (
     });
 }
 
+export const getStudyById = (
+  studyId: number,
+  config?: AxiosRequestConfig
+): Promise<StudyDto> => {
+  const path = `/studies/${studyId}`;
+
+  const requestConfig = {
+    ...config,
+    paramsSerializer: {
+      serialize: serializeParams,
+    },
+  };
+  return apiClient.get<StudyDto>(path, requestConfig)
+    .then(response => {
+      return response.data;
+    })
+    .catch(error => {
+      console.error('Error fetching study:', error);
+      throw error;
+    });
+}
+
 //getStudybyID not really needed since getStudies can take multiple IDs or a single ID
 
 export const getReportsByStudyId = (
-  study_id: number,
-  include_pdf_links?: boolean,
+  studyId: number,
+  includePdfLinks?: boolean,
   config?: AxiosRequestConfig
 ): Promise<ReportDto[]> => {
-  const path = `/studies/${study_id}/reports`;
+  const path = `/studies/${studyId}/reports`;
 
   const requestConfig = {
     ...config,
     params: {
-      include_pdf_links: include_pdf_links,
+      include_pdf_links: includePdfLinks,
     },
     paramsSerializer: {
       serialize: serializeParams,
@@ -61,7 +73,7 @@ export const getReportsByStudyId = (
       return response.data;
     })
     .catch(error => {
-      console.error(`Error fetching reports for study ${study_id}:`, error);
+      console.error(`Error fetching reports for study ${studyId}:`, error);
       throw error;
     });
 }
@@ -72,114 +84,114 @@ export const getReportsByStudyId = (
 
 
 export const getInterventionsForStudy = (
-  study_id: number,
+  studyId: number,
   config?: AxiosRequestConfig
 ): Promise<InterventionDto[]> => {
-  const path = `/studies/${study_id}/interventions`;
+  const path = `/studies/${studyId}/interventions`;
   return apiClient.get<InterventionDto[]>(path, config)
     .then(response => {
       return response.data;
     })
     .catch(error => {
-      console.error(`Error fetching interventions for study ${study_id}:`, error);
+      console.error(`Error fetching interventions for study ${studyId}:`, error);
       throw error;
     });
 }
 
 export const getConditionsForStudy = (
-  study_id: number,
+  studyId: number,
   config?: AxiosRequestConfig
 ): Promise<ConditionDto[]> => {
-    const path = `/studies/${study_id}/conditions`;
+    const path = `/studies/${studyId}/conditions`;
     return apiClient.get<ConditionDto[]>(path, config)
       .then(response => {
         return response.data;
       })
       .catch(error => {
-        console.error(`Error fetching conditions for study ${study_id}:`, error);
+        console.error(`Error fetching conditions for study ${studyId}:`, error);
         throw error;
       });
 }
 
 export const getOutcomesForStudy = (
-  study_id: number,
+  studyId: number,
   config?: AxiosRequestConfig
 ): Promise<OutcomeDto[]> => {
-    const path = `/studies/${study_id}/outcomes`;
+    const path = `/studies/${studyId}/outcomes`;
     return apiClient.get<OutcomeDto[]>(path, config)
       .then(response => {
         return response.data;
       })
       .catch(error => {
-        console.error(`Error fetching outcomes for study ${study_id}:`, error);
+        console.error(`Error fetching outcomes for study ${studyId}:`, error);
         throw error;
       });
 }
 
 //get participants description for a study
-export const getParticipantsForStudy = (study_id: number): Promise<string[]> => {
-    const path = `/studies/${study_id}/participants`;
+export const getParticipantsForStudy = (studyId: number): Promise<string[]> => {
+    const path = `/studies/${studyId}/participants`;
     return apiClient.get<string[]>(path)
       .then(response => {
         return response.data;
       })
       .catch(error => {
-        console.error(`Error fetching participants description for study ${study_id}:`, error);
+        console.error(`Error fetching participants description for study ${studyId}:`, error);
         throw error;
       });
 }
 
 export const getDesignForStudy = (
-  study_id: number,
+  studyId: number,
   config?: AxiosRequestConfig
 ): Promise<string[]> => {
-    const path = `/studies/${study_id}/design`;
+    const path = `/studies/${studyId}/design`;
     return apiClient.get<string[]>(path, config)
       .then(response => {
         return response.data;
       })
       .catch(error => {
-        console.error(`Error fetching design for study ${study_id}:`, error);
+        console.error(`Error fetching design for study ${studyId}:`, error);
         throw error;
       });
 }
 
 export const getPersonsForStudy = (
-  study_id: number,
+  studyId: number,
   config?: AxiosRequestConfig
 ): Promise<string[]> => {  
-  const path = `/studies/${study_id}/persons`;
+  const path = `/studies/${studyId}/persons`;
   return apiClient.get<string[]>(path, config)
     .then(response => {
       return response.data || [];
     })
     .catch(error => {
-      console.error(`Error fetching persons for study ${study_id}:`, error);
+      console.error(`Error fetching persons for study ${studyId}:`, error);
       throw error;
     });
 };
 
 export const getReportPdf = (
-  report_id: number,
+  reportId: number,
   config?: AxiosRequestConfig
 ): Promise<ArrayBuffer> => {
-  const path = `/reports/${report_id}/pdf`;
+  const path = `/reports/${reportId}/pdf`;
   return apiClient.get<ArrayBuffer>(path, { responseType: 'arraybuffer', ...config })
     .then(response => {
       return response.data;
     })
     .catch(error => {
-      console.error(`Error fetching PDF for report ${report_id}:`, error.message || error);
+      console.error(`Error fetching PDF for report ${reportId}:`, error.message || error);
       throw error;
     });
 }
 
 export const getStudiesForReport = (
-  report_id: number,
+  reportId: number,
   params?: { date_from?: string | null; date_to?: string | null },
   config?: AxiosRequestConfig
 ): Promise<StudyDto[]> => {
-  const path = `/reports/${report_id}/studies`;
+  const path = `/reports/${reportId}/studies`;
 
   const requestConfig: AxiosRequestConfig = {
     ...config,
@@ -192,7 +204,7 @@ export const getStudiesForReport = (
     .then((response) => response.data)
     .catch((error) => {
       console.error(
-        `Error fetching studies for report ${report_id}:`,
+        `Error fetching studies for report ${reportId}:`,
         error.message || error
       );
       throw error;
@@ -200,7 +212,7 @@ export const getStudiesForReport = (
 };
 
 export const createStudy = (
-  payload: CreateStudyPayload,
+  payload: StudyCreateDto,
   config?: AxiosRequestConfig
 ): Promise<StudyDto> => {
   return apiClient

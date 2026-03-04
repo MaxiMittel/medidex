@@ -121,7 +121,7 @@ const features: Feature[] = [
     image: "/images/showcase/associated-reports.png",
     highlights: [
       "List of all reports linked to a study",
-      "CRG ID and title for each report",
+      "ID and title for each report",
       "Individual PDF download for each report",
       "Download All option for bulk export",
     ],

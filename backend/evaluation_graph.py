@@ -81,8 +81,8 @@ def load_next_initial(state: EvalState) -> dict:
     current = state["studies"][idx]
     logger.info(
         "load_next_initial: study_id=%s short_name=%s",
-        current.CRGStudyID,
-        current.ShortName,
+        current.studyId,
+        current.shortName,
     )
     return {
         "current": current,
@@ -105,7 +105,7 @@ def classify_initial(state: EvalState) -> dict:
         logger.info("classify_initial: no_current_study")
         return {"decision": "unsure", "reason": "No study loaded."}
 
-    logger.info("classify_initial: study_id=%s", current.CRGStudyID)
+    logger.info("classify_initial: study_id=%s", current.studyId)
     user_payload = build_user_payload(state["report"], current)
     prompt = apply_background_prompt(
         get_prompt(state, "initial_eval_prompt", DEFAULT_EVAL_PROMPT),
@@ -132,7 +132,7 @@ def classify_initial(state: EvalState) -> dict:
         logger.info("classify_initial: reason=%s", str(exc))
     idx = state["idx"]
 
-    study_id = str(current.CRGStudyID) if current else f"index-{idx}"
+    study_id = str(current.studyId) if current else f"index-{idx}"
     result = {"study_id": study_id, "decision": decision, "reason": reason}
 
     not_matches = list(state["not_matches"])
@@ -216,7 +216,7 @@ def select_very_likely(state: EvalState) -> dict:
             very_likely.append(
                 {
                     "study_id": study_id,
-                    "short_name": study.ShortName if study else None,
+                    "short_name": study.shortName if study else None,
                     "prior_reason": prior_reason,
                     "group_reason": reason,
                 }
@@ -352,8 +352,8 @@ def load_next_likely(state: EvalState) -> dict:
         if current is not None:
             logger.info(
                 "load_next_likely: study_id=%s short_name=%s",
-                current.CRGStudyID,
-                current.ShortName,
+                current.studyId,
+                current.shortName,
             )
             return {
                 "current": current,
@@ -395,7 +395,7 @@ def classify_likely_review(state: EvalState) -> dict:
         logger.info("classify_likely_review: no_current_study")
         return {"decision": "unsure", "reason": "No study loaded."}
 
-    study_id = str(current.CRGStudyID)
+    study_id = str(current.studyId)
     prior_entry = get_bucket_entry(state.get("likely_matches", []), study_id)
     prior_reason = prior_entry.get("reason") if prior_entry else None
     logger.info("classify_likely_review: study_id=%s", study_id)
@@ -494,8 +494,8 @@ def load_next_unsure(state: EvalState) -> dict:
         if current is not None:
             logger.info(
                 "load_next_unsure: study_id=%s short_name=%s",
-                current.CRGStudyID,
-                current.ShortName,
+                current.studyId,
+                current.shortName,
             )
             return {
                 "current": current,
@@ -529,7 +529,7 @@ def classify_unsure(state: EvalState) -> dict:
         logger.info("classify_unsure: no_current_study")
         return {"decision": "unsure", "reason": "No study loaded."}
 
-    study_id = str(current.CRGStudyID)
+    study_id = str(current.studyId)
     prior_entry = get_bucket_entry(state.get("unsure", []), study_id)
     prior_reason = prior_entry.get("reason") if prior_entry else None
 

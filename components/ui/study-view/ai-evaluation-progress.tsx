@@ -56,7 +56,7 @@ export function AiEvaluationProgress({
     : "Summary available. Click Show to view details.";
 
   return (
-    <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950">
+    <div className="m-4 mb-0 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950">
       <div className="flex items-center gap-3">
         {isStreaming ? (
           <Spinner className="h-4 w-4 flex-shrink-0 text-blue-600 dark:text-blue-400" />

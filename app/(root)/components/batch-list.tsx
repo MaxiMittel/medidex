@@ -1,8 +1,6 @@
-"use client";
+"use client"
 
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileText, Calendar, CheckCircle2, Sparkles, ArrowRight, Upload } from "lucide-react";
@@ -15,18 +13,17 @@ interface BatchListProps {
 
 export function BatchList({ batches }: BatchListProps) {
   const router = useRouter();
-  const { selectBatch, setBatches } = useBatchReportsStore();
 
   // Hydrate the store with server-fetched batches
-  useEffect(() => {
+  /*useEffect(() => {
     if (batches.length > 0) {
       setBatches(batches);
     }
-  }, [batches, setBatches]);
+  }, [batches, setBatches]);*/
 
   const handleBatchClick = (batchHash: string) => {
-    selectBatch(batchHash);
-    router.push(`/reports?batch=${batchHash}`);
+    //selectBatch(batchHash);
+    router.push(`/batches/${batchHash}`);
   };
 
   const formatDate = (dateString: string) => {

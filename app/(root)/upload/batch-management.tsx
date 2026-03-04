@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useBatchReportsStore } from "@/hooks/use-batch-reports-store";
 import type { BatchDto } from "@/types/apiDTOs";
 import { useState, useEffect, useImperativeHandle, forwardRef } from "react";
 
@@ -43,13 +42,19 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingHash, setDeletingHash] = useState<string | null>(null);
-  const { fetchBatches: refreshStoreBatches } = useBatchReportsStore();
 
   const loadBatches = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/meerkat/batches");
+      const response = await fetch("/api/meerkat/batches", {
+        method: "GET",
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+      });
       if (!response.ok) {
         const errorMessage = await response.text();
         throw new Error(
@@ -79,6 +84,11 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
     try {
       const response = await fetch(`/api/meerkat/batches/${batchHash}`, {
         method: "DELETE",
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
       });
       if (!response.ok) {
         const errorMessage = await response.text();
@@ -88,8 +98,7 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
       }
       // Remove from local state
       setBatches((prev) => prev.filter((b) => b.batch_hash !== batchHash));
-      // Refresh store batches
-      await refreshStoreBatches();
+
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete batch");
     } finally {

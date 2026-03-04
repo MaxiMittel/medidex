@@ -21,7 +21,7 @@ export async function middleware(request: NextRequest) {
       headers: await headers(),
     });
 
-    const isApproved = (session as any)?.isApproved ?? false;
+    const isApproved = (session as any)?.user.isApproved ?? false;
     const isPendingApprovalPage = request.nextUrl.pathname.startsWith("/pending-approval");
 
     // If user is approved but on pending-approval page, redirect to home

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSimilarStudies } from "@/lib/api/batchApi";
-import { getReportsByStudyId } from "@/lib/api/studiesApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
-import type { RelevanceStudy, StudyReportSummary } from "@/types/reports";
+import type { RelevanceStudy } from "@/types/reports";
 
 export async function GET(
   request: NextRequest,
@@ -16,11 +15,10 @@ export async function GET(
     );
   }
 
-  // Parse assignedStudyIds from query (?assignedStudyIds=1,2,3)
+  // Parse assignedStudies from query (?assignedStudies=1,2,3)
   const url = new URL(request.url);
-  const assignedIdsParam = url.searchParams.get("assignedStudyIds");
-  const assignedStudyIds =
-    assignedIdsParam?.split(",").map((id) => Number(id)).filter(Boolean) ?? [];
+  //const assignedIdsParam = url.searchParams.get("assignedStudies");
+  //const assignedStudies = assignedIdsParam?.split(",").map((id) => Number(id)).filter(Boolean) ?? [];
   
   const limitParam = url.searchParams.get("limit");
   const limit = limitParam ? Number(limitParam) : 10;
@@ -34,39 +32,11 @@ export async function GET(
       { headers }
     );
 
-    const studies: RelevanceStudy[] = await Promise.all(
-      similar.CRGStudyID.map(async (studyId, idx) => {
-        let relatedReports: StudyReportSummary[] = [];
-        try {
-          const reports = await getReportsByStudyId(studyId, undefined, {
-            headers,
-          });
-          relatedReports = reports.map((report) => ({
-            CENTRALReportID: report.CENTRALReportID ?? null,
-            CRGReportID: report.CRGReportID,
-            Title: report.Title,
-          }));
-        } catch (error) {
-          console.error(
-            `Failed fetching reports for study ${studyId}`,
-            error
-          );
-        }
-
-        return {
-          Linked: assignedStudyIds.includes(studyId),
-          CRGStudyID: studyId,
-          Relevance: Number(similar.Relevance[idx] ?? 0),
-          ShortName: similar.ShortName[idx] ?? "",
-          NumberParticipants: similar.NumberParticipants[idx] ?? null,
-          Duration: similar.Duration[idx] ?? null,
-          Comparison: similar.Comparison[idx] ?? null,
-          Countries: similar.Countries[idx] ?? "",
-          StatusofStudy: similar.StatusofStudy[idx] ?? "",
-          DateEntered: similar.DateEntered[idx] ?? "",
-          DateEdited: similar.DateEdited[idx] ?? "",
-          reports: relatedReports,
-        } satisfies RelevanceStudy;
+    const studies: RelevanceStudy[] = similar.map(
+      (study) => ({
+        ...study,
+        isLinked: false,
+        reports: [],
       })
     );
 

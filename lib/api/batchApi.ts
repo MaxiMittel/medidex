@@ -1,6 +1,6 @@
 import apiClient from "./apiClient";
 import { AxiosRequestConfig } from "axios";
-import {BatchDto, ReportDetailDto, SimilarTagDto, GetSimilarTagsParams, GetSimilarStudiesParams, SimilarStudiesResponseDto} from "../../types/apiDTOs";
+import {BatchDto, ReportDetailDto, SimilarTagDto, GetSimilarTagsParams, GetSimilarStudiesParams, SimilarStudyResponseDto} from "../../types/apiDTOs";
 import {serializeParams} from "./helpers";    
 
 //get all batches
@@ -100,6 +100,22 @@ export const getReportData = (
     });
 }
 
+//get all report details for a batch
+export const getBatchReports = (
+  batch_hash: string,
+  config?: AxiosRequestConfig
+): Promise<ReportDetailDto[]> => {
+  return apiClient
+    .get<ReportDetailDto[]>(`/batches/${batch_hash}/reports`, config)
+    .then(response => {
+      return response.data;
+    })
+    .catch(error => {
+      console.error(`Error fetching reports for batch ${batch_hash}:`, error);
+      throw error;
+    });
+}
+
 //assign studies to a report
 export const assignStudiesToReport = (
   batch_hash: string,
@@ -141,7 +157,7 @@ export const getSimilarTags = (
   report_index: number,
   params: GetSimilarTagsParams
 ): Promise<SimilarTagDto[]> => {
-  const path = `/batches/${batch_hash}/${report_index}/similar_tags`;
+  const path = `/batches/${batch_hash}/${report_index}/similar-tags`;
   return apiClient.get<SimilarTagDto[]>(path, {
     params: params,
     paramsSerializer: { serialize: serializeParams }, 
@@ -156,9 +172,9 @@ export const getSimilarStudies = (
   report_index: number,
   params: GetSimilarStudiesParams = {},
   config?: AxiosRequestConfig
-): Promise<SimilarStudiesResponseDto> => { 
-  const path = `/batches/${batch_hash}/${report_index}/similar_studies`;
-  return apiClient.get<SimilarStudiesResponseDto>(path, {
+): Promise<SimilarStudyResponseDto[]> => { 
+  const path = `/batches/${batch_hash}/${report_index}/similar-studies`;
+  return apiClient.get<SimilarStudyResponseDto[]>(path, {
       ...config,
       params: params,
       paramsSerializer: { serialize: serializeParams }
@@ -171,6 +187,5 @@ export const getSimilarStudies = (
       throw error;
     });
 }
-
 
 //Endpoint to get studies related to a specific tag always gives server error 500 so not implemented yet

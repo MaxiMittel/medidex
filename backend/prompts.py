@@ -24,26 +24,23 @@ SUMMARY_MATCH_EVAL_NOTE = (
 
 REASON_NOTE = "Always address studies by their short names."
 LIKELY_GROUP_ID_NOTE = (
-    "Return very_likely_study_ids using only candidate study_id values (CRG study IDs). "
+    "Return very_likely_study_ids using only candidate study_id values (Study IDs). "
     "Do not return trial registration IDs, short names, or free text in very_likely_study_ids. "
     "If none qualify, return an empty list."
 )
 LIKELY_COMPARE_ID_NOTE = (
-    "If decision is match, study_id must be exactly one candidate study_id (CRG study ID) from the payload. "
+    "If decision is match, study_id must be exactly one candidate study_id (Study ID) from the payload. "
     "Do not return trial registration IDs, short names, or free text in study_id."
 )
 
 from .constants import (
-    CENTRAL_SUBMISSION_STATUS_OPTIONS,
     COUNTRY_OPTIONS,
-    DURATION_UNCERTAIN_VALUE,
     DURATION_UNITS,
     STATUS_OF_STUDY_OPTIONS,
 )
 
 _COUNTRY_OPTIONS_TEXT = ", ".join(COUNTRY_OPTIONS)
 _STATUS_OPTIONS_TEXT = ", ".join(STATUS_OF_STUDY_OPTIONS)
-_CENTRAL_STATUS_OPTIONS_TEXT = ", ".join(CENTRAL_SUBMISSION_STATUS_OPTIONS)
 _DURATION_UNITS_TEXT = "|".join(DURATION_UNITS)
 
 SUGGEST_NEW_STUDY_PROMPT = (
@@ -51,20 +48,20 @@ SUGGEST_NEW_STUDY_PROMPT = (
     "Return a single new_study object that fits the add-study form. "
     "If a field is unknown, return an empty string for that field. "
     f"Allowed status_of_study values: {_STATUS_OPTIONS_TEXT}. "
-    f"Allowed central_submission_status values: {_CENTRAL_STATUS_OPTIONS_TEXT}. "
     f"Allowed countries values: {_COUNTRY_OPTIONS_TEXT}. "
-    f"duration must be '{DURATION_UNCERTAIN_VALUE}' or '<number> <unit>' where unit is {_DURATION_UNITS_TEXT}, or empty. "
+    f"duration_value must be 'None' if uncertain or 'integer'."
+    f"duration_unit is one out of {_DURATION_UNITS_TEXT}. If not available convert it to the closest unit for example 30 minutes -> 0.5 hours"
     "number_of_participants must be a numeric string. "
     "Example output: "
     "{"
     "\"new_study\":{"
     "\"short_name\":\"Zhang 2025\","
     "\"status_of_study\":\"Planned\","
-    "\"countries\":\"Unclear\","
-    "\"central_submission_status\":\"Pending\","
-    "\"duration\":\"3 months\","
-    "\"number_of_participants\":\"600\","
-    "\"comparison\":\"Group psychological counseling vs usual care\""
+    "\"countries\":[\"Unclear\"],"
+    "\"duration_value\":3,"
+    "\"duration_unit\": \"months\,"
+    "\"number_of_participants\":600,"
+    "\"comparison\":[{\"intervention\": [\"Cognitive behavioural therapy\", \"Apriprozol\"], \"control\":[\"Treatment as usual\"]}]"
     "}"
     "}"
 )
