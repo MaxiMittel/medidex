@@ -31,6 +31,7 @@ export async function sendReportEvent(
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
+      cache: "no-store",
     });
 
     if (!response.ok) {

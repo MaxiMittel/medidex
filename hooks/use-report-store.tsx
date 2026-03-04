@@ -29,6 +29,7 @@ const assignStudyViaApi = async (reportId: number, studyId: number) => {
     const response = await fetch(getReportStudyPath(reportId, studyId), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
+        cache: "no-store",
     })
     await ensureSuccess(response, "Assigning study to report")
 }
@@ -37,6 +38,7 @@ const removeStudyViaApi = async (reportId: number, studyId: number) => {
     const response = await fetch(getReportStudyPath(reportId, studyId), {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
+        cache: "no-store",
     })
     await ensureSuccess(response, "Removing study from report")
 }

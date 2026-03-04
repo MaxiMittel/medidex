@@ -91,6 +91,11 @@ export function UploadSection(props: UploadSectionProps) {
       const response = await fetch("/api/meerkat/batches/upload", {
         method: "POST",
         body: formData,
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
       });
 
       if (!response.ok) {

@@ -157,7 +157,7 @@ export const getSimilarTags = (
   report_index: number,
   params: GetSimilarTagsParams
 ): Promise<SimilarTagDto[]> => {
-  const path = `/batches/${batch_hash}/${report_index}/similar_tags`;
+  const path = `/batches/${batch_hash}/${report_index}/similar-tags`;
   return apiClient.get<SimilarTagDto[]>(path, {
     params: params,
     paramsSerializer: { serialize: serializeParams }, 
@@ -173,7 +173,7 @@ export const getSimilarStudies = (
   params: GetSimilarStudiesParams = {},
   config?: AxiosRequestConfig
 ): Promise<SimilarStudyResponseDto[]> => { 
-  const path = `/batches/${batch_hash}/${report_index}/similar_studies`;
+  const path = `/batches/${batch_hash}/${report_index}/similar-studies`;
   return apiClient.get<SimilarStudyResponseDto[]>(path, {
       ...config,
       params: params,

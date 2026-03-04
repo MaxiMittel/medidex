@@ -8,7 +8,7 @@ export const getSimilarStudiesByReport = (
   params: GetSimilarStudiesParams = {},
   config?: AxiosRequestConfig
 ): Promise<SimilarStudyResponseDto[]> => { 
-  const path = `/reports/${reportId}/similar_studies`;
+  const path = `/reports/${reportId}/similar-studies`;
   const { params: configParams, ...restConfig } = config ?? {};
   const requestParams = {
     ...(configParams ?? {}),
@@ -20,11 +20,11 @@ export const getSimilarStudiesByReport = (
       paramsSerializer: { serialize: serializeParams }
     })
     .then(response => {
-      return response.data;
+    return response.data;
     })
     .catch(error => {
-      console.error(`Error fetching similar studies for report ${reportId}:`, error);
-      throw error;
+    console.error(`Error fetching similar studies for report ${reportId}:`, error);
+    throw error;
     });
 }
 
@@ -66,8 +66,6 @@ export const assignNewStudyToReportByReportId = (
   study: StudyDto,
   config?: AxiosRequestConfig
 ): Promise<void> => {
-    console.log("Study");
-    console.log(study);
   const path = `/reports/${reportId}/studies`;
   return apiClient
     .post(path, study, config)
@@ -86,7 +84,7 @@ export const getSimilarTagsByReportId = (
   params: GetSimilarTagsParams = {},
   config?: AxiosRequestConfig
 ): Promise<SimilarTagDto[]> => {
-  const path = `/reports/${reportId}/similar_studies/tags`;
+  const path = `/reports/${reportId}/similar-studies/tags`;
   const { params: configParams, ...restConfig } = config ?? {};
   const requestParams = {
     ...(configParams ?? {}),

@@ -50,6 +50,7 @@ export async function POST(
     const response = await fetch(
       `${meerkatApiUrl}/api/reports/${reportId}/events`,
       {
+        cache: "no-store",
         method: "POST",
         headers: {
           ...headers,

@@ -42,13 +42,7 @@ export function StudyDetails({ study }: StudyDetailsProps) {
     new Set()
   );
 
-  console.log("Init");
-  console.log(study);
-
   useEffect(() => {
-    console.log("Use effect");
-    console.log(study);
-    console.log(study?.studyId);
     if (!study) {
       setReports([]);
       setReportsLoading(false);
@@ -58,15 +52,12 @@ export function StudyDetails({ study }: StudyDetailsProps) {
 
     let isActive = true;
     const studyId = study.studyId;
-    
-    console.log(studyId);
 
     setReportsLoading(true);
     setReportsError(null);
 
     const fetchReports = async () => {
       try {
-        console.log("Fetch " +studyId);
         const response = await fetch(
           `/api/meerkat/studies/${studyId}/reports`,
           { cache: "no-store" }

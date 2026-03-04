@@ -1,3 +1,5 @@
+import axios from "axios";
+import { notFound } from "next/navigation";
 import { StudyRelevanceTable } from "@/components/ui/study-view/study-relevance-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SimilarStudyResponseDto } from "@/types/apiDTOs";
@@ -28,13 +30,25 @@ export default async function StudyList({ params, searchParams }: StudyListProps
 
   const { batchHash, reportId } = await params;
   const { k } = await searchParams;
+  const source = batchHash;
   const reportIdNumber = Number(reportId);
 
   const headers = await getMeerkatHeaders();
-  const response = await getSimilarStudiesByReport(reportIdNumber, undefined, {
-    headers,
-    params: { k },
-  });
+  let response: SimilarStudyResponseDto[] = [];
+
+  try {
+    response = await getSimilarStudiesByReport(reportIdNumber, undefined, {
+      headers,
+      params: { k, source },
+    });
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      notFound();
+    }
+
+    throw error;
+  }
+
   const studies = mapResponseToRelevanceStudies(response);
 
   return (
@@ -48,6 +62,7 @@ export default async function StudyList({ params, searchParams }: StudyListProps
 
 export function StudyListSkeleton() {
   const rowPlaceholders = Array.from({ length: 4 });
+  console.log("Study List Skeleton visualized");
 
   return (
     <div className="h-full flex flex-col min-w-0 overflow-hidden p-4 md:px-8">

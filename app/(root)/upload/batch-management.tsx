@@ -47,7 +47,14 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/meerkat/batches");
+      const response = await fetch("/api/meerkat/batches", {
+        method: "GET",
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+      });
       if (!response.ok) {
         const errorMessage = await response.text();
         throw new Error(
@@ -77,6 +84,11 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
     try {
       const response = await fetch(`/api/meerkat/batches/${batchHash}`, {
         method: "DELETE",
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
       });
       if (!response.ok) {
         const errorMessage = await response.text();

@@ -121,6 +121,7 @@ export function StudyAspects({ study }: StudyDetailsProps) {
     async function fetchJson<T>(endpoint: string, label: string): Promise<T> {
       const response = await fetch(`${basePath}/${endpoint}`, {
         signal: controller.signal,
+        cache: "no-store",
       });
 
       if (!response.ok) {

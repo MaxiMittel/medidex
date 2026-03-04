@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   Plus,
   Link,
+  Microscope,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { AddStudyDialog } from "./add-study-dialog";
@@ -185,6 +186,7 @@ export function StudyRelevanceTable({
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
+        cache: "no-store",
       });
 
       let responseBody: unknown = null;
@@ -360,7 +362,7 @@ export function StudyRelevanceTable({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-6 w-6 text-primary" />
+              <Microscope className="h-6 w-6 text-primary" />
             </div>
             <h2 className="text-lg font-semibold">Relevant Studies</h2>
             <Badge variant="secondary" className="text-xs font-normal">
@@ -431,7 +433,6 @@ export function StudyRelevanceTable({
       </div>
 
       {shouldShowProgress ? (
-        <div className="px-4 pt-4">
           <AiEvaluationProgress
             message={progressMessage}
             isStreaming={evalState?.isStreaming ?? false}
@@ -441,7 +442,6 @@ export function StudyRelevanceTable({
               setProgressCollapsedByReport(prev => ({ ...prev, [reportKey]: collapsed }));
             }}
           />
-        </div>
       ) : null}
 
       {/* Scrollable Content */}

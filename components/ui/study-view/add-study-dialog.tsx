@@ -36,7 +36,7 @@ import {
   createComparisonGroup,
   hasValidComparisonGroups,
 } from "@/lib/comparisonUtils";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   DurationUnit,
   NewStudySuggestion,
@@ -49,6 +49,9 @@ import type {
 } from "@/types/comparisons";
 
 const SUGGESTION_DISPLAY_LIMIT = 8;
+const COMPARISON_CARD_VERTICAL_GAP = 12; // matches space-y-3 spacing to prevent clipping
+const COMPARISON_PANEL_MAX_HEIGHT = 1.1; // portion of viewport for comparisons scroll region (roughly 2x previous)
+const COMPARISON_PANEL_MAX_PIXEL = 900; // hard cap so dialog never exceeds viewport
 const buildEmptyComparisonGroups = () => [createComparisonGroup()];
 
 const buildComparisonGroupsFromSuggestion = (
@@ -123,10 +126,11 @@ export function AddStudyDialog({
 
   const [addStudyDialogOpen, setAddStudyDialogOpen] = useState(false);
   const [creatingStudy, setCreatingStudy] = useState(false);
+  const firstComparisonRef = useRef<HTMLDivElement | null>(null);
+  const [comparisonPanelHeight, setComparisonPanelHeight] = useState<number | null>(null);
 
   const resetLocalFormState = useCallback(() => {
     if (suggestedValues) {
-      console.log(suggestedValues);
       setShortName(suggestedValues.short_name ?? "");
       setStatusOfStudy(suggestedValues.status_of_study ?? "");
       setSelectedCountries(suggestedValues.countries);
@@ -189,7 +193,9 @@ export function AddStudyDialog({
       try {
         const response = await fetch(
           `/api/meerkat/reports/${currentReportId}/similar-studies/tags`,
-          { signal: controller.signal }
+          { signal: controller.signal,
+            cache: "no-store",
+           },
         );
 
         if (!response.ok) {
@@ -231,6 +237,38 @@ export function AddStudyDialog({
       controller.abort();
     };
   }, [addStudyDialogOpen, currentReportId]);
+
+  useLayoutEffect(() => {
+    if (!addStudyDialogOpen) {
+      setComparisonPanelHeight(null);
+      return;
+    }
+
+    if (comparisonGroups.length <= 1) {
+      setComparisonPanelHeight(null);
+      return;
+    }
+
+    const measureHeight = () => {
+      if (!firstComparisonRef.current) {
+        setComparisonPanelHeight(null);
+        return;
+      }
+
+      const measuredHeight = firstComparisonRef.current.getBoundingClientRect().height;
+      if (measuredHeight > 0) {
+        const baseHeight = measuredHeight + COMPARISON_CARD_VERTICAL_GAP;
+        setComparisonPanelHeight(baseHeight);
+      }
+    };
+
+    measureHeight();
+    window.addEventListener("resize", measureHeight);
+
+    return () => {
+      window.removeEventListener("resize", measureHeight);
+    };
+  }, [comparisonGroups, addStudyDialogOpen]);
 
   const handleAddStudySubmit = async (
     event: React.FormEvent<HTMLFormElement>
@@ -543,6 +581,7 @@ export function AddStudyDialog({
         : "";
   const normalizedCountry =
     selectedCountries.length > 0 ? selectedCountries.join(", ") : "Unclear";
+  const hasMultipleComparisonGroups = comparisonGroups.length > 1;
   const comparisonValid = hasValidComparisonGroups(comparisonGroups);
 
   const isSubmitDisabled =
@@ -571,7 +610,7 @@ export function AddStudyDialog({
         Add New Study
       </Button>
       <DialogContent
-        className="max-w-[900px] sm:max-w-[720px] w-[min(92vw,900px)]"
+        className="max-w-[900px] sm:max-w-[720px] w-[min(92vw,900px)] max-h-[90vh] overflow-y-auto"
         onOpenAutoFocus={(event) => event.preventDefault()}
       >
         <DialogHeader>
@@ -714,40 +753,55 @@ export function AddStudyDialog({
                 + Add comparison
               </Button>
             </div>
-            <div className="space-y-3">
-              {comparisonGroups.map((group, index) => (
-                <div
-                  key={group.id}
-                  className="space-y-3 rounded-lg border border-border/60 p-3.5"
-                >
-
+            <div className="rounded-lg border border-border/60 overflow-hidden">
+              <div
+                className={`space-y-3 p-3.5 ${hasMultipleComparisonGroups ? "overflow-y-auto" : ""}`}
+                style={{
+                  height:
+                    hasMultipleComparisonGroups && comparisonPanelHeight
+                      ? `${Math.round(comparisonPanelHeight)}px`
+                      : undefined,
+                  maxHeight: hasMultipleComparisonGroups
+                    ? `min(${Math.round(
+                        COMPARISON_PANEL_MAX_HEIGHT * 100
+                      )}vh, ${COMPARISON_PANEL_MAX_PIXEL}px)`
+                    : undefined,
+                }}
+              >
+                {comparisonGroups.map((group, index) => (
                   <div
-                    className="grid gap-3 items-start"
-                    style={{
-                      gridTemplateColumns:
-                        "minmax(0,45%) minmax(0,10%) minmax(0,45%)",
-                    }}
+                    ref={index === 0 ? firstComparisonRef : undefined}
+                    key={group.id}
+                    className="space-y-3 rounded-lg border border-border/40 p-3.5"
                   >
-                    {renderComparisonSideInputs(group, "Intervention", "a")}
-                    <div className="text-xs font-semibold text-muted-foreground flex items-center justify-center mt-2">
-                      vs.
+                    <div
+                      className="grid gap-3 items-start"
+                      style={{
+                        gridTemplateColumns:
+                          "minmax(0,45%) minmax(0,10%) minmax(0,45%)",
+                      }}
+                    >
+                      {renderComparisonSideInputs(group, "Intervention", "a")}
+                      <div className="text-xs font-semibold text-muted-foreground flex items-center justify-center mt-2">
+                        vs.
+                      </div>
+                      {renderComparisonSideInputs(group, "Control", "b")}
                     </div>
-                    {renderComparisonSideInputs(group, "Control", "b")}
+                    <div className="flex justify-end">
+                      {comparisonGroups.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          onClick={() => removeComparisonGroup(group.id)}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex justify-end">
-                    {comparisonGroups.length > 1 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        type="button"
-                        onClick={() => removeComparisonGroup(group.id)}
-                      >
-                        Remove
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -755,8 +809,6 @@ export function AddStudyDialog({
               type="button"
               variant="ghost"
               onClick={() => {
-                //resetLocalFormState();
-                //resetNewStudyForm();
                 setAddStudyDialogOpen(false);
               }}
               disabled={creatingStudy}
