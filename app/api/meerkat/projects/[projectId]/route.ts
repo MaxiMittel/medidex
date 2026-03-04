@@ -1,28 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deleteBatchByHash } from "@/lib/api/batchApi";
+import { deleteProjectById } from "@/lib/api/projectApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: Promise<{ batchHash: string }> }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
-  const { batchHash } = await params;
+  const { projectId } = await params;
 
-  if (!batchHash) {
+  if (!projectId) {
     return NextResponse.json(
-      { error: "Missing batch hash." },
+      { error: "Missing project id." },
       { status: 400 }
     );
   }
 
   try {
     const headers = await getMeerkatHeaders();
-    await deleteBatchByHash(batchHash, { headers });
+    await deleteProjectById(projectId, { headers });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Unexpected error while deleting batch:", error);
+    console.error("Unexpected error while deleting project:", error);
     return NextResponse.json(
-      { error: "Unexpected error while deleting batch." },
+      { error: "Unexpected error while deleting project." },
       { status: 500 }
     );
   }

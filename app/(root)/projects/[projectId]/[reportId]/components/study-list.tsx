@@ -9,7 +9,7 @@ import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
 interface StudyListProps {
   params: {
-    batchHash: string;
+    projectId: string;
     reportId: string;
   };
   searchParams: {
@@ -28,9 +28,9 @@ const mapResponseToRelevanceStudies = (
 
 export default async function StudyList({ params, searchParams }: StudyListProps) {
 
-  const { batchHash, reportId } = await params;
+  const { projectId, reportId } = await params;
   const { k } = await searchParams;
-  const source = batchHash;
+  const source = projectId;
   const reportIdNumber = Number(reportId);
 
   const headers = await getMeerkatHeaders();
@@ -54,15 +54,14 @@ export default async function StudyList({ params, searchParams }: StudyListProps
   return (
     <StudyRelevanceTable
           studies={studies}
-          currentBatchHash={batchHash}
-          currentReportId={reportIdNumber}
+          projectId={projectId}
+          reportId={reportIdNumber}
         />
   );
 }
 
 export function StudyListSkeleton() {
   const rowPlaceholders = Array.from({ length: 4 });
-  console.log("Study List Skeleton visualized");
 
   return (
     <div className="h-full flex flex-col min-w-0 overflow-hidden p-4 md:px-8">

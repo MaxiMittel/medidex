@@ -72,11 +72,11 @@ export function ReportsList({
   const [removingAssignments, setRemovingAssignments] = useState<Set<string>>(new Set());
   const router = useRouter();
   const params = useParams();
-  const batchHash =
-    typeof params.batchHash === "string"
-      ? params.batchHash
-      : Array.isArray(params.batchHash)
-      ? params.batchHash[0]
+  const projectId =
+    typeof params.projectId === "string"
+      ? params.projectId
+      : Array.isArray(params.projectId)
+      ? params.projectId[0]
       : undefined;
 
   const reportIdParam =
@@ -119,12 +119,12 @@ export function ReportsList({
 
   const navigateToReport = useCallback(
     (reportId: number) => {
-      if (!batchHash) {
+      if (!projectId) {
         return;
       }
-      router.push(`/batches/${batchHash}/${reportId}?k=10`);
+      router.push(`/projects/${projectId}/${reportId}?k=10`);
     },
-    [batchHash, router]
+    [projectId, router]
   );
 
   const reportsWithStoredAssignments = useMemo(
@@ -345,7 +345,7 @@ export function ReportsList({
               const hasAbstract = report.report.abstract && report.report.abstract.length > 0;
               const isSelected = selectedReportId === report.report.reportId;
               const isExpanded = isSelected && hasAbstract;
-              const reportKey = `${batchHash}-${report.report.reportId}`;
+              const reportKey = `${projectId}-${report.report.reportId}`;
               const isRunningEvaluation = runningEvaluations.includes(reportKey);
               const reportResults = storeResults[reportKey];
               const resultCount = reportResults ? Object.keys(reportResults).length : 0;

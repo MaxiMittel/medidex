@@ -1,35 +1,35 @@
 import axios from "axios";
 import { NextRequest, NextResponse } from "next/server";
-import { getBatchReports } from "@/lib/api/batchApi";
+import { getProjectReports } from "@/lib/api/projectApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ batchHash: string }> }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
-  const { batchHash } = await params;
+  const { projectId } = await params;
 
-  if (!batchHash) {
+  if (!projectId) {
     return NextResponse.json(
-      { error: "Missing batch hash." },
+      { error: "Missing project id." },
       { status: 400 }
     );
   }
 
   try {
     const headers = await getMeerkatHeaders();
-    const reports = await getBatchReports(batchHash, { headers });
+    const reports = await getProjectReports(projectId, { headers });
     return NextResponse.json(reports);
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) {
       const payload =
-        error.response.data ?? { error: "Batch reports not found." };
+        error.response.data ?? { error: "Project reports not found." };
       return NextResponse.json(payload, { status: 404 });
     }
 
-    console.error("Unexpected error while fetching batch reports:", error);
+    console.error("Unexpected error while fetching project reports:", error);
     return NextResponse.json(
-      { error: "Unexpected error while fetching batch reports." },
+      { error: "Unexpected error while fetching project reports." },
       { status: 500 }
     );
   }

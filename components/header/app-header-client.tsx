@@ -1,6 +1,6 @@
 "use client";
 
-import { Upload, Users } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HeaderUser } from "./header-user";
 import { Role } from "@/enums/role.enum";
@@ -42,20 +42,22 @@ export function AppHeaderClient({ user }: AppHeaderClientProps) {
         <div className="flex items-center gap-1">
           {/* Navigation buttons */}
           <nav className="flex items-center gap-1 mr-2">
-            <Button
-              variant={pathname === "/upload" ? "secondary" : "ghost"}
-              size="sm"
-              asChild
-              className={cn(
-                "gap-2",
-                pathname === "/upload" && "bg-secondary"
-              )}
-            >
-              <Link href="/upload">
-                <Upload className="h-4 w-4" />
-                <span className="hidden sm:inline">Upload</span>
-              </Link>
-            </Button>
+            {isAdmin && (
+              <Button
+                variant={pathname === "/upload" ? "secondary" : "ghost"}
+                size="sm"
+                asChild
+                className={cn(
+                  "gap-2",
+                  pathname === "/upload" && "bg-secondary"
+                )}
+              >
+                <Link href="/upload">
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Create Project</span>
+                </Link>
+              </Button>
+            )}
 
             {isAdmin && (
               <Button

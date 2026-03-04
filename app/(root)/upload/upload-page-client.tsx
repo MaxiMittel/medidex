@@ -2,29 +2,29 @@
 
 import * as React from "react";
 import { UploadSection } from "./upload-section";
-import { BatchManagement, type BatchManagementRef } from "./batch-management";
+import { ProjectManagement, type ProjectManagementRef } from "./project-management";
 import { useRef, useCallback } from "react";
 
 export function UploadPageClient() {
-  const batchManagementRef = useRef<BatchManagementRef>(null);
+  const projectManagementRef = useRef<ProjectManagementRef>(null);
 
   const handleUploadSuccess = useCallback(() => {
-    // Trigger reload of batch management
-    if (batchManagementRef.current) {
-      batchManagementRef.current.reload();
+    // Trigger reload of project management
+    if (projectManagementRef.current) {
+      projectManagementRef.current.reload();
     }
   }, []);
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold mb-4">Upload New Batch</h2>
+        <h2 className="text-lg font-semibold mb-4">Create New Project</h2>
         <UploadSection onUploadSuccess={handleUploadSuccess} />
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold mb-4">Existing Batches</h2>
-        <BatchManagement ref={batchManagementRef} />
+        <h2 className="text-lg font-semibold mb-4">Existing Projects</h2>
+        <ProjectManagement ref={projectManagementRef} />
       </div>
     </div>
   );

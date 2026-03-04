@@ -30,24 +30,24 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import type { BatchDto } from "@/types/apiDTOs";
+import type { ProjectDto } from "@/types/apiDTOs";
 import { useState, useEffect, useImperativeHandle, forwardRef } from "react";
 
-export interface BatchManagementRef {
+export interface ProjectManagementRef {
   reload: () => void;
 }
 
-export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
-  const [batches, setBatches] = useState<BatchDto[]>([]);
+export const ProjectManagement = forwardRef<ProjectManagementRef>((_, ref) => {
+  const [projects, setProjects] = useState<ProjectDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [deletingHash, setDeletingHash] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const loadBatches = React.useCallback(async () => {
+  const loadProjects = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/meerkat/batches", {
+      const response = await fetch("/api/meerkat/projects", {
         method: "GET",
         cache: "no-store",
         headers: {
@@ -58,13 +58,13 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
       if (!response.ok) {
         const errorMessage = await response.text();
         throw new Error(
-          errorMessage || "Failed to load batches via proxy route."
+          errorMessage || "Failed to load projects via proxy route."
         );
       }
-      const batchList = (await response.json()) as BatchDto[];
-      setBatches(batchList);
+      const projectList = (await response.json()) as ProjectDto[];
+      setProjects(projectList);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load batches");
+      setError(err instanceof Error ? err.message : "Failed to load projects");
     } finally {
       setLoading(false);
     }
@@ -72,17 +72,17 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
 
   // Expose reload function via ref
   useImperativeHandle(ref, () => ({
-    reload: loadBatches,
+    reload: loadProjects,
   }));
 
   useEffect(() => {
-    void loadBatches();
-  }, [loadBatches]);
+    void loadProjects();
+  }, [loadProjects]);
 
-  const handleDelete = async (batchHash: string) => {
-    setDeletingHash(batchHash);
+  const handleDelete = async (projectId: string) => {
+    setDeletingId(projectId);
     try {
-      const response = await fetch(`/api/meerkat/batches/${batchHash}`, {
+      const response = await fetch(`/api/meerkat/projects/${projectId}`, {
         method: "DELETE",
         cache: "no-store",
         headers: {
@@ -93,16 +93,16 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
       if (!response.ok) {
         const errorMessage = await response.text();
         throw new Error(
-          errorMessage || "Failed to delete batch via proxy route."
+          errorMessage || "Failed to delete project via proxy route."
         );
       }
       // Remove from local state
-      setBatches((prev) => prev.filter((b) => b.batch_hash !== batchHash));
+      setProjects((prev) => prev.filter((b) => b.projectId !== projectId));
 
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete batch");
+      setError(err instanceof Error ? err.message : "Failed to delete project");
     } finally {
-      setDeletingHash(null);
+      setDeletingId(null);
     }
   };
 
@@ -121,13 +121,13 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
     }
   };
 
-  const getProgressPercentage = (batch: BatchDto) => {
-    if (batch.number_reports === 0) return 0;
-    return Math.round((batch.embedded / batch.number_reports) * 100);
+  const getProgressPercentage = (project: ProjectDto) => {
+    if (project.numberReports === 0) return 0;
+    return Math.round((project.numberReportsProcessed / project.numberReports) * 100);
   };
 
-  const isProcessing = (batch: BatchDto) => {
-    return batch.embedded < batch.number_reports;
+  const isProcessing = (project: ProjectDto) => {
+    return project.numberReportsProcessed < project.numberReports;
   };
 
   return (
@@ -135,15 +135,15 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Batch Management</CardTitle>
+            <CardTitle>Project Management</CardTitle>
             <CardDescription>
-              View and manage your uploaded batches
+              View and manage your projects
             </CardDescription>
           </div>
           <Button
             variant="outline"
             size="icon"
-            onClick={loadBatches}
+            onClick={loadProjects}
             disabled={loading}
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -157,30 +157,30 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
           </Alert>
         )}
 
-        {loading && batches.length === 0 ? (
+        {loading && projects.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
-            Loading batches...
+            Loading projects...
           </div>
-        ) : batches.length === 0 ? (
+        ) : projects.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
-            No batches found. Upload a batch to get started.
+            No projects found. Create a new project to get started.
           </div>
         ) : (
           <div className="space-y-3">
-            {batches.map((batch) => {
-              const progress = getProgressPercentage(batch);
-              const processing = isProcessing(batch);
+            {projects.map((project) => {
+              const progress = getProgressPercentage(project);
+              const processing = isProcessing(project);
 
               return (
                 <div
-                  key={batch.batch_hash}
+                  key={project.projectId}
                   className="border rounded-lg p-4 space-y-3"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
                         <h3 className="font-medium truncate">
-                          {batch.batch_description || "Untitled Batch"}
+                          {project.name || "Untitled Project"}
                         </h3>
                         {processing ? (
                           <Badge variant="outline" className="bg-blue-50">
@@ -197,16 +197,16 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
                       <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4" />
-                          <span>{batch.number_reports} reports</span>
+                          <span>{project.numberReports} reports</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
-                          <span>{formatDate(batch.created_at)}</span>
+                          <span>{formatDate(project.createdAt)}</span>
                         </div>
                         <div className="text-xs">
-                          Hash:{" "}
+                          Project Id:{" "}
                           <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1 rounded">
-                            {batch.batch_hash}
+                            {project.projectId}
                           </code>
                         </div>
                       </div>
@@ -216,9 +216,9 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
                         <Button
                           variant="destructive"
                           size="icon"
-                          disabled={deletingHash === batch.batch_hash}
+                          disabled={deletingId === project.projectId}
                         >
-                          {deletingHash === batch.batch_hash ? (
+                          {deletingId === project.projectId ? (
                             <RefreshCw className="h-4 w-4 animate-spin" />
                           ) : (
                             <Trash2 className="h-4 w-4" />
@@ -227,24 +227,24 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Batch</AlertDialogTitle>
+                          <AlertDialogTitle>Delete Project</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Are you sure you want to delete this batch? This
-                            will permanently delete the batch and all its
+                            Are you sure you want to delete this project? This
+                            will permanently delete the project and all its
                             associated reports, including calculated embedding
                             vectors. This action cannot be undone.
                             <br />
                             <br />
-                            <strong>Batch:</strong>{" "}
-                            {batch.batch_description || "Untitled Batch"}
+                            <strong>Project:</strong>{" "}
+                            {project.name || "Untitled Project"}
                             <br />
-                            <strong>Reports:</strong> {batch.number_reports}
+                            <strong>Reports:</strong> {project.numberReports}
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
                           <AlertDialogAction
-                            onClick={() => handleDelete(batch.batch_hash)}
+                            onClick={() => handleDelete(project.projectId)}
                             className="bg-red-600 hover:bg-red-700"
                           >
                             Delete
@@ -261,7 +261,7 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
                         Embedding Progress
                       </span>
                       <span className="font-medium">
-                        {batch.embedded} / {batch.number_reports} ({progress}%)
+                        {project.numberReportsProcessed} / {project.numberReports} ({progress}%)
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
@@ -271,8 +271,8 @@ export const BatchManagement = forwardRef<BatchManagementRef>((_, ref) => {
                       />
                     </div>
                     <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>Assigned: {batch.assigned}</span>
-                      <span>Embedded: {batch.embedded}</span>
+                      <span>Ready: {project.numberReportsReady}</span>
+                      <span>Processed: {project.numberReportsProcessed}</span>
                     </div>
                   </div>
                 </div>

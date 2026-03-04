@@ -19,6 +19,22 @@ export async function getUsers(): Promise<UserDto[]> {
   }));
 }
 
+export async function getUserById(id: string): Promise<UserDto | null> {
+  const user = await prisma.user.findUnique({
+    where: { id },
+  });
+
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    roles: user.roles as Role[],
+    isApproved: user.isApproved,
+  };
+}
+
 export async function updateUser(
   id: string,
   updateUserDto: UpdateUserDto

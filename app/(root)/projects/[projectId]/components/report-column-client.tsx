@@ -14,11 +14,11 @@ import ReportList from "./report-list";
 interface ReportColumnClientProps {
   children: ReactNode;
   reports: ReportDetailDto[];
-  batchHash: string;
+  projectId: string;
 }
 
-export function ReportColumnClient({ children, reports, batchHash }: ReportColumnClientProps) {
-  const panelBaseId = `batch-panels-${batchHash}`;
+export function ReportColumnClient({ children, reports, projectId }: ReportColumnClientProps) {
+  const panelBaseId = `project-panels-${projectId}`;
   const reportsPanelId = `${panelBaseId}-reports`;
   const detailsPanelId = `${panelBaseId}-details`;
   const resizeHandleId = `${panelBaseId}-resize-handle`;

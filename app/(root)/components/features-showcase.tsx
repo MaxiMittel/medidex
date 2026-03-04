@@ -32,13 +32,13 @@ const features: Feature[] = [
     id: "dashboard",
     title: "Research Dashboard",
     description:
-      "Get a bird's-eye view of your research progress with personalized stats and batch overview.",
+      "Get a bird's-eye view of your research progress with personalized stats and project overview.",
     icon: LayoutDashboard,
     image: "/images/showcase/hompage.png",
     highlights: [
-      "Track total batches, reports, and assignment progress",
-      "Quick access to all your research batches",
-      "Visual progress indicators for each batch",
+      "Track total projects, reports, and assignment progress",
+      "Quick access to all your research projects",
+      "Visual progress indicators for each project",
       "Personalized greeting with motivational messages",
     ],
   },
@@ -95,7 +95,7 @@ const features: Feature[] = [
       "One-click study assignment to reports",
       "Visual confirmation of successful assignment",
       "Assigned studies shown as badges on reports",
-      "Track assignment progress across batches",
+      "Track assignment progress across projects",
     ],
   },
   {
@@ -157,7 +157,7 @@ export function FeaturesShowcase() {
           Discover MediDex Features
         </h2>
         <p className="text-muted-foreground mt-2 max-w-2xl">
-          From batch uploads to AI-powered study matching, explore how MediDex
+          From project creation to AI-powered study matching, explore how MediDex
           streamlines your medical research workflow.
         </p>
       </div>
@@ -256,7 +256,7 @@ export function FeaturesShowcase() {
 
       {/* Quick Feature Pills */}
       <div className="mt-8 flex flex-wrap gap-3 justify-center">
-        <FeaturePill icon={Upload} label="Batch Upload" />
+        <FeaturePill icon={Upload} label="Project Creation" />
         <FeaturePill icon={Sparkles} label="AI Matching" />
         <FeaturePill icon={Search} label="Smart Search" />
         <FeaturePill icon={Download} label="PDF Export" />

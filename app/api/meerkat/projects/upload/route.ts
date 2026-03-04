@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { uploadBatch } from "@/lib/api/batchApi";
+import { createProject } from "@/lib/api/projectApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
 export async function POST(request: NextRequest) {
@@ -15,12 +15,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const headers = await getMeerkatHeaders();
-    const batchHash = await uploadBatch(file, { headers });
-    return NextResponse.json({ batchHash });
+    const projectId = await createProject(file, { headers });
+    return NextResponse.json({ projectId });
   } catch (error) {
-    console.error("Unexpected error while uploading batch:", error);
+    console.error("Unexpected error while creating project:", error);
     return NextResponse.json(
-      { error: "Unexpected error while uploading batch." },
+      { error: "Unexpected error while creating project." },
       { status: 500 }
     );
   }

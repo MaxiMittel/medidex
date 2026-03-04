@@ -3,7 +3,6 @@
 import { create } from "zustand";
 import { evaluateStudiesStream } from "@/lib/api/genaiStreamApi";
 import type { PromptOverrides, ReportDto, StreamEvent, StudyDto } from "@/types/apiDTOs";
-import { RelevanceStudy } from "@/types/reports";
 
 export type AIClassification = "match" | "likely_match" | "unsure" | "not_match" | "very_likely";
 export type AIModel = "gpt-5.2" | "gpt-5" | "gpt-5-mini" | "gpt-4.1";
@@ -34,15 +33,15 @@ interface GenAIEvaluationStore {
   streamCleanups: Record<string, () => void>;
   dismissedSuggestions: Set<string>;
 
-  getReportKey: (batchHash: string, reportId: number) => string;
+  getReportKey: (projectId: string, reportId: number) => string;
   canStartEvaluation: () => boolean;
   isSuggestionDismissed: (suggestionKey: string) => boolean;
   dismissSuggestion: (suggestionKey: string) => void;
-  getReportEvaluationState: (batchHash: string, reportId: number) => ReportEvaluationState | null;
-  isEvaluationRunning: (batchHash: string, reportId: number) => boolean;
+  getReportEvaluationState: (projectId: string, reportId: number) => ReportEvaluationState | null;
+  isEvaluationRunning: (projectId: string, reportId: number) => boolean;
   getRunningEvaluationsCount: () => number;
-  getStudyResult: (batchHash: string, reportId: number, studyId: number) => StudyAIResult | null;
-  getResultsForReport: (batchHash: string, reportId: number) => Record<number, StudyAIResult> | undefined;
+  getStudyResult: (projectId: string, reportId: number, studyId: number) => StudyAIResult | null;
+  getResultsForReport: (projectId: string, reportId: number) => Record<number, StudyAIResult> | undefined;
   
   addStudyResult: (reportKey: string, studyId: number, classification: AIClassification, reason: string) => void;
   updateClassification: (reportKey: string, studyId: number, classification: AIClassification, reason?: string) => void;
@@ -51,15 +50,15 @@ interface GenAIEvaluationStore {
   endEvaluation: (reportKey: string, error?: string) => void;
   
   evaluateStream: (
-    batchHash: string,
+    projectId: string,
     report: ReportDto,
     studies: StudyDto[],
     options: { model?: AIModel; includePdf?: boolean; promptOverrides?: PromptOverrides },
     onStreamComplete?: () => void
   ) => () => void;
   
-  cancelStream: (batchHash?: string, reportId?: number) => void;
-  clearResults: (batchHash?: string, reportId?: number) => void;
+  cancelStream: (projectId?: string, reportId?: number) => void;
+  clearResults: (projectId?: string, reportId?: number) => void;
 }
 
 export const useGenAIEvaluationStore = create<GenAIEvaluationStore>((set, get) => ({
@@ -69,7 +68,7 @@ export const useGenAIEvaluationStore = create<GenAIEvaluationStore>((set, get) =
   streamCleanups: {},
   dismissedSuggestions: new Set(),
 
-  getReportKey: (batchHash: string, reportId: number) => `${batchHash}-${reportId}`,
+  getReportKey: (projectId: string, reportId: number) => `${projectId}-${reportId}`,
 
   canStartEvaluation: () => get().runningEvaluations.length < 4,
 
@@ -83,25 +82,25 @@ export const useGenAIEvaluationStore = create<GenAIEvaluationStore>((set, get) =
     });
   },
 
-  getReportEvaluationState: (batchHash: string, reportId: number) => {
-    const key = get().getReportKey(batchHash, reportId);
+  getReportEvaluationState: (projectId: string, reportId: number) => {
+    const key = get().getReportKey(projectId, reportId);
     return get().evaluationsByReport[key] || null;
   },
 
-  isEvaluationRunning: (batchHash: string, reportId: number) => {
-    const key = get().getReportKey(batchHash, reportId);
+  isEvaluationRunning: (projectId: string, reportId: number) => {
+    const key = get().getReportKey(projectId, reportId);
     return get().runningEvaluations.includes(key);
   },
 
   getRunningEvaluationsCount: () => get().runningEvaluations.length,
 
-  getStudyResult: (batchHash: string, reportId: number, studyId: number) => {
-    const key = get().getReportKey(batchHash, reportId);
+  getStudyResult: (projectId: string, reportId: number, studyId: number) => {
+    const key = get().getReportKey(projectId, reportId);
     return get().results[key]?.[studyId] || null;
   },
 
-  getResultsForReport: (batchHash: string, reportId: number) => {
-    const key = get().getReportKey(batchHash, reportId);
+  getResultsForReport: (projectId: string, reportId: number) => {
+    const key = get().getReportKey(projectId, reportId);
     return get().results[key];
   },
 
@@ -173,9 +172,9 @@ export const useGenAIEvaluationStore = create<GenAIEvaluationStore>((set, get) =
     });
   },
 
-  evaluateStream: (batchHash : string, report : ReportDto, studies : StudyDto[], options, onStreamComplete) => {
+  evaluateStream: (projectId : string, report : ReportDto, studies : StudyDto[], options, onStreamComplete) => {
     const { getReportKey, startEvaluation, addStudyResult, updateClassification, setEvaluationState, endEvaluation, streamCleanups } = get();
-    const reportKey = getReportKey(batchHash, report.reportId);
+    const reportKey = getReportKey(projectId, report.reportId);
 
     if (streamCleanups[reportKey]) {
       streamCleanups[reportKey]();
@@ -277,10 +276,10 @@ export const useGenAIEvaluationStore = create<GenAIEvaluationStore>((set, get) =
     return cleanup;
   },
 
-  cancelStream: (batchHash?: string, reportId?: number) => {
+  cancelStream: (projectId?: string, reportId?: number) => {
     const { getReportKey, streamCleanups, endEvaluation } = get();
-    if (batchHash !== undefined && reportId !== undefined) {
-      const reportKey = getReportKey(batchHash, reportId);
+    if (projectId !== undefined && reportId !== undefined) {
+      const reportKey = getReportKey(projectId, reportId);
       if (streamCleanups[reportKey]) {
         streamCleanups[reportKey]();
         const newCleanups = { ...streamCleanups };
@@ -294,10 +293,10 @@ export const useGenAIEvaluationStore = create<GenAIEvaluationStore>((set, get) =
     }
   },
 
-  clearResults: (batchHash?: string, reportId?: number) => {
+  clearResults: (projectId?: string, reportId?: number) => {
     const { getReportKey } = get();
-    if (batchHash !== undefined && reportId !== undefined) {
-      const reportKey = getReportKey(batchHash, reportId);
+    if (projectId !== undefined && reportId !== undefined) {
+      const reportKey = getReportKey(projectId, reportId);
       set((state) => {
         const newResults = { ...state.results };
         delete newResults[reportKey];

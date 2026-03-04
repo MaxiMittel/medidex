@@ -3,41 +3,41 @@ import axios from "axios";
 import { notFound } from "next/navigation";
 import { ReportDetailDto } from "@/types/apiDTOs";
 import { ReportColumnClient } from "./components/report-column-client";
-import { getBatchReports as fetchBatchReports } from "@/lib/api/batchApi";
+import { getProjectReports as fetchProjectReports } from "@/lib/api/projectApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ReportColumnProps {
     children: ReactNode;
     params: Promise<{
-        batchHash: string;
+        projectId: string;
     }>;
 }
 
-async function getBatchReports(batchHash: string): Promise<ReportDetailDto[]> {
+async function getProjectReports(projectId: string): Promise<ReportDetailDto[]> {
     const headers = await getMeerkatHeaders();
 
     try {
-        const reports = await fetchBatchReports(batchHash, { headers });
+        const reports = await fetchProjectReports(projectId, { headers });
         return reports ?? [];
     } catch (error) {
         if (axios.isAxiosError(error) && error.response?.status === 404) {
             notFound();
         }
 
-        throw new Error("Failed to load batch reports.");
+        throw new Error("Failed to load project reports.");
     }
 }
 
 export default async function ReportColumn({ children, params }: ReportColumnProps) {
     const resolvedParams = await params;
-    const batchHash = resolvedParams?.batchHash;
+    const projectId = resolvedParams?.projectId;
 
-    if (!batchHash) {
+    if (!projectId) {
         notFound();
     }
 
-    const reports = await getBatchReports(batchHash);
+    const reports = await getProjectReports(projectId);
 
     const detailsContent = (
         <Suspense fallback={<ReportDetailsSkeleton />}>
@@ -46,7 +46,7 @@ export default async function ReportColumn({ children, params }: ReportColumnPro
     );
 
     return (
-        <ReportColumnClient batchHash={batchHash} reports={reports}>
+        <ReportColumnClient projectId={projectId} reports={reports}>
             {detailsContent}
         </ReportColumnClient>
     );

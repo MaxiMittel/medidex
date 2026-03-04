@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { assignStudiesToReport, removeStudiesFromReport } from "@/lib/api/batchApi";
+import { assignStudiesToReport, removeStudiesFromReport } from "@/lib/api/projectApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ batchHash: string; reportIndex: string }> }
+  { params }: { params: Promise<{ projectId: string; reportIndex: string }> }
 ) {
-  const { batchHash, reportIndex } = await params;
+  const { projectId, reportIndex } = await params;
 
-  if (!batchHash || typeof reportIndex === "undefined") {
+  if (!projectId || typeof reportIndex === "undefined") {
     return NextResponse.json(
-      { error: "Missing batch hash or report index." },
+      { error: "Missing project id or report index." },
       { status: 400 }
     );
   }
@@ -37,7 +37,7 @@ export async function PUT(
 
   try {
     const headers = await getMeerkatHeaders();
-    await assignStudiesToReport(batchHash, Number(reportIndex), studyIds, {
+    await assignStudiesToReport(projectId, Number(reportIndex), studyIds, {
       headers,
     });
 
@@ -56,20 +56,20 @@ export async function PUT(
 
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: Promise<{ batchHash: string; reportIndex: string }> }
+  { params }: { params: Promise<{ projectId: string; reportIndex: string }> }
 ) {
-  const { batchHash, reportIndex } = await params;
+  const { projectId, reportIndex } = await params;
 
-  if (!batchHash || typeof reportIndex === "undefined") {
+  if (!projectId || typeof reportIndex === "undefined") {
     return NextResponse.json(
-      { error: "Missing batch hash or report index." },
+      { error: "Missing project id or report index." },
       { status: 400 }
     );
   }
 
   try {
     const headers = await getMeerkatHeaders();
-    await removeStudiesFromReport(batchHash, Number(reportIndex), { headers });
+    await removeStudiesFromReport(projectId, Number(reportIndex), { headers });
 
     return NextResponse.json({ success: true });
   } catch (error) {

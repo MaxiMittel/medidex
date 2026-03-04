@@ -3,13 +3,21 @@ export interface TokenDto {
   token_type: string;
 }
 
-export interface BatchDto {
-  batch_hash: string;
-  batch_description: string;
-  number_reports: number;
-  created_at: string;
-  embedded: number;
-  assigned: number;
+export interface ProjectAssigneeDto {
+  userId : string;
+  numberReportsLinked: number;
+}
+
+export interface ProjectDto {
+  projectId: string;
+  name: string;
+  numberReports: number;
+  createdAt: string;
+  numberReportsProcessed: number;
+  numberReportsWithPdf: number;
+  numberReportsReady: number;
+  owner: string;
+  assignees : ProjectAssigneeDto[]
 }
 
 export interface ReportDetailDto {

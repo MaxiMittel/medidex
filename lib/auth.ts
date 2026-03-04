@@ -1,5 +1,4 @@
 import { betterAuth } from "better-auth";
-import { customSession } from "better-auth/plugins";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import prisma from "./db";
@@ -18,7 +17,7 @@ export const auth = betterAuth({
       roles: {
         type: [Role.USER, Role.ADMIN],
         required: false,
-        defaultValue: Role.USER,
+        defaultValue: [Role.USER],
         input: false, // don't allow user to set role
       },
       isApproved: {

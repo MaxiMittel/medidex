@@ -1,16 +1,14 @@
-"use client";
-
 import { Layers, FileText, CheckCircle2, Sparkles } from "lucide-react";
 
 interface QuickStatsProps {
-  totalBatches: number;
+  totalProjects: number;
   totalReports: number;
   totalAssigned: number;
   totalEmbedded: number;
 }
 
 export function QuickStats({
-  totalBatches,
+  totalProjects,
   totalReports,
   totalAssigned,
   totalEmbedded,
@@ -21,8 +19,8 @@ export function QuickStats({
 
   const stats = [
     {
-      label: "Batches",
-      value: totalBatches,
+      label: "Projects",
+      value: totalProjects,
       icon: Layers,
       accent: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
     },
@@ -33,7 +31,7 @@ export function QuickStats({
       accent: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
     },
     {
-      label: "Assigned",
+      label: "Studyfied",
       value: `${assignmentRate}%`,
       subtext: `${totalAssigned} of ${totalReports}`,
       icon: CheckCircle2,

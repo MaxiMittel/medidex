@@ -13,7 +13,7 @@ interface UploadFile {
   progress: number;
   status: "pending" | "uploading" | "completed" | "error";
   error?: string;
-  batchHash?: string;
+  projectId?: string;
 }
 
 interface UploadSectionProps {
@@ -88,7 +88,7 @@ export function UploadSection(props: UploadSectionProps) {
       const formData = new FormData();
       formData.append("file", uploadFile.file, uploadFile.file.name);
 
-      const response = await fetch("/api/meerkat/batches/upload", {
+      const response = await fetch("/api/meerkat/projects/upload", {
         method: "POST",
         body: formData,
         cache: "no-store",
@@ -100,10 +100,10 @@ export function UploadSection(props: UploadSectionProps) {
 
       if (!response.ok) {
         const errorMessage = await response.text();
-        throw new Error(errorMessage || "Failed to upload batch via proxy route.");
+        throw new Error(errorMessage || "Failed create project via proxy route.");
       }
 
-      const { batchHash } = (await response.json()) as { batchHash: string };
+      const { projectId } = (await response.json()) as { projectId: string };
 
       if (progressInterval) {
         clearInterval(progressInterval);
@@ -113,15 +113,12 @@ export function UploadSection(props: UploadSectionProps) {
       setFiles((prev) =>
         prev.map((f) =>
           f.id === uploadFile.id
-            ? { ...f, status: "completed", progress: 100, batchHash }
+            ? { ...f, status: "completed", progress: 100, projectId }
             : f
         )
       );
 
-      // Refresh batches list
-      //await fetchBatches();
-
-      // Trigger callback to reload batch management
+      // Trigger callback to reload project management
       if (onUploadSuccess) {
         onUploadSuccess();
       }
@@ -293,9 +290,9 @@ export function UploadSection(props: UploadSectionProps) {
                     <p className="text-xs text-gray-500">
                       {formatFileSize(file.file.size)}
                     </p>
-                    {file.batchHash && (
+                    {file.projectId && (
                       <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                        Batch: {file.batchHash}
+                        Project: {file.projectId}
                       </p>
                     )}
                   </div>
