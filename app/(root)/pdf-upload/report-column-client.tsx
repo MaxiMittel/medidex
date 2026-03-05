@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -20,7 +20,7 @@ export function ReportColumnClient({ children, reports, projectId }: ReportColum
   const reportsPanelId = `${panelBaseId}-reports`;
   const detailsPanelId = `${panelBaseId}-details`;
   const resizeHandleId = `${panelBaseId}-resize-handle`;
-
+  
   return (
       <ResizablePanelGroup
         id={panelBaseId}
@@ -33,7 +33,7 @@ export function ReportColumnClient({ children, reports, projectId }: ReportColum
           minSize={25}
           className="border-r bg-background min-w-0 flex-[0_0_55%]"
         >
-          <ReportList reports={reports} baseUrl="pdf-upload"/>
+          <ReportList reports={reports} baseUrl="pdf-upload" useStudyBadges={false}/>
         </ResizablePanel>
 
         <ResizableHandle

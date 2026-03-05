@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -9,7 +9,8 @@ import {
 import { DetailsSheetProvider } from "@/app/context/details-sheet-context";
 import StudySheet from "../study-sheet";
 import { ReportDetailDto } from "@/types/apiDTOs";
-import { ReportList } from "@/components/ui/study-view/reports-list";
+import { ReportList } from "@/components/ui/study-view/report-list";
+import { useReportStore } from "@/hooks/use-report-store";
 
 interface ReportColumnClientProps {
   children: ReactNode;
@@ -22,6 +23,12 @@ export function ReportColumnClient({ children, reports, projectId }: ReportColum
   const reportsPanelId = `${panelBaseId}-reports`;
   const detailsPanelId = `${panelBaseId}-details`;
   const resizeHandleId = `${panelBaseId}-resize-handle`;
+
+  const setReports = useReportStore((state) => state.setReports);
+  
+  useEffect(() => {
+    setReports(reports);
+  }, [reports, setReports]);
 
   return (
     <DetailsSheetProvider>
@@ -36,7 +43,7 @@ export function ReportColumnClient({ children, reports, projectId }: ReportColum
           minSize={25}
           className="border-r bg-background min-w-0 flex-[0_0_55%]"
         >
-          <ReportList reports={reports} baseUrl="projects"/>
+          <ReportList reports={reports} baseUrl="projects" useStudyBadges={true}/>
         </ResizablePanel>
 
         <ResizableHandle

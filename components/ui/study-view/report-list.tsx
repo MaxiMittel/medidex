@@ -6,7 +6,6 @@ import {
   Calendar,
   Users,
   Download,
-  Loader2,
   Sparkles,
   Search,
   X,
@@ -20,15 +19,13 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
-import { useReportStore } from "@/hooks/use-report-store";
-import { ReportDetailDto, ReportDto, StudyDto } from "../../../types/apiDTOs";
+import { ReportDetailDto } from "../../../types/apiDTOs";
 
 interface ReportListProps {
   reports: ReportDetailDto[];
   baseUrl: string;
+  useStudyBadges: boolean;
 }
-
-const getAssignmentKey = (reportId: number, studyId: number) => `${reportId}-${studyId}`;
 
 const toTimestamp = (value: Date | string | number | null | undefined): number | null => {
   if (value === null || value === undefined) {
@@ -51,13 +48,14 @@ const isNewStudyAssignment = (
 export function ReportList({
   reports,
   baseUrl,
+  useStudyBadges,
 }: ReportListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [assignmentFilter, setAssignmentFilter] = useState<
     "all" | "assigned" | "unassigned" | "newStudy"
   >("all");
   const [downloadingPdf, setDownloadingPdf] = useState<Set<number>>(new Set());
-   const params = useParams();
+  const params = useParams();
   const projectId =
     typeof params.projectId === "string"
       ? params.projectId
@@ -89,27 +87,10 @@ export function ReportList({
     }
   }, [selectedReportId]);
 
-  const setReports = useReportStore((state) => state.setReports);
-
-  useEffect(() => {
-    setReports(reports);
-  }, [reports, setReports]);
-
   const storeResults = useGenAIEvaluationStore((state) => state.results);
   const runningEvaluations = useGenAIEvaluationStore((state) => state.runningEvaluations);
-  const storedReports = useReportStore((state) => state.reports);
 
-  const reportsWithStoredAssignments = useMemo(
-    () =>
-      reports.map((report) => ({
-        ...report,
-        assignedStudies:
-          storedReports[report.report.reportId]?.assignedStudies ?? report.assignedStudies,
-      })),
-    [reports, storedReports]
-  );
-
-  const filteredReports = reportsWithStoredAssignments.filter((report) => {
+  const filteredReports = reports.filter((report) => {
     // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -344,13 +325,10 @@ export function ReportList({
                         {report.report.abstract}
                       </p>
                     )}
-
-                    {report.assignedStudies.length > 0 && (
-                      <ReportAssignedStudiesBadges
-                        report={report}
-                        reportCreatedAt={report.report.createdAt}
-                      />
-                    )}
+                    {useStudyBadges && (
+                    <ReportAssignedStudiesBadges
+                      report={report}
+                    />)}
                   </div>
 
                   {/* Expanded Abstract */}
