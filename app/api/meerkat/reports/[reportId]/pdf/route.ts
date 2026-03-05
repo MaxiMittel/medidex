@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getReportPdf } from "@/lib/api/studiesApi";
+import { getReportPdf } from "@/lib/api/reportApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
 export async function GET(

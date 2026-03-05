@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import type { ProjectDto } from "@/types/apiDTOs";
+import type { ProjectDetailsDto } from "@/types/apiDTOs";
 import { useState, useEffect, useImperativeHandle, forwardRef } from "react";
 
 export interface ProjectManagementRef {
@@ -38,7 +38,7 @@ export interface ProjectManagementRef {
 }
 
 export const ProjectManagement = forwardRef<ProjectManagementRef>((_, ref) => {
-  const [projects, setProjects] = useState<ProjectDto[]>([]);
+  const [projects, setProjects] = useState<ProjectDetailsDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -61,7 +61,7 @@ export const ProjectManagement = forwardRef<ProjectManagementRef>((_, ref) => {
           errorMessage || "Failed to load projects via proxy route."
         );
       }
-      const projectList = (await response.json()) as ProjectDto[];
+      const projectList = (await response.json()) as ProjectDetailsDto[];
       setProjects(projectList);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load projects");
@@ -121,13 +121,13 @@ export const ProjectManagement = forwardRef<ProjectManagementRef>((_, ref) => {
     }
   };
 
-  const getProgressPercentage = (project: ProjectDto) => {
-    if (project.numberReports === 0) return 0;
-    return Math.round((project.numberReportsProcessed / project.numberReports) * 100);
+  const getProgressPercentage = (project: ProjectDetailsDto) => {
+    if (project.numberReportsTotal === 0) return 0;
+    return Math.round((project.numberReportsReadyForReview / project.numberReportsTotal) * 100);
   };
 
-  const isProcessing = (project: ProjectDto) => {
-    return project.numberReportsProcessed < project.numberReports;
+  const isProcessing = (project: ProjectDetailsDto) => {
+    return project.numberReportsReadyForReview < project.numberReportsTotal;
   };
 
   return (
@@ -197,7 +197,7 @@ export const ProjectManagement = forwardRef<ProjectManagementRef>((_, ref) => {
                       <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4" />
-                          <span>{project.numberReports} reports</span>
+                          <span>{project.numberReportsTotal} reports</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
@@ -238,7 +238,7 @@ export const ProjectManagement = forwardRef<ProjectManagementRef>((_, ref) => {
                             <strong>Project:</strong>{" "}
                             {project.name || "Untitled Project"}
                             <br />
-                            <strong>Reports:</strong> {project.numberReports}
+                            <strong>Reports:</strong> {project.numberReportsTotal}
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -261,7 +261,7 @@ export const ProjectManagement = forwardRef<ProjectManagementRef>((_, ref) => {
                         Embedding Progress
                       </span>
                       <span className="font-medium">
-                        {project.numberReportsProcessed} / {project.numberReports} ({progress}%)
+                        {project.numberReportsPreProcessed} / {project.numberReportsTotal} ({progress}%)
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
@@ -271,8 +271,8 @@ export const ProjectManagement = forwardRef<ProjectManagementRef>((_, ref) => {
                       />
                     </div>
                     <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>Ready: {project.numberReportsReady}</span>
-                      <span>Processed: {project.numberReportsProcessed}</span>
+                      <span>Ready: {project.numberReportsReadyForReview}</span>
+                      <span>Processed: {project.numberReportsPreProcessed}</span>
                     </div>
                   </div>
                 </div>

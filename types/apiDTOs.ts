@@ -6,13 +6,21 @@ export interface ProjectAssigneeDto {
 export interface ProjectDto {
   projectId: string;
   name: string;
-  numberReports: number;
   createdAt: string;
-  numberReportsProcessed: number;
-  numberReportsWithPdf: number;
-  numberReportsReady: number;
   owner: string;
+  numberReportsReadyForProcessing: number;
+}
+
+export interface ProjectDetailsDto extends ProjectDto{
+  numberReportsTotal: number;
+  numberReportsPreProcessed: number;
+  numberReportsReadyForReview: number;
   assignees : ProjectAssigneeDto[]
+}
+
+export interface ProjectTaskDto {
+  project : ProjectDto;
+  numberReportsProcessed: number;
 }
 
 export interface ReportDetailDto {

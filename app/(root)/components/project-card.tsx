@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -15,7 +14,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Calendar, UserPlus, Check, Settings, FileUp, ClipboardCheck, Trash2, Download, Bot } from "lucide-react";
-import type { ProjectDto, ProjectAssigneeDto } from "@/types/apiDTOs";
+import type { ProjectDetailsDto, ProjectAssigneeDto } from "@/types/apiDTOs";
 import type { UserDto } from "@/types/user/user.dto";
 
 const EMPTY_USERS: UserDto[] = [];
@@ -33,11 +32,10 @@ const withMediBot = (users: UserDto[]) => {
 };
 
 interface ProjectCardProps {
-  project: ProjectDto;
+  project: ProjectDetailsDto;
   index?: number;
   assignableUsers?: UserDto[];
   onAssigneesChange?: (payload: { projectId: string; userIds: string[] }) => void;
-  currentUserId?: string;
 }
 
 const getUserInitials = (name?: string) => {
@@ -58,7 +56,6 @@ export function ProjectCard({
   project,
   index = 0,
   assignableUsers = EMPTY_USERS,
-  currentUserId,
   onAssigneesChange,
 }: ProjectCardProps) {
   const router = useRouter();
@@ -67,7 +64,9 @@ export function ProjectCard({
   );
   const [isAssigneePopoverOpen, setIsAssigneePopoverOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [pendingAssigneeId, setPendingAssigneeId] = useState<string | null>(null);
   const availableUsers = useMemo(() => withMediBot(assignableUsers), [assignableUsers]);
+  const isUpdatingAssignees = pendingAssigneeId !== null;
 
   useEffect(() => {
     setAssigneeIds((project.assignees ?? []).map((assignee) => assignee.userId));
@@ -95,25 +94,70 @@ export function ProjectCard({
     profile: knownUsers.get(userId),
   }));
 
-  const overflowCount = Math.max(resolvedAssignees.length - 3, 0);
   const hasAssignees = assigneeIds.length > 0;
-  const ownerName = useMemo(() => {
-    if (!project.owner) return "Unassigned";
-    return knownUsers.get(project.owner)?.name ?? project.owner;
-  }, [project.owner, knownUsers]);
 
-  const toggleAssignee = (userId: string) => {
-    setAssigneeIds((prev) => {
-      const isSelected = prev.includes(userId);
-      const next = isSelected ? prev.filter((id) => id !== userId) : [...prev, userId];
-      onAssigneesChange?.({ projectId: project.projectId, userIds: next });
-      return next;
-    });
-  };
+  const toggleAssignee = useCallback(
+    async (userId: string) => {
+      if (isUpdatingAssignees) {
+        return;
+      }
+      const normalizedUserId = userId.trim();
+      if (!normalizedUserId) {
+        return;
+      }
+      const isSelected = assigneeIds.includes(normalizedUserId);
+      const endpoint = isSelected
+        ? `/api/meerkat/projects/${project.projectId}/assignees/${encodeURIComponent(normalizedUserId)}`
+        : `/api/meerkat/projects/${project.projectId}/assignees`;
+      const requestInit: RequestInit = isSelected
+        ? { method: "DELETE" }
+        : {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(normalizedUserId),
+          };
 
-  const handleProjectNavigation = (projectId: string) => {
-    router.push(`/projects/${projectId}`);
-  };
+      setPendingAssigneeId(normalizedUserId);
+      try {
+        const response = await fetch(endpoint, requestInit);
+        if (!response.ok) {
+          let detail = "Failed to update project assignees.";
+          try {
+            const data = await response.json();
+            if (typeof data?.detail === "string") {
+              detail = data.detail;
+            } else if (data) {
+              detail = JSON.stringify(data);
+            }
+          } catch {
+            const text = await response.text();
+            if (text) {
+              detail = text;
+            }
+          }
+          throw new Error(detail);
+        }
+
+        setAssigneeIds((prev) => {
+          const next = isSelected
+            ? prev.filter((id) => id !== normalizedUserId)
+            : [...prev, normalizedUserId];
+          onAssigneesChange?.({ projectId: project.projectId, userIds: next });
+          return next;
+        });
+      } catch (error) {
+        console.error(`Failed to update assignee ${normalizedUserId}`, error);
+        window.alert(
+          error instanceof Error
+            ? error.message
+            : "Unable to update project assignees. Please try again."
+        );
+      } finally {
+        setPendingAssigneeId(null);
+      }
+    },
+    [assigneeIds, isUpdatingAssignees, onAssigneesChange, project.projectId]
+  );
 
   const handleDeleteProject = useCallback(async () => {
     if (isDeleting) return;
@@ -169,10 +213,10 @@ export function ProjectCard({
     }
   };
 
-  const totalReports = Math.max(project.numberReports, 1);
-  const processedCount = clamp(project.numberReportsProcessed ?? 0, 0, totalReports);
-  const pdfUploadedCount = clamp(project.numberReportsWithPdf ?? 0, 0, totalReports);
-  const reviewCompletedCount = clamp(project.numberReportsReady ?? 0, 0, totalReports);
+  const totalReports = Math.max(project.numberReportsTotal, 1);
+  const processedCount = clamp(project.numberReportsPreProcessed ?? 0, 0, totalReports);
+  const pdfUploadedCount = clamp(project.numberReportsReadyForProcessing ?? 0, 0, totalReports);
+  const reviewCompletedCount = clamp(project.numberReportsReadyForReview ?? 0, 0, totalReports);
 
   const progressPercent = totalReports > 0 ? Math.round((reviewCompletedCount / totalReports) * 100) : 0;
 
@@ -297,7 +341,6 @@ export function ProjectCard({
             <Calendar className="w-3 h-3" />
             {getRelativeTime(project.createdAt)}
           </p>
-          <p className="text-[11px] text-muted-foreground/80 mt-1">Owner · {ownerName}</p>
         </div>
         <Button
           type="button"
@@ -471,7 +514,11 @@ export function ProjectCard({
                         return (
                           <CommandItem
                             key={user.id}
-                            onSelect={() => toggleAssignee(user.id)}
+                            disabled={isUpdatingAssignees}
+                            onSelect={() => {
+                              if (isUpdatingAssignees) return;
+                              void toggleAssignee(user.id);
+                            }}
                             className="flex items-center gap-2"
                           >
                             <Avatar className="h-7 w-7 border border-border/70 bg-muted">

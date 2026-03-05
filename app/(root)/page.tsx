@@ -1,6 +1,8 @@
-import { getProjects } from "@/lib/api/projectApi";
+import { getProjects, getTasks } from "@/lib/api/projectApi";
+import prisma from "@/lib/db";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 import { ProjectCard } from "./components/project-card";
+import { TaskCard } from "./components/task-card";
 import { auth } from "../../lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -10,6 +12,7 @@ import { FeaturesShowcase } from "./components/features-showcase";
 import { Role } from "@/enums/role.enum";
 import { Button } from "@/components/ui/button";
 import { FileText, Plus } from "lucide-react";
+import type { ProjectTaskDto } from "@/types/apiDTOs";
 import type { UserDto } from "@/types/user/user.dto";
 import { getUsers } from "./user-management/server";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
@@ -24,8 +27,45 @@ async function fetchProjects() {
   }
 }
 
+async function fetchTasks() {
+  try {
+    const headers = await getMeerkatHeaders();
+    return await getTasks({ headers });
+  } catch (error) {
+    console.error("Failed to fetch tasks:", error);
+    return [];
+  }
+}
+
+async function resolveOwnerNames(tasks: ProjectTaskDto[]) {
+  const ownerIds = Array.from(
+    new Set(
+      tasks
+        .map((task) => task.project.owner)
+        .filter((ownerId): ownerId is string => Boolean(ownerId))
+    )
+  );
+
+  if (ownerIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  try {
+    const owners = await prisma.user.findMany({
+      where: { id: { in: ownerIds } },
+      select: { id: true, name: true },
+    });
+
+    return new Map(owners.map((owner) => [owner.id, owner.name]));
+  } catch (error) {
+    console.error("Failed to resolve owner names:", error);
+    return new Map<string, string>();
+  }
+}
+
 export default async function Home() {
-  const projects = await fetchProjects();
+  const [projects, tasks] = await Promise.all([fetchProjects(), fetchTasks()]);
+  const ownerNameById = await resolveOwnerNames(tasks);
 
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -36,7 +76,9 @@ export default async function Home() {
   }
 
   const isAdmin = session.user.roles?.includes(Role.ADMIN) ?? false;
-  const currentUserId = session.user.id ?? undefined;
+  const emptyTaskMessage = isAdmin
+    ? "Create a project and assign it to yourself."
+    : "Ask an admin to assign you to a project.";
   let assignableUsers: UserDto[] = [];
 
   if (isAdmin) {
@@ -48,13 +90,9 @@ export default async function Home() {
   }
 
   // Calculate stats
-  const totalReports = projects.reduce((sum, b) => sum + b.numberReports, 0);
-  const totalAssigned = projects.reduce((sum, b) => sum + b.numberReportsReady, 0);
-  const totalEmbedded = projects.reduce((sum, b) => sum + b.numberReportsProcessed, 0);
-
-  const normalizedUserId = currentUserId ?? "";
-  const visibleProjects = projects.filter((project) => normalizedUserId === project.owner);
-  const hasVisibleProjects = visibleProjects.length > 0;
+  const totalReports = projects.reduce((sum, b) => sum + b.numberReportsTotal, 0);
+  const totalEmbedded = projects.reduce((sum, b) => sum + b.numberReportsPreProcessed, 0);
+  const totalAssigned = projects.reduce((sum, b) => sum + b.numberReportsReadyForReview, 0);
 
   return (
     <div className="flex-1 overflow-auto">
@@ -74,14 +112,39 @@ export default async function Home() {
         />
 
         <div className="mt-10">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-xl font-semibold tracking-tight">Your Projects</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Select a project to start linking the new reports to studies
-              </p>
+          <div className="mb-5">
+            <h2 className="text-xl font-semibold tracking-tight">Your Tasks</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Stay focused on the projects that need your attention right now.
+            </p>
+          </div>
+
+          {tasks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/25 bg-muted/30 px-6 py-12 text-center">
+              <p className="text-sm text-muted-foreground">{emptyTaskMessage}</p>
             </div>
-            {isAdmin && (
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {tasks.map((task) => (
+                <TaskCard
+                  key={task.project.projectId}
+                  task={task}
+                  ownerName={ownerNameById.get(task.project.owner)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {isAdmin && (
+          <div className="mt-10">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-xl font-semibold tracking-tight">Your Projects</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Select a project to start linking the new reports to studies
+                </p>
+              </div>
               <CreateProjectDialog
                 trigger={
                   <Button variant="outline" size="sm" className="gap-2">
@@ -90,19 +153,17 @@ export default async function Home() {
                   </Button>
                 }
               />
-            )}
-          </div>
+            </div>
 
-          {projects.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30">
-              <div className="w-16 h-16 bg-primary/10 flex items-center justify-center mb-5 rounded-full">
-                <FileText className="w-7 h-7 text-primary" />
-              </div>
-              <h2 className="text-xl font-semibold mb-2">No projects yet</h2>
-              <p className="text-muted-foreground max-w-sm mb-6">
-                Create your first project to start analyzing reports and discovering study connections.
-              </p>
-              {isAdmin ? (
+            {projects.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30">
+                <div className="w-16 h-16 bg-primary/10 flex items-center justify-center mb-5 rounded-full">
+                  <FileText className="w-7 h-7 text-primary" />
+                </div>
+                <h2 className="text-xl font-semibold mb-2">No projects yet</h2>
+                <p className="text-muted-foreground max-w-sm mb-6">
+                  Create your first project to start analyzing reports and discovering study connections.
+                </p>
                 <CreateProjectDialog
                   trigger={
                     <Button>
@@ -111,38 +172,21 @@ export default async function Home() {
                     </Button>
                   }
                 />
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Only administrators can create new projects.
-                </p>
-              )}
-            </div>
-          ) : (
-            <>
-              {!hasVisibleProjects ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-muted-foreground/30 bg-muted/20">
-                  <FileText className="w-10 h-10 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-1">Owner access required</h3>
-                  <p className="text-sm text-muted-foreground max-w-md">
-                    You are not listed as an owner for any projects yet. Ask an administrator to add you as an owner so you can view and manage specific projects.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
-                  {visibleProjects.map((project, index) => (
-                    <ProjectCard
-                      key={project.projectId}
-                      project={project}
-                      index={index}
-                      currentUserId={currentUserId}
-                      assignableUsers={assignableUsers}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+                {projects.map((project, index) => (
+                  <ProjectCard
+                    key={project.projectId}
+                    project={project}
+                    index={index}
+                    assignableUsers={assignableUsers}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <FeaturesShowcase />
       </div>

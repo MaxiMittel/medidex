@@ -28,7 +28,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { AddStudyDialog } from "./add-study-dialog";
 import { AIMatchSettingsDialog } from "./ai-match-settings-dialog";
 import { LoadMoreStudiesButton } from "./load-more-studies-button";
-import { sendReportEvent } from "@/lib/api/reportEventsApi";
 import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
 import type { AIModel } from "@/hooks/use-genai-evaluation-store";
 import type { NewStudySuggestion, PromptOverrides, StudyDto, StudyCreateDto } from "@/types/apiDTOs";

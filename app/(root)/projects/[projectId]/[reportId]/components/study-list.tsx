@@ -4,7 +4,7 @@ import { StudyRelevanceTable } from "@/components/ui/study-view/study-relevance-
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SimilarStudyDto } from "@/types/apiDTOs";
 import type { RelevanceStudy } from "@/types/reports";
-import { getSimilarStudiesByReport } from "@/lib/api/reportApi";
+import { getSimilarStudiesByReportId } from "@/lib/api/reportApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
 interface StudyListProps {
@@ -37,7 +37,7 @@ export default async function StudyList({ params, searchParams }: StudyListProps
   let response: SimilarStudyDto[] = [];
 
   try {
-    response = await getSimilarStudiesByReport(reportIdNumber, undefined, {
+    response = await getSimilarStudiesByReportId(reportIdNumber, undefined, {
       headers,
       params: { k, source },
     });

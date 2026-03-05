@@ -1,12 +1,24 @@
 import apiClient from "./apiClient";
 import { AxiosRequestConfig } from "axios";
-import {ProjectDto, ReportDetailDto, SimilarTagDto, GetSimilarTagsParams, GetSimilarStudiesParams, SimilarStudyDto} from "../../types/apiDTOs";
-import {serializeParams} from "./helpers";    
+import {ProjectAssigneeDto, ProjectDetailsDto, ProjectTaskDto, ReportDetailDto} from "../../types/apiDTOs";
 
 //get all projects
-export const getProjects = (config?: AxiosRequestConfig): Promise<ProjectDto[]> => {
+export const getProjects = (config?: AxiosRequestConfig): Promise<ProjectDetailsDto[]> => {
   return apiClient
-    .get<ProjectDto[]>("/projects", config)
+    .get<ProjectDetailsDto[]>("/projects", config)
+    .then(response => {
+      return response.data;
+    })
+    .catch(error => {
+      console.error("Error fetching project:", error);
+      throw error;
+    });
+}
+
+//get all projects
+export const getTasks = (config?: AxiosRequestConfig): Promise<ProjectTaskDto[]> => {
+  return apiClient
+    .get<ProjectTaskDto[]>("/tasks", config)
     .then(response => {
       return response.data;
     })
@@ -43,16 +55,6 @@ export const createProject = (
       });
 }
 
-//get a project by its id
-export const getProjectById = (projectId: string): Promise<ProjectDto> => {
-    return apiClient.get<ProjectDto>(`/projects/${projectId}`).then(response => {
-        return response.data;
-    }).catch(error => {
-        console.error(`Error fetching project with id ${projectId}:`, error);
-        throw error;
-    });
-}
-
 //delete a project by its id
 export const deleteProjectById = (
   projectId: string,
@@ -65,37 +67,6 @@ export const deleteProjectById = (
     })
     .catch(error => {
       console.error(`Error deleting project with id ${projectId}:`, error);
-      throw error;
-    });
-}
-
-//stream project information
-//this one is likely wrong, needs to be fixed return type is probably not string
-export const streamProjectInfo = (projectId: string): Promise<ProjectDto> => {
-    return apiClient.get<ProjectDto>(`/projects/${projectId}/subscribe`).then(response => {
-        return response.data;
-    }).catch(error => {
-        console.error(`Error streaming project info for id ${projectId}:`, error);
-        throw error;
-    });
-}
-
-//get report details by project id and report index
-export const getReportData = (
-  projectId: string,
-  reportIndex: number,
-  config?: AxiosRequestConfig
-): Promise<ReportDetailDto> => {
-  return apiClient
-    .get<ReportDetailDto>(`/projects/${projectId}/${reportIndex}`, config)
-    .then(response => {
-      return response.data;
-    })
-    .catch(error => {
-      console.error(
-        `Error fetching report data for project ${projectId}, report ${reportIndex}:`,
-        error
-      );
       throw error;
     });
 }
@@ -116,76 +87,46 @@ export const getProjectReports = (
     });
 }
 
-//assign studies to a report
-export const assignStudiesToReport = (
+export const assignUserToProject = (
   projectId: string,
-  reportIndex: number,
-  studyIds: number[],
+  userId: string,
   config?: AxiosRequestConfig
-): Promise<void> => {
-  const path = `/projects/${projectId}/${reportIndex}/studies`;
-  const requestConfig = {
-    ...config,
-    params: { study_ids: studyIds },
-    paramsSerializer: { serialize: serializeParams } 
-  };
-  return apiClient.put(path, null, requestConfig).then(response => response.data);
-}
+): Promise<ProjectAssigneeDto> => {
+  const path = `/projects/${projectId}/assignees`;
 
-//remove studies from a report
-export const removeStudiesFromReport = (
-  projectId: string,
-  reportIndex: number,
-  config?: AxiosRequestConfig
-): Promise<void> => {
-  const path = `/projects/${projectId}/${reportIndex}/studies`;
   return apiClient
-    .delete(path, config)
-    .then(response => {
-      return;
-    })
+    .post<ProjectAssigneeDto>(path, JSON.stringify(userId), config)
+    .then(response => response.data)
     .catch(error => {
-      console.error(`Error removing studies from report ${reportIndex}:`, error);
+      console.error(`Error assigning user to project ${projectId}:`, error);
+      if (error.response?.data?.detail) {
+        const errorMessage = typeof error.response.data.detail === "string"
+          ? error.response.data.detail
+          : JSON.stringify(error.response.data.detail);
+        throw new Error(errorMessage);
+      }
       throw error;
     });
-}
+};
 
-//get similar tags for a report
-//will get a 500 server error if you test it because the endpoint is broken on the server side
-export const getSimilarTags = (
+export const removeUserFromProject = (
   projectId: string,
-  reportIndex: number,
-  params: GetSimilarTagsParams
-): Promise<SimilarTagDto[]> => {
-  const path = `/projects/${projectId}/${reportIndex}/similar-tags`;
-  return apiClient.get<SimilarTagDto[]>(path, {
-    params: params,
-    paramsSerializer: { serialize: serializeParams }, 
-  }).then(response => response.data);
-}
-
-
-//endpoint to get similar studies for a report
-//api endpoint gives data in a weirdly columnar format so might have to be converted to array of objects later
-export const getSimilarStudies = (
-  projectId: string,
-  reportIndex: number,
-  params: GetSimilarStudiesParams = {},
+  userId: string,
   config?: AxiosRequestConfig
-): Promise<SimilarStudyDto[]> => { 
-  const path = `/projects/${projectId}/${reportIndex}/similar-studies`;
-  return apiClient.get<SimilarStudyDto[]>(path, {
-      ...config,
-      params: params,
-      paramsSerializer: { serialize: serializeParams }
-    })
-    .then(response => {
-      return response.data;
-    })
+): Promise<void> => {
+  const path = `/projects/${projectId}/assignees/${userId}`;
+
+  return apiClient
+    .delete<void>(path, config)
+    .then(() => undefined)
     .catch(error => {
-      console.error(`Error fetching similar studies for report ${reportIndex}:`, error);
+      console.error(`Error removing user ${userId} from project ${projectId}:`, error);
+      if (error.response?.data?.detail) {
+        const errorMessage = typeof error.response.data.detail === "string"
+          ? error.response.data.detail
+          : JSON.stringify(error.response.data.detail);
+        throw new Error(errorMessage);
+      }
       throw error;
     });
-}
-
-//Endpoint to get studies related to a specific tag always gives server error 500 so not implemented yet
+};
