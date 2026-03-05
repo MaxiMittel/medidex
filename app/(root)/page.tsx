@@ -9,8 +9,10 @@ import { QuickStats } from "./components/quick-stats";
 import { FeaturesShowcase } from "./components/features-showcase";
 import { Role } from "@/enums/role.enum";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
 import { FileText, Plus } from "lucide-react";
+import type { UserDto } from "@/types/user/user.dto";
+import { getUsers } from "./user-management/server";
+import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 
 async function fetchProjects() {
   try {
@@ -35,23 +37,23 @@ export default async function Home() {
 
   const isAdmin = session.user.roles?.includes(Role.ADMIN) ?? false;
   const currentUserId = session.user.id ?? undefined;
+  let assignableUsers: UserDto[] = [];
+
+  if (isAdmin) {
+    try {
+      assignableUsers = await getUsers();
+    } catch (error) {
+      console.error("Failed to fetch assignable users:", error);
+    }
+  }
 
   // Calculate stats
   const totalReports = projects.reduce((sum, b) => sum + b.numberReports, 0);
   const totalAssigned = projects.reduce((sum, b) => sum + b.numberReportsReady, 0);
   const totalEmbedded = projects.reduce((sum, b) => sum + b.numberReportsProcessed, 0);
 
-  const projectsWithOwnership = projects.map((project) => {
-    const normalizedUserId = currentUserId ?? "";
-    const isOwner = normalizedUserId == project.owner;
-
-    return {
-      project,
-      isOwner
-    };
-  });
-
-  const visibleProjects = projectsWithOwnership.filter((entry) => entry.isOwner)
+  const normalizedUserId = currentUserId ?? "";
+  const visibleProjects = projects.filter((project) => normalizedUserId === project.owner);
   const hasVisibleProjects = visibleProjects.length > 0;
 
   return (
@@ -79,6 +81,16 @@ export default async function Home() {
                 Select a project to start linking the new reports to studies
               </p>
             </div>
+            {isAdmin && (
+              <CreateProjectDialog
+                trigger={
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    <span className="hidden sm:inline">Create Project</span>
+                  </Button>
+                }
+              />
+            )}
           </div>
 
           {projects.length === 0 ? (
@@ -91,12 +103,14 @@ export default async function Home() {
                 Create your first project to start analyzing reports and discovering study connections.
               </p>
               {isAdmin ? (
-                <Button asChild>
-                  <Link href="/upload">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create your first project.
-                  </Link>
-                </Button>
+                <CreateProjectDialog
+                  trigger={
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create your first project
+                    </Button>
+                  }
+                />
               ) : (
                 <p className="text-sm text-muted-foreground">
                   Only administrators can create new projects.
@@ -115,13 +129,13 @@ export default async function Home() {
                 </div>
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
-                  {visibleProjects.map(({ project, isOwner }, index) => (
+                  {visibleProjects.map((project, index) => (
                     <ProjectCard
                       key={project.projectId}
                       project={project}
                       index={index}
-                      isProjectOwner={isOwner}
                       currentUserId={currentUserId}
+                      assignableUsers={assignableUsers}
                     />
                   ))}
                 </div>

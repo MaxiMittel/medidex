@@ -1,6 +1,6 @@
 import apiClient from "./apiClient";
 import { AxiosRequestConfig } from "axios";
-import {ProjectDto, ReportDetailDto, SimilarTagDto, GetSimilarTagsParams, GetSimilarStudiesParams, SimilarStudyResponseDto} from "../../types/apiDTOs";
+import {ProjectDto, ReportDetailDto, SimilarTagDto, GetSimilarTagsParams, GetSimilarStudiesParams, SimilarStudyDto} from "../../types/apiDTOs";
 import {serializeParams} from "./helpers";    
 
 //get all projects
@@ -71,8 +71,8 @@ export const deleteProjectById = (
 
 //stream project information
 //this one is likely wrong, needs to be fixed return type is probably not string
-export const streamProjectInfo = (projectId: string): Promise<string> => {
-    return apiClient.get<string>(`/projects/${projectId}/subscribe`).then(response => {
+export const streamProjectInfo = (projectId: string): Promise<ProjectDto> => {
+    return apiClient.get<ProjectDto>(`/projects/${projectId}/subscribe`).then(response => {
         return response.data;
     }).catch(error => {
         console.error(`Error streaming project info for id ${projectId}:`, error);
@@ -172,9 +172,9 @@ export const getSimilarStudies = (
   reportIndex: number,
   params: GetSimilarStudiesParams = {},
   config?: AxiosRequestConfig
-): Promise<SimilarStudyResponseDto[]> => { 
+): Promise<SimilarStudyDto[]> => { 
   const path = `/projects/${projectId}/${reportIndex}/similar-studies`;
-  return apiClient.get<SimilarStudyResponseDto[]>(path, {
+  return apiClient.get<SimilarStudyDto[]>(path, {
       ...config,
       params: params,
       paramsSerializer: { serialize: serializeParams }

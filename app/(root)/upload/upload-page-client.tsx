@@ -8,7 +8,7 @@ import { useRef, useCallback } from "react";
 export function UploadPageClient() {
   const projectManagementRef = useRef<ProjectManagementRef>(null);
 
-  const handleUploadSuccess = useCallback(() => {
+  const handleUploadSuccess = useCallback((_projectId?: string) => {
     // Trigger reload of project management
     if (projectManagementRef.current) {
       projectManagementRef.current.reload();

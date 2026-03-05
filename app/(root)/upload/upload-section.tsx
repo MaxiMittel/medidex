@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback, useEffect, useImperativeHandle, forwardRef } from "react";
 import { Upload, FileText, X, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -16,77 +16,121 @@ interface UploadFile {
   projectId?: string;
 }
 
-interface UploadSectionProps {
-  onUploadSuccess?: () => void;
+export interface UploadSectionHandle {
+  triggerUpload: () => void;
 }
 
-export function UploadSection(props: UploadSectionProps) {
-  const { onUploadSuccess } = props;
-  const [files, setFiles] = useState<UploadFile[]>([]);
+export interface UploadSectionSnapshot {
+  hasFile: boolean;
+  status: UploadFile["status"] | null;
+}
+
+interface UploadSectionProps {
+  onUploadSuccess?: (projectId: string) => void;
+  buildFormData?: (file: File) => FormData;
+  disabled?: boolean;
+  emptyQueueMessage?: string;
+  autoStart?: boolean;
+  onStateChange?: (snapshot: UploadSectionSnapshot) => void;
+}
+
+export const UploadSection = forwardRef<UploadSectionHandle, UploadSectionProps>(function UploadSection(
+  {
+    onUploadSuccess,
+    buildFormData,
+    disabled = false,
+    emptyQueueMessage,
+    autoStart = true,
+    onStateChange,
+  }: UploadSectionProps,
+  ref,
+) {
+  const [currentFile, setCurrentFile] = useState<UploadFile | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const createFormData = useCallback(
+    (file: File) => {
+      if (buildFormData) {
+        return buildFormData(file);
+      }
+      const formData = new FormData();
+      formData.append("file", file, file.name);
+      return formData;
+    },
+    [buildFormData],
+  );
+
+  useEffect(() => {
+    onStateChange?.({
+      hasFile: Boolean(currentFile),
+      status: currentFile?.status ?? null,
+    });
+  }, [currentFile, onStateChange]);
+
   const handleUploadClick = () => {
+    if (disabled) return;
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) return;
     const selectedFiles = event.target.files;
-    if (selectedFiles && selectedFiles.length > 0) {
-      const newFiles: UploadFile[] = Array.from(selectedFiles).map((file) => ({
-        id: `${Date.now()}-${Math.random()}`,
-        file,
-        progress: 0,
-        status: "pending" as const,
-      }));
-      setFiles((prev) => [...prev, ...newFiles]);
+    if (!selectedFiles?.length) return;
 
-      // Start uploading each file
-      newFiles.forEach((uploadFile) => {
-        void uploadFileToServer(uploadFile);
-      });
+    const selectedFile = selectedFiles[0];
+    const newFile: UploadFile = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      file: selectedFile,
+      progress: 0,
+      status: "pending",
+    };
+
+    setCurrentFile(newFile);
+    if (autoStart) {
+      void uploadFileToServer(newFile);
     }
 
-    // Reset input so same file can be selected again
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
-  const uploadFileToServer = async (uploadFile: UploadFile) => {
+  const uploadFileToServer = useCallback(async (uploadFile: UploadFile) => {
     let progressInterval: NodeJS.Timeout | null = null;
 
     try {
-      // Update status to uploading
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === uploadFile.id
-            ? { ...f, status: "uploading", progress: 10 }
-            : f
-        )
+      setCurrentFile((prev) =>
+        prev && prev.id === uploadFile.id ? { ...prev, status: "uploading", progress: 10 } : prev,
       );
 
-      // Simulate progress (since we don't have real upload progress from axios)
       progressInterval = setInterval(() => {
-        setFiles((prev) =>
-          prev.map((f) => {
-            if (
-              f.id === uploadFile.id &&
-              f.status === "uploading" &&
-              f.progress < 90
-            ) {
-              return { ...f, progress: Math.min(f.progress + 10, 90) };
-            }
-            return f;
-          })
-        );
+        setCurrentFile((prev) => {
+          if (!prev || prev.id !== uploadFile.id || prev.status !== "uploading") {
+            return prev;
+          }
+          if (prev.progress >= 90) return prev;
+          return { ...prev, progress: Math.min(prev.progress + 10, 90) };
+        });
       }, 200);
 
-      // Upload the file
-      const formData = new FormData();
-      formData.append("file", uploadFile.file, uploadFile.file.name);
+      let formData: FormData;
+      try {
+        formData = createFormData(uploadFile.file);
+      } catch (builderError) {
+        const builderMessage =
+          builderError instanceof Error ? builderError.message : "Unable to prepare upload payload.";
+        setCurrentFile((prev) =>
+          prev && prev.id === uploadFile.id
+            ? {
+                ...prev,
+                status: "error",
+                error: builderMessage,
+              }
+            : prev,
+        );
+        return;
+      }
 
       const response = await fetch("/api/meerkat/projects/upload", {
         method: "POST",
@@ -109,21 +153,14 @@ export function UploadSection(props: UploadSectionProps) {
         clearInterval(progressInterval);
       }
 
-      // Update to completed
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === uploadFile.id
-            ? { ...f, status: "completed", progress: 100, projectId }
-            : f
-        )
+      setCurrentFile((prev) =>
+        prev && prev.id === uploadFile.id
+          ? { ...prev, status: "completed", progress: 100, projectId }
+          : prev,
       );
 
-      // Trigger callback to reload project management
-      if (onUploadSuccess) {
-        onUploadSuccess();
-      }
+      onUploadSuccess?.(projectId);
     } catch (error) {
-      // Clear progress interval if it exists
       if (progressInterval) {
         clearInterval(progressInterval);
       }
@@ -132,34 +169,86 @@ export function UploadSection(props: UploadSectionProps) {
       if (error instanceof Error) {
         errorMessage = error.message;
       } else if (typeof error === "object" && error !== null) {
-        // Try to extract error message from various error formats
-        const errorObj = error as any;
-        if (errorObj.response?.data?.detail) {
-          errorMessage =
-            typeof errorObj.response.data.detail === "string"
-              ? errorObj.response.data.detail
-              : JSON.stringify(errorObj.response.data.detail);
-        } else if (errorObj.message) {
-          errorMessage = errorObj.message;
+        const errorObj = error as Record<string, unknown>;
+        const detail = (errorObj as any)?.response?.data?.detail;
+        if (typeof detail === "string") {
+          errorMessage = detail;
+        } else if (detail) {
+          errorMessage = JSON.stringify(detail);
+        } else if (typeof (errorObj as any)?.message === "string") {
+          errorMessage = (errorObj as any).message;
         }
       }
 
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === uploadFile.id
-            ? {
-                ...f,
-                status: "error",
-                error: errorMessage,
-              }
-            : f
-        )
+      setCurrentFile((prev) =>
+        prev && prev.id === uploadFile.id
+          ? {
+              ...prev,
+              status: "error",
+              error: errorMessage,
+            }
+          : prev,
       );
+    }
+  }, [createFormData, onUploadSuccess]);
+
+  const handleDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+    if (disabled) return;
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent) => {
+    event.preventDefault();
+    if (disabled) return;
+    setIsDragging(false);
+  };
+
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    if (disabled) return;
+    setIsDragging(false);
+
+    const droppedFiles = event.dataTransfer.files;
+    if (!droppedFiles.length) return;
+
+    const risFile = Array.from(droppedFiles).find((file) =>
+      file.name.toLowerCase().endsWith(".ris"),
+    );
+    if (!risFile) return;
+
+    const newFile: UploadFile = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      file: risFile,
+      progress: 0,
+      status: "pending",
+    };
+
+    setCurrentFile(newFile);
+    if (autoStart) {
+      void uploadFileToServer(newFile);
     }
   };
 
+  const triggerUpload = useCallback(() => {
+    if (!currentFile || currentFile.status === "uploading" || currentFile.status === "completed") {
+      return;
+    }
+    void uploadFileToServer({ ...currentFile, status: "pending" });
+  }, [currentFile, uploadFileToServer]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      triggerUpload,
+    }),
+    [triggerUpload],
+  );
+
   const removeFile = (id: string) => {
-    setFiles((prev) => prev.filter((file) => file.id !== id));
+    if (currentFile?.id === id) {
+      setCurrentFile(null);
+    }
   };
 
   const formatFileSize = (bytes: number) => {
@@ -167,7 +256,7 @@ export function UploadSection(props: UploadSectionProps) {
     const k = 1024;
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
+    return `${Math.round((bytes / Math.pow(k, i)) * 100) / 100} ${sizes[i]}`;
   };
 
   const getStatusColor = (status: UploadFile["status"]) => {
@@ -200,68 +289,36 @@ export function UploadSection(props: UploadSectionProps) {
     }
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-
-    const droppedFiles = e.dataTransfer.files;
-    if (droppedFiles.length > 0) {
-      const risFiles = Array.from(droppedFiles).filter((file) =>
-        file.name.toLowerCase().endsWith(".ris")
-      );
-
-      if (risFiles.length === 0) {
-        return;
-      }
-
-      const newFiles: UploadFile[] = risFiles.map((file) => ({
-        id: `${Date.now()}-${Math.random()}`,
-        file,
-        progress: 0,
-        status: "pending" as const,
-      }));
-      setFiles((prev) => [...prev, ...newFiles]);
-
-      // Start uploading each file
-      newFiles.forEach((uploadFile) => {
-        void uploadFileToServer(uploadFile);
-      });
-    }
-  };
-
   return (
     <div className="space-y-4">
-      {/* Upload Area */}
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`flex items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+        className={`flex items-center justify-center w-full h-32 border-2 border-dashed rounded-lg transition-colors ${
           isDragging
             ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-            : "border-gray-300 bg-gray-50 hover:bg-gray-100 dark:hover:bg-gray-800 dark:bg-gray-900 dark:border-gray-600 dark:hover:border-gray-500"
+            : `border-gray-300 bg-gray-50 hover:bg-gray-100 dark:hover:bg-gray-800 dark:bg-gray-900 dark:border-gray-600 dark:hover:border-gray-500 ${
+                disabled ? "opacity-70 cursor-not-allowed" : "cursor-pointer"
+              }`
         }`}
         onClick={handleUploadClick}
+        aria-disabled={disabled}
       >
-        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+        <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
           <Upload className="w-8 h-8 mb-2 text-gray-500 dark:text-gray-400" />
           <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
-            <span className="font-semibold">Click to upload</span> or drag and
-            drop
+            {disabled ? (
+              "Enter required details to enable uploads"
+            ) : (
+              <>
+                <span className="font-semibold">Click to upload</span> or drag and drop
+              </>
+            )}
           </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            RIS files only
-          </p>
+          {!disabled && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">RIS files only</p>
+          )}
         </div>
         <input
           ref={fileInputRef}
@@ -269,75 +326,56 @@ export function UploadSection(props: UploadSectionProps) {
           type="file"
           className="hidden"
           accept=".ris"
-          multiple
           onChange={handleFileChange}
+          disabled={disabled}
         />
       </div>
 
-      {/* File List */}
-      {files.length > 0 && (
+      {currentFile ? (
         <div className="space-y-3">
-          <h3 className="text-sm font-medium">Upload Queue</h3>
-          {files.map((file) => (
-            <div key={file.id} className="border rounded-lg p-3 space-y-2">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-2 flex-1 min-w-0">
-                  <FileText className="w-5 h-5 mt-0.5 shrink-0 text-gray-500" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {file.file.name}
+          <div className="border rounded-lg p-3 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start gap-2 flex-1 min-w-0">
+                <FileText className="w-5 h-5 mt-0.5 shrink-0 text-gray-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{currentFile.file.name}</p>
+                  <p className="text-xs text-gray-500">{formatFileSize(currentFile.file.size)}</p>
+                  {currentFile.projectId && (
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                      Project: {currentFile.projectId}
                     </p>
-                    <p className="text-xs text-gray-500">
-                      {formatFileSize(file.file.size)}
-                    </p>
-                    {file.projectId && (
-                      <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                        Project: {file.projectId}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge className={getStatusColor(file.status)}>
-                    {getStatusLabel(file.status)}
-                  </Badge>
-                  {file.status !== "uploading" && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={() => removeFile(file.id)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
                   )}
                 </div>
               </div>
-              {file.status === "uploading" && (
-                <div className="space-y-1">
-                  <Progress value={file.progress} className="h-2" />
-                  <p className="text-xs text-gray-500 text-right">
-                    {file.progress}%
-                  </p>
-                </div>
-              )}
-              {file.status === "error" && file.error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Upload failed</AlertTitle>
-                  <AlertDescription>{file.error}</AlertDescription>
-                </Alert>
-              )}
-              {file.status === "completed" && (
-                <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span>Upload successful</span>
-                </div>
-              )}
+              
             </div>
-          ))}
+
+            {currentFile.status === "uploading" && (
+              <div className="space-y-1">
+                <Progress value={currentFile.progress} className="h-2" />
+                <p className="text-xs text-gray-500 text-right">{currentFile.progress}%</p>
+              </div>
+            )}
+
+            {currentFile.status === "error" && currentFile.error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Upload failed</AlertTitle>
+                <AlertDescription>{currentFile.error}</AlertDescription>
+              </Alert>
+            )}
+
+            {currentFile.status === "completed" && (
+              <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Upload successful</span>
+              </div>
+            )}
+          </div>
         </div>
+      ) : (
+        emptyQueueMessage && <p className="text-xs text-muted-foreground">{emptyQueueMessage}</p>
       )}
     </div>
   );
-}
+});

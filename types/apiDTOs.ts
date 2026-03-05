@@ -1,8 +1,3 @@
-export interface TokenDto {
-  access_token: string;
-  token_type: string;
-}
-
 export interface ProjectAssigneeDto {
   userId : string;
   numberReportsLinked: number;
@@ -37,7 +32,7 @@ export interface GetSimilarTagsParams {
   k?: number;
 }
 
-export interface SimilarStudyResponseDto {
+export interface SimilarStudyDto {
   relevance: number;
   study: StudyDto;
 }

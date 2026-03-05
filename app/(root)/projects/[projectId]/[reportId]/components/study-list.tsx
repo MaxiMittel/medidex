@@ -2,7 +2,7 @@ import axios from "axios";
 import { notFound } from "next/navigation";
 import { StudyRelevanceTable } from "@/components/ui/study-view/study-relevance-table";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { SimilarStudyResponseDto } from "@/types/apiDTOs";
+import type { SimilarStudyDto } from "@/types/apiDTOs";
 import type { RelevanceStudy } from "@/types/reports";
 import { getSimilarStudiesByReport } from "@/lib/api/reportApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
@@ -18,7 +18,7 @@ interface StudyListProps {
 }
 
 const mapResponseToRelevanceStudies = (
-  response: SimilarStudyResponseDto[]
+  response: SimilarStudyDto[]
 ): RelevanceStudy[] => {
   return response.map((study) => ({
     ...study,
@@ -34,7 +34,7 @@ export default async function StudyList({ params, searchParams }: StudyListProps
   const reportIdNumber = Number(reportId);
 
   const headers = await getMeerkatHeaders();
-  let response: SimilarStudyResponseDto[] = [];
+  let response: SimilarStudyDto[] = [];
 
   try {
     response = await getSimilarStudiesByReport(reportIdNumber, undefined, {

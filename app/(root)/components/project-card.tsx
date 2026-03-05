@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Calendar, ArrowRight, UserPlus, Check, Settings, FileUp, ClipboardCheck } from "lucide-react";
+import { Calendar, UserPlus, Check, Settings, FileUp, ClipboardCheck, Trash2, Download, Bot } from "lucide-react";
 import type { ProjectDto, ProjectAssigneeDto } from "@/types/apiDTOs";
 import type { UserDto } from "@/types/user/user.dto";
 
@@ -32,17 +32,12 @@ const withMediBot = (users: UserDto[]) => {
   return hasMediBot ? users : [...users, MEDIBOT_USER];
 };
 
-type UsersResponse = {
-  users?: UserDto[];
-};
-
 interface ProjectCardProps {
   project: ProjectDto;
   index?: number;
   assignableUsers?: UserDto[];
   onAssigneesChange?: (payload: { projectId: string; userIds: string[] }) => void;
   currentUserId?: string;
-  isProjectOwner?: boolean;
 }
 
 const getUserInitials = (name?: string) => {
@@ -64,7 +59,6 @@ export function ProjectCard({
   index = 0,
   assignableUsers = EMPTY_USERS,
   currentUserId,
-  isProjectOwner = false,
   onAssigneesChange,
 }: ProjectCardProps) {
   const router = useRouter();
@@ -72,44 +66,12 @@ export function ProjectCard({
     (project.assignees ?? []).map((assignee) => assignee.userId),
   );
   const [isAssigneePopoverOpen, setIsAssigneePopoverOpen] = useState(false);
-  const [availableUsers, setAvailableUsers] = useState<UserDto[]>(withMediBot(assignableUsers));
+  const [isDeleting, setIsDeleting] = useState(false);
+  const availableUsers = useMemo(() => withMediBot(assignableUsers), [assignableUsers]);
 
   useEffect(() => {
     setAssigneeIds((project.assignees ?? []).map((assignee) => assignee.userId));
   }, [project.assignees]);
-
-  useEffect(() => {
-    setAvailableUsers(withMediBot(assignableUsers));
-  }, [assignableUsers]);
-
-  useEffect(() => {
-    let active = true;
-
-    const fetchAssignableUsers = async () => {
-      try {
-        const response = await fetch("/api/users", { cache: "no-store" });
-        if (!response.ok) {
-          if (response.status !== 403) {
-            console.error("Failed to load users", await response.text());
-          }
-          return;
-        }
-
-        const data: UsersResponse = await response.json();
-        if (active && Array.isArray(data?.users)) {
-          setAvailableUsers(withMediBot(data.users));
-        }
-      } catch (error) {
-        console.error("Failed to load users", error);
-      }
-    };
-
-    fetchAssignableUsers();
-
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const sortedUsers = useMemo(
     () => [...availableUsers].sort((a, b) => a.email.localeCompare(b.email)),
@@ -152,6 +114,31 @@ export function ProjectCard({
   const handleProjectNavigation = (projectId: string) => {
     router.push(`/projects/${projectId}`);
   };
+
+  const handleDeleteProject = useCallback(async () => {
+    if (isDeleting) return;
+    const confirmed = window.confirm(`Delete project "${project.name}"? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/meerkat/projects/${project.projectId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to delete project");
+      }
+
+      router.refresh();
+    } catch (error) {
+      console.error("Failed to delete project", error);
+      window.alert("Unable to delete project. Please try again or contact an administrator.");
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [isDeleting, project.name, project.projectId, router]);
 
   const formatDate = (dateString: string) => {
     try {
@@ -209,22 +196,20 @@ export function ProjectCard({
     router.push(buildReviewUrl("review"));
   }, [buildReviewUrl, router]);
 
-  const handleStartStudification = useCallback(() => {
-    router.push(`/projects/${project.projectId}`);
-  }, [project.projectId, router]);
+  const handleStartExport = useCallback(() => {
+    window.alert("Export is coming soon. We'll start the download once all reports are ready.");
+  }, []);
+
+  const isExportReady = reviewCompletedCount >= totalReports;
 
   const stageMetrics = [
     {
       id: "processing",
-      label: "Processing",
+      label: "Preprocessing",
       icon: Settings,
       value: processedCount,
       total: totalReports,
       fillClass: "bg-primary/70",
-      description:
-        processedCount >= totalReports
-          ? "Processing complete"
-          : `${processedCount} processed`,
     },
     {
       id: "pdf",
@@ -233,10 +218,6 @@ export function ProjectCard({
       value: pdfUploadedCount,
       total: totalReports,
       fillClass: "bg-sky-500/70",
-      description:
-        pdfUploadedCount >= totalReports
-          ? "PDFs uploaded"
-          : `${pdfUploadedCount} uploaded`,
       cta: {
         label: "Start PDF Upload",
         variant: "secondary",
@@ -250,40 +231,53 @@ export function ProjectCard({
       value: reviewCompletedCount,
       total: totalReports,
       fillClass: "bg-emerald-500/70",
-      description: `${reviewCompletedCount} ready (${progressPercent}%)`,
       cta: {
         label: "Start Review",
         onClick: handleStartReview,
       },
     },
+    {
+      id: "export",
+      label: "Ready for Export",
+      icon: Download,
+      value: reviewCompletedCount,
+      total: totalReports,
+      fillClass: "bg-amber-500/70",
+      cta: {
+        label: "Start Export",
+        variant: "secondary",
+        onClick: handleStartExport,
+        disabled: !isExportReady,
+      },
+    },
   ];
+
+  const processingStage = stageMetrics.find((stage) => stage.id === "processing");
+  const actionableStageMetrics = stageMetrics.filter((stage) => stage.id !== "processing");
+  const ProcessingStageIcon = processingStage?.icon;
+  const processingStagePercent = processingStage && processingStage.total > 0
+    ? Math.round((processingStage.value / processingStage.total) * 100)
+    : 0;
 
   const getReviewerProgress = (userId: string) =>
     clamp(((assigneeMap.get(userId)?.numberReportsLinked ?? 0) / totalReports) * 100);
 
-  const isCurrentUserAssigned = currentUserId ? assigneeIds.includes(currentUserId) : false;
-  const personalAssignment = currentUserId
-    ? assigneeMap.get(currentUserId) ?? (isCurrentUserAssigned ? { userId: currentUserId, numberReportsLinked: 0 } : undefined)
-    : undefined;
-  const showPersonalProgress = Boolean(personalAssignment);
-  const personalReportsLinked = personalAssignment?.numberReportsLinked ?? 0;
-  const personalProgressPercent = showPersonalProgress
-    ? clamp((personalReportsLinked / totalReports) * 100)
-    : 0;
-  const personalProgressRounded = Math.round(personalProgressPercent);
-  const personalProgressDescription =
-    personalReportsLinked >= totalReports
-      ? "All assigned reports linked"
-      : personalReportsLinked > 0
-        ? `${personalReportsLinked} of ${totalReports} reports linked`
-        : "You haven't linked any reports yet";
-
-  const handlePersonalProgressKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      handleProjectNavigation(project.projectId);
-    }
-  };
+  const assigneeProgressPanels = resolvedAssignees.map(({ userId, profile }) => {
+    const linkedReports = assigneeMap.get(userId)?.numberReportsLinked ?? 0;
+    return {
+      userId,
+      name: profile?.name ?? userId,
+      percent: getReviewerProgress(userId),
+      linkedReports,
+    };
+  });
+  const orderedAssigneePanels = assigneeProgressPanels.length
+    ? [
+        ...assigneeProgressPanels.filter((panel) => panel.userId === MEDIBOT_USER.id),
+        ...assigneeProgressPanels.filter((panel) => panel.userId !== MEDIBOT_USER.id),
+      ]
+    : assigneeProgressPanels;
+  const hasAssigneePanels = orderedAssigneePanels.length > 0;
 
   return (
     <div
@@ -305,133 +299,145 @@ export function ProjectCard({
           </p>
           <p className="text-[11px] text-muted-foreground/80 mt-1">Owner · {ownerName}</p>
         </div>
-        <ArrowRight className="w-4 h-4 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0 mt-0.5" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={(event) => {
+            event.stopPropagation();
+            handleDeleteProject();
+          }}
+          disabled={isDeleting}
+        >
+          <Trash2 className="w-4 h-4 text-destructive" />
+          <span className="sr-only">Delete project</span>
+        </Button>
       </div>
 
-      {(isProjectOwner || showPersonalProgress) && (
-        <div className="mt-4 space-y-3">
-          {isProjectOwner && (
-            <>
-              <div className="flex items-center gap-3">
-                {stageMetrics.map((stage) => {
-                  const percent = stage.total > 0 ? Math.round((stage.value / stage.total) * 100) : 0;
-                  return (
-                    <div key={stage.id} className="flex-1">
-                      <div className="relative h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div className={`absolute inset-y-0 left-0 ${stage.fillClass}`} style={{ width: `${percent}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
+      <div className="mt-4 space-y-3">
+        {processingStage && ProcessingStageIcon && (
+          <div className="rounded-md border border-dashed border-border/60 bg-muted/20 px-3 py-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1 font-semibold uppercase tracking-wide">
+                <ProcessingStageIcon className="h-3.5 w-3.5" />
+                <span>{processingStage.label}</span>
               </div>
-
-              <div className="grid grid-cols-1 gap-2 text-sm text-muted-foreground sm:grid-cols-3">
-                {stageMetrics.map((stage) => {
-                  const StageIcon = stage.icon;
-                  return (
-                    <div
-                      key={stage.id}
-                      className="rounded-lg border bg-muted/30 p-3 transition-colors group-hover:border-primary/30"
-                    >
-                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        <StageIcon className="h-3.5 w-3.5" />
-                        {stage.label}
-                      </div>
-                      <div className="mt-2 text-base font-semibold text-foreground">
-                        {stage.value} / {stage.total}
-                      </div>
-                      <p className="text-xs text-muted-foreground/80">{stage.description}</p>
-                      {stage.cta && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="mt-3 w-full"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            stage.cta?.onClick();
-                          }}
-                        >
-                          {stage.cta.label}
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-
-          {showPersonalProgress && (
-            <div
-              className="rounded-lg border bg-muted/40 p-4 cursor-pointer"
-              role="button"
-              tabIndex={0}
-              onClick={() => handleProjectNavigation(project.projectId)}
-              onKeyDown={handlePersonalProgressKeyDown}
-            >
-              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <span>Personal Progress</span>
-                <span>{personalProgressRounded}%</span>
-              </div>
-              <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
-                <div className="h-full rounded-full bg-primary" style={{ width: `${personalProgressPercent}%` }} />
-              </div>
-              <p className="mt-1.5 text-xs text-muted-foreground/80">{personalProgressDescription}</p>
-              <Button
-                type="button"
-                size="sm"
-                className="mt-3 w-full sm:w-auto"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleStartStudification();
-                }}
-              >
-                Start Studification
-              </Button>
+              <span className="text-sm font-semibold text-foreground">
+                {processingStage.value} / {processingStage.total}
+              </span>
             </div>
-          )}
+            <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+              <div
+                className={`h-full ${processingStage.fillClass}`}
+                style={{ width: `${processingStagePercent}%` }}
+              />
+            </div>
+            
+          </div>
+        )}
+
+        <div className="flex items-center gap-3">
+          {actionableStageMetrics.map((stage) => {
+            const percent = stage.total > 0 ? Math.round((stage.value / stage.total) * 100) : 0;
+            return (
+              <div key={stage.id} className="flex-1">
+                <div className="relative h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div className={`absolute inset-y-0 left-0 ${stage.fillClass}`} style={{ width: `${percent}%` }} />
+                </div>
+              </div>
+            );
+          })}
         </div>
-      )}
+
+        <div className="grid grid-cols-1 gap-2 text-sm text-muted-foreground sm:grid-cols-3">
+          {actionableStageMetrics.map((stage) => {
+            const StageIcon = stage.icon;
+            return (
+              <div
+                key={stage.id}
+                className="rounded-lg border bg-muted/30 p-3 transition-colors group-hover:border-primary/30"
+              >
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <StageIcon className="h-3.5 w-3.5" />
+                  {stage.label}
+                </div>
+                <div className="mt-2 text-base font-semibold text-foreground">
+                  {stage.value} / {stage.total}
+                </div>
+                {stage.cta && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="mt-3 w-full"
+                    disabled={stage.cta?.disabled}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      stage.cta?.onClick();
+                    }}
+                  >
+                    {stage.cta.label}
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <span>Studification Progress</span>
+          </div>
+          <div
+            className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory items-stretch"
+            style={{ height: "5.5rem" }}
+          >
+            {hasAssigneePanels ? (
+              orderedAssigneePanels.map((panel) => {
+                const isMediBot = panel.userId === MEDIBOT_USER.id;
+                const description = panel.linkedReports >= totalReports
+                  ? "All reports linked"
+                  : `${panel.linkedReports} of ${totalReports} reports linked`;
+
+                return (
+                  <div
+                    key={panel.userId}
+                    className="min-w-[15rem] rounded-lg border bg-muted/40 p-4 text-left flex flex-col justify-between h-full"
+                  >
+                    <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <span className="truncate flex items-center gap-1.5">
+                        {isMediBot && <Bot className="h-4 w-4" aria-hidden />}
+                        <span className="truncate">{panel.name}</span>
+                      </span>
+                    </div>
+                    <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full rounded-full bg-primary" style={{ width: `${panel.percent}%` }} />
+                    </div>
+                    <p className="mt-1.5 text-xs text-muted-foreground/80">{description}</p>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="flex-1 min-w-full flex-shrink-0 rounded-lg border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground flex flex-col justify-between h-full">
+                
+                <p className="mt-3 text-xs text-muted-foreground/80 text-center">
+                  Assign at least one studificator to start tracking progress.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       <div className="mt-4 space-y-3 border-t border-border/50 pt-3">
         <div className="flex items-center gap-2">
-          <div className="flex flex-1 items-center gap-2 min-h-10">
+          <div className="flex flex-1 items-center min-h-10">
             {hasAssignees ? (
-              <>
-                <div className="flex -space-x-2">
-                  {resolvedAssignees.slice(0, 3).map(({ userId, profile }) => {
-                    const name = profile?.name ?? userId;
-                    const reviewerProgress = getReviewerProgress(userId);
-                    return (
-                      <div
-                        key={userId}
-                        className="relative h-9 w-9"
-                        title={`${name} · ${Math.round(reviewerProgress)}%`}
-                      >
-                        <div
-                          className="absolute inset-0 rounded-full"
-                          style={{
-                            background:
-                              reviewerProgress > 0
-                                ? `conic-gradient(hsl(var(--primary)) ${reviewerProgress}%, hsl(var(--muted)) ${reviewerProgress}%)`
-                                : "hsl(var(--muted))",
-                          }}
-                        />
-                        <div className="absolute inset-[2px] rounded-full bg-card shadow-sm border border-border flex items-center justify-center text-[11px] font-semibold">
-                          {getUserInitials(name)}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                {overflowCount > 0 && (
-                  <Badge variant="secondary" className="text-[11px] font-medium">
-                    +{overflowCount} more
-                  </Badge>
-                )}
-              </>
+              <p className="text-xs text-muted-foreground">
+                {resolvedAssignees.length} studificator{resolvedAssignees.length === 1 ? "" : "s"} assigned.
+              </p>
             ) : (
-              <p className="text-xs text-muted-foreground">No reviewers assigned yet.</p>
+              <p className="text-xs text-muted-foreground">No studificators assigned yet.</p>
             )}
           </div>
           <Popover open={isAssigneePopoverOpen} onOpenChange={setIsAssigneePopoverOpen}>
