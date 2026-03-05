@@ -83,6 +83,15 @@ export function ProjectCard({
     return map;
   }, [sortedUsers]);
 
+  const automationUsers = useMemo(
+    () => sortedUsers.filter((user) => user.id === MEDIBOT_USER.id),
+    [sortedUsers]
+  );
+  const humanUsers = useMemo(
+    () => sortedUsers.filter((user) => user.id !== MEDIBOT_USER.id),
+    [sortedUsers]
+  );
+
   const assigneeMap = useMemo(() => {
     const map = new Map<string, ProjectAssigneeDto>();
     (project.assignees ?? []).forEach((assignee) => map.set(assignee.userId, assignee));
@@ -214,9 +223,10 @@ export function ProjectCard({
   };
 
   const totalReports = Math.max(project.numberReportsTotal, 1);
-  const processedCount = clamp(project.numberReportsPreProcessed ?? 0, 0, totalReports);
-  const pdfUploadedCount = clamp(project.numberReportsReadyForProcessing ?? 0, 0, totalReports);
-  const reviewCompletedCount = clamp(project.numberReportsReadyForReview ?? 0, 0, totalReports);
+  const preprocessedCount = clamp(project.numberReportsPreProcessed ?? 0, 0, totalReports);
+  const readyForProcessingCount = clamp(project.numberReportsReadyForProcessing ?? 0, 0, totalReports);
+  const readyForReviewCount = clamp(project.numberReportsReadyForReview ?? 0, 0, totalReports);
+  const reviewCompletedCount = 0;
 
   const progressPercent = totalReports > 0 ? Math.round((reviewCompletedCount / totalReports) * 100) : 0;
 
@@ -232,8 +242,8 @@ export function ProjectCard({
   );
 
   const handleStartPdfUpload = useCallback(() => {
-    const params = new URLSearchParams({ project: project.projectId });
-    router.push(`/upload?${params.toString()}`);
+    const path = `/pdf-upload/${encodeURIComponent(project.projectId)}`;
+    router.push(path);
   }, [project.projectId, router]);
 
   const handleStartReview = useCallback(() => {
@@ -251,7 +261,7 @@ export function ProjectCard({
       id: "processing",
       label: "Preprocessing",
       icon: Settings,
-      value: processedCount,
+      value: preprocessedCount,
       total: totalReports,
       fillClass: "bg-primary/70",
     },
@@ -259,7 +269,7 @@ export function ProjectCard({
       id: "pdf",
       label: "PDF Upload",
       icon: FileUp,
-      value: pdfUploadedCount,
+      value: readyForProcessingCount,
       total: totalReports,
       fillClass: "bg-sky-500/70",
       cta: {
@@ -272,7 +282,7 @@ export function ProjectCard({
       id: "review",
       label: "Ready for Review",
       icon: ClipboardCheck,
-      value: reviewCompletedCount,
+      value: readyForReviewCount,
       total: totalReports,
       fillClass: "bg-emerald-500/70",
       cta: {
@@ -322,6 +332,32 @@ export function ProjectCard({
       ]
     : assigneeProgressPanels;
   const hasAssigneePanels = orderedAssigneePanels.length > 0;
+
+  const renderUserCommandItem = (user: UserDto) => {
+    const isSelected = assigneeIds.includes(user.id);
+    const isMediBotUser = user.id === MEDIBOT_USER.id;
+    return (
+      <CommandItem
+        key={user.id}
+        disabled={isUpdatingAssignees}
+        onSelect={() => {
+          if (isUpdatingAssignees) return;
+          void toggleAssignee(user.id);
+        }}
+        className="flex items-center gap-2"
+      >
+        <Avatar className="h-7 w-7 border border-border/70 bg-muted">
+          <AvatarFallback className="text-[11px] font-semibold">
+            {isMediBotUser ? <Bot className="h-3.5 w-3.5" aria-hidden /> : getUserInitials(user.name)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex-1 truncate">
+          <p className="text-sm font-medium leading-tight truncate">{user.name}</p>
+        </div>
+        {isSelected && <Check className="h-4 w-4 text-primary" />}
+      </CommandItem>
+    );
+  };
 
   return (
     <div
@@ -438,9 +474,11 @@ export function ProjectCard({
             {hasAssigneePanels ? (
               orderedAssigneePanels.map((panel) => {
                 const isMediBot = panel.userId === MEDIBOT_USER.id;
-                const description = panel.linkedReports >= totalReports
-                  ? "All reports linked"
-                  : `${panel.linkedReports} of ${totalReports} reports linked`;
+                const description = readyForProcessingCount <= 0
+                  ? "No reports available"
+                  : panel.linkedReports >= readyForProcessingCount
+                    ? "All reports linked"
+                    : `${panel.linkedReports} of ${readyForProcessingCount} reports linked`;
 
                 return (
                   <div
@@ -508,32 +546,18 @@ export function ProjectCard({
                 <CommandList className="max-h-64 overflow-y-auto">
                   <CommandEmpty>No users found.</CommandEmpty>
                   {sortedUsers.length ? (
-                    <CommandGroup heading="Team">
-                      {sortedUsers.map((user) => {
-                        const isSelected = assigneeIds.includes(user.id);
-                        return (
-                          <CommandItem
-                            key={user.id}
-                            disabled={isUpdatingAssignees}
-                            onSelect={() => {
-                              if (isUpdatingAssignees) return;
-                              void toggleAssignee(user.id);
-                            }}
-                            className="flex items-center gap-2"
-                          >
-                            <Avatar className="h-7 w-7 border border-border/70 bg-muted">
-                              <AvatarFallback className="text-[11px] font-semibold">
-                                {getUserInitials(user.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 truncate">
-                              <p className="text-sm font-medium leading-tight truncate">{user.name}</p>
-                            </div>
-                            {isSelected && <Check className="h-4 w-4 text-primary" />}
-                          </CommandItem>
-                        );
-                      })}
-                    </CommandGroup>
+                    <>
+                      {automationUsers.length > 0 && (
+                        <CommandGroup heading="Automation">
+                          {automationUsers.map(renderUserCommandItem)}
+                        </CommandGroup>
+                      )}
+                      {humanUsers.length > 0 && (
+                        <CommandGroup heading="Team">
+                          {humanUsers.map(renderUserCommandItem)}
+                        </CommandGroup>
+                      )}
+                    </>
                   ) : (
                     <div className="px-3 py-6 text-center text-sm text-muted-foreground">
                       No reviewers available yet.

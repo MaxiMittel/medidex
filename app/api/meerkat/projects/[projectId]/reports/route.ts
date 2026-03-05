@@ -18,7 +18,7 @@ export async function GET(
 
   try {
     const headers = await getMeerkatHeaders();
-    const reports = await getProjectReports(projectId, { headers });
+    const reports = await getProjectReports(projectId, true, { headers });
     return NextResponse.json(reports);
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) {

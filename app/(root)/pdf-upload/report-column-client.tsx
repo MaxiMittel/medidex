@@ -6,10 +6,8 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { DetailsSheetProvider } from "@/app/context/details-sheet-context";
-import StudySheet from "../study-sheet";
 import { ReportDetailDto } from "@/types/apiDTOs";
-import { ReportList } from "@/components/ui/study-view/reports-list";
+import { ReportList } from "@/components/ui/study-view/report-list";
 
 interface ReportColumnClientProps {
   children: ReactNode;
@@ -24,7 +22,6 @@ export function ReportColumnClient({ children, reports, projectId }: ReportColum
   const resizeHandleId = `${panelBaseId}-resize-handle`;
 
   return (
-    <DetailsSheetProvider>
       <ResizablePanelGroup
         id={panelBaseId}
         direction="horizontal"
@@ -36,7 +33,7 @@ export function ReportColumnClient({ children, reports, projectId }: ReportColum
           minSize={25}
           className="border-r bg-background min-w-0 flex-[0_0_55%]"
         >
-          <ReportList reports={reports} baseUrl="projects"/>
+          <ReportList reports={reports} baseUrl="pdf-upload"/>
         </ResizablePanel>
 
         <ResizableHandle
@@ -53,7 +50,5 @@ export function ReportColumnClient({ children, reports, projectId }: ReportColum
           {children}
         </ResizablePanel>
       </ResizablePanelGroup>
-      <StudySheet />
-    </DetailsSheetProvider>
   );
 }

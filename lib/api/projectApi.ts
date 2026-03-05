@@ -74,10 +74,19 @@ export const deleteProjectById = (
 //get all report details for a project
 export const getProjectReports = (
   projectId: string,
+  readyOnly: boolean,
   config?: AxiosRequestConfig
 ): Promise<ReportDetailDto[]> => {
+  const requestConfig: AxiosRequestConfig = {
+    ...config,
+    params: {
+      ...config?.params,
+      ready_only: readyOnly,
+    },
+  };
+
   return apiClient
-    .get<ReportDetailDto[]>(`/projects/${projectId}/reports`, config)
+    .get<ReportDetailDto[]>(`/projects/${projectId}/reports`, requestConfig)
     .then(response => {
       return response.data;
     })

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   FileText,
   Calendar,
@@ -11,30 +11,21 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
+import Link from "next/link";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
+import { ReportAssignedStudiesBadges } from "@/components/ui/study-view/report-assigned-studies-badges";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
 import { useReportStore } from "@/hooks/use-report-store";
 import { ReportDetailDto, ReportDto, StudyDto } from "../../../types/apiDTOs";
-import { useDetailsSheet } from "@/app/context/details-sheet-context";
 
-interface ReportsListProps {
+interface ReportListProps {
   reports: ReportDetailDto[];
+  baseUrl: string;
 }
 
 const getAssignmentKey = (reportId: number, studyId: number) => `${reportId}-${studyId}`;
@@ -57,26 +48,19 @@ const isNewStudyAssignment = (
   return studyTimestamp !== null && reportTimestamp !== null && studyTimestamp > reportTimestamp;
 };
 
-export function ReportsList({
+export function ReportList({
   reports,
-}: ReportsListProps) {
+  baseUrl,
+}: ReportListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [assignmentFilter, setAssignmentFilter] = useState<
     "all" | "assigned" | "unassigned" | "newStudy"
   >("all");
   const [downloadingPdf, setDownloadingPdf] = useState<Set<number>>(new Set());
-  const [studyToRemove, setStudyToRemove] = useState<{
-    report: ReportDto;
-    study: StudyDto;
-  } | null>(null);
-  const [removingAssignments, setRemovingAssignments] = useState<Set<string>>(new Set());
-  const router = useRouter();
-  const params = useParams();
+   const params = useParams();
   const projectId =
     typeof params.projectId === "string"
       ? params.projectId
-      : Array.isArray(params.projectId)
-      ? params.projectId[0]
       : undefined;
 
   const reportIdParam =
@@ -94,7 +78,7 @@ export function ReportsList({
     return Number.isNaN(parsed) ? null : parsed;
   }, [reportIdParam]);
 
-  const selectedCardRef = useRef<HTMLDivElement | null>(null);
+  const selectedCardRef = useRef<HTMLAnchorElement | null>(null);
 
   useEffect(() => {
     if (selectedReportId !== null && selectedCardRef.current) {
@@ -105,27 +89,15 @@ export function ReportsList({
     }
   }, [selectedReportId]);
 
+  const setReports = useReportStore((state) => state.setReports);
+
+  useEffect(() => {
+    setReports(reports);
+  }, [reports, setReports]);
+
   const storeResults = useGenAIEvaluationStore((state) => state.results);
-  const evaluationsByReport = useGenAIEvaluationStore((state) => state.evaluationsByReport);
   const runningEvaluations = useGenAIEvaluationStore((state) => state.runningEvaluations);
   const storedReports = useReportStore((state) => state.reports);
-  const removeAssignedStudy = useReportStore((state) => state.removeAssignedStudy);
-  const isRemovalDialogOpen = Boolean(studyToRemove);
-  const isConfirmingRemoval = studyToRemove
-    ? removingAssignments.has(getAssignmentKey(studyToRemove.report.reportId, studyToRemove.study.studyId))
-    : false;
-
-  const {openWithStudyId} = useDetailsSheet()
-
-  const navigateToReport = useCallback(
-    (reportId: number) => {
-      if (!projectId) {
-        return;
-      }
-      router.push(`/projects/${projectId}/${reportId}?k=10`);
-    },
-    [projectId, router]
-  );
 
   const reportsWithStoredAssignments = useMemo(
     () =>
@@ -163,54 +135,6 @@ export function ReportsList({
 
     return true;
   });
-
-  const handleStudyBadgeClick = useCallback(
-    (event: React.MouseEvent, studyId: number) => {
-      event.stopPropagation();
-      openWithStudyId(studyId);
-    },
-    []
-  );
-
-  const handleCardKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>, reportId: number) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        navigateToReport(reportId);
-      }
-    },
-    [navigateToReport]
-  );
-
-  const handleOpenRemoveDialog = useCallback((event: React.MouseEvent, report: ReportDto, study: StudyDto) => {
-    event.stopPropagation();
-    setStudyToRemove({ report, study });
-  }, []);
-
-  const handleConfirmRemove = async () => {
-    if (!studyToRemove) {
-      return;
-    }
-
-    const { report, study } = studyToRemove;
-    const assignmentKey = getAssignmentKey(report.reportId, study.studyId);
-    setRemovingAssignments((prev) => new Set(prev).add(assignmentKey));
-
-    try {
-      await removeAssignedStudy(report.reportId, study.studyId);
-      toast.success(`Removed study ${study.shortName} from report`);
-      setStudyToRemove(null);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      toast.error(`Failed to remove study ${study.shortName}: ${message}`);
-    } finally {
-      setRemovingAssignments((prev) => {
-        const next = new Set(prev);
-        next.delete(assignmentKey);
-        return next;
-      });
-    }
-  };
 
   const handleDownloadPdf = async (reportId: number, title: string, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -345,25 +269,31 @@ export function ReportsList({
               const hasAbstract = report.report.abstract && report.report.abstract.length > 0;
               const isSelected = selectedReportId === report.report.reportId;
               const isExpanded = isSelected && hasAbstract;
-              const reportKey = `${projectId}-${report.report.reportId}`;
+              const reportKey = `${report.report.reportId}`;
               const isRunningEvaluation = runningEvaluations.includes(reportKey);
               const reportResults = storeResults[reportKey];
               const resultCount = reportResults ? Object.keys(reportResults).length : 0;
-              
+              const reportHref = `/${baseUrl}/${projectId}/${report.report.reportId}?k=10`;
+
+              // If projectId is not available, render as non-link
+              if (!reportHref) {
+                return null;
+              }
+
               return (
-                <div
-                  ref={isSelected ? selectedCardRef : undefined}
-                  key={report.report.reportId || idx}
-                  role="button"
-                  tabIndex={0}
-                  aria-selected={isSelected}
-                  onClick={() => navigateToReport(report.report.reportId)}
-                  onKeyDown={(event) => handleCardKeyDown(event, report.report.reportId)}
-                  className={`relative rounded-lg border bg-card hover:border-primary/20 transition-all first:mt-3 scroll-mt-4 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60 ${
-                    isSelected
-                      ? "border-primary bg-primary/5 outline outline-2 outline-primary/40"
-                      : ""}`}
-                >
+                <Link
+                    key={report.report.reportId || idx}
+                    href={reportHref}
+                    scroll={true}
+                    ref={isSelected ? selectedCardRef : undefined}
+                    tabIndex={0}
+                    aria-selected={isSelected}
+                    className={`block relative rounded-lg border bg-card hover:border-primary/20 transition-all first:mt-3 scroll-mt-4 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60 ${
+                      isSelected
+                        ? "border-primary bg-primary/5 outline outline-2 outline-primary/40"
+                        : ""
+                    }`}
+                  >
                   {/* Report Content */}
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-3 mb-3">
@@ -416,42 +346,10 @@ export function ReportsList({
                     )}
 
                     {report.assignedStudies.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {report.assignedStudies.map((study) => {
-                          const assignmentKey = getAssignmentKey(report.report.reportId, study.studyId);
-                          const isRemovingAssignment = removingAssignments.has(assignmentKey);
-                          const isNewStudy = isNewStudyAssignment(
-                            study.createdAt,
-                            report.report.createdAt
-                          );
-                          return (
-                            <Badge
-                              key={study.studyId}
-                              variant={isNewStudy ? "destructive" : "outline"}
-                              className={`text-xs font-mono cursor-pointer inline-flex items-center gap-1 pr-2 ${
-                                isNewStudy ? "" : "border-destructive text-destructive"
-                              }`}
-                              onClick={(event) => handleStudyBadgeClick(event, study.studyId)}
-                            >
-                              <span>{study.shortName}</span>
-                              <button
-                                type="button"
-                                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-destructive/70 text-destructive-foreground hover:bg-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
-                                title="Remove study from report"
-                                aria-label={`Remove study ${study.shortName} from report`}
-                                onClick={(event) => handleOpenRemoveDialog(event, report.report, study)}
-                                disabled={isRemovingAssignment}
-                              >
-                                {isRemovingAssignment ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : (
-                                  <X className="h-3 w-3" />
-                                )}
-                              </button>
-                            </Badge>
-                          );
-                        })}
-                      </div>
+                      <ReportAssignedStudiesBadges
+                        report={report}
+                        reportCreatedAt={report.report.createdAt}
+                      />
                     )}
                   </div>
 
@@ -463,44 +361,13 @@ export function ReportsList({
                       </p>
                     </div>
                   )}
-                </div>
+                </Link>
               );
             })
           )}
         </div>
       </ScrollArea>
-      <AlertDialog
-        open={isRemovalDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setStudyToRemove(null);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove study assignment?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {studyToRemove
-                ? (
-                    <span>
-                      This will remove study <strong>{studyToRemove.study.shortName}</strong> from report <strong>{studyToRemove.report.title}</strong>.
-                    </span>
-                  )
-                : "Select a study to remove."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isConfirmingRemoval}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmRemove} disabled={isConfirmingRemoval}>
-              {isConfirmingRemoval && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      
     </div>
   );
 }
