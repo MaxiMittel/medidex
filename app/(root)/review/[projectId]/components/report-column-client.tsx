@@ -1,13 +1,14 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
 import { ReportDetailDto } from "@/types/apiDTOs";
-import { ReportList } from "@/components/ui/study-view/report-list";
+import { ReportList } from "@/components/ui/report-view/report-list";
+import { useReportStore } from "@/hooks/use-report-store";
 
 interface ReportColumnClientProps {
   children: ReactNode;
@@ -16,7 +17,7 @@ interface ReportColumnClientProps {
 }
 
 const reportFilterOptions = [
-  { value: "readyForReview", label: "Requireing Review" },
+  { value: "readyForReview", label: "Ready For Review" },
   { value: "notReadyForReview", label: "Not Ready Yet" },
 ];
 
@@ -25,6 +26,12 @@ export function ReportColumnClient({ children, reports, projectId }: ReportColum
   const reportsPanelId = `${panelBaseId}-reports`;
   const detailsPanelId = `${panelBaseId}-details`;
   const resizeHandleId = `${panelBaseId}-resize-handle`;
+
+  const setReports = useReportStore((state) => state.setReports);
+    
+  useEffect(() => {
+    setReports(reports);
+  }, [reports, setReports]);
   
   return (
       <ResizablePanelGroup
@@ -39,7 +46,6 @@ export function ReportColumnClient({ children, reports, projectId }: ReportColum
           className="border-r bg-background min-w-0 flex-[0_0_55%]"
         >
           <ReportList
-            reports={reports}
             baseUrl="review"
             useStudyBadges={false}
             filterOptions={reportFilterOptions}

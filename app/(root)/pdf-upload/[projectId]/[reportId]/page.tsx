@@ -5,14 +5,15 @@ import Link from "next/link";
 import {
   UploadSection,
   type UploadSectionHandle,
-  type UploadSectionSnapshot,
 } from "@/app/(root)/upload/upload-section";
-import { Button } from "@/components/ui/button";
 import { ReportSourcesDto } from "@/types/apiDTOs";
+import { useReportStore } from "@/hooks/use-report-store";
 
 import {
-  Upload
+  Upload,
+  FileText
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface PdfPageProps {
   params: Promise<{
@@ -22,18 +23,34 @@ interface PdfPageProps {
 }
 
 export default function PdfDetailsPage({ params }: PdfPageProps) {
+
   const { projectId, reportId } = use(params);
+
+  const setHasPdf = useReportStore((state) => state.setHasPdf);
 
   const uploadSectionRef = useRef<UploadSectionHandle>(null);
 
-  const [uploadSnapshot, setUploadSnapshot] =
-    useState<UploadSectionSnapshot>({ hasFile: false, status: null });
-
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [iframeKey, setIframeKey] = useState(0);
 
   const [links, setLinks] = useState<ReportSourcesDto | null>(null);
   const [linksLoading, setLinksLoading] = useState(true);
   const [linksError, setLinksError] = useState<string | null>(null);
+
+  const handleNotAvailableClick = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/meerkat/reports/${reportId}/pdf`, {
+        method: "POST",
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+      });
+      setIframeKey((k) => k + 1);
+    } catch (error) {
+      console.error('Error in Not Available button:', error);
+    }
+  }, [reportId, setIframeKey]);
 
   useEffect(() => {
     async function fetchLinks() {
@@ -56,27 +73,9 @@ export default function PdfDetailsPage({ params }: PdfPageProps) {
     fetchLinks();
   }, [reportId]);
 
-  const buildFormData = useCallback(
-    (file: File) => {
-      const formData = new FormData();
-      formData.append("projectId", projectId);
-      formData.append("reportId", reportId);
-      formData.append("file", file, file.name);
-      return formData;
-    },
-    [projectId, reportId]
-  );
-
   const handleUploadSuccess = useCallback(() => {
-    setSuccessMessage("PDF uploaded successfully.");
-  }, []);
-
-  const canUpload = uploadSnapshot.hasFile;
-  const isUploadDisabled =
-    !canUpload || uploadSnapshot.status === "uploading";
-
-  const handleUpload = useCallback(() => {
-    uploadSectionRef.current?.triggerUpload();
+    setHasPdf(Number(reportId), true);
+    setIframeKey((k) => k + 1); // force iframe reload
   }, []);
 
   return (
@@ -94,12 +93,15 @@ export default function PdfDetailsPage({ params }: PdfPageProps) {
           ) : (
             <a target="_blank" href={`https://www.doi.org/${links?.doi}`} className="truncate max-w-xs" style={{ display: 'inline-block', verticalAlign: 'middle', color: 'inherit', textDecoration: 'none' }}>{links?.doi}</a>
           )}
+          <div style={{ marginLeft: 'auto' }}>
+            <Button onClick={handleNotAvailableClick}>
+              Not Available
+            </Button>
+          </div>
         </div>
       </div>
 
       <div className="mb-3 p-4">
-        
-        <h4 className="text-lg font-semibold mb-1">Fulltext Links</h4>
 
         {linksLoading ? (
           <div className="text-muted-foreground">Loading links...</div>
@@ -112,7 +114,8 @@ export default function PdfDetailsPage({ params }: PdfPageProps) {
         ) : (
           <div>
             {links?.links.map((link, idx) => (
-              <div key={link + idx}>
+              <div key={link + idx} className="flex items-center gap-2 mb-1">
+                <FileText className="h-4 w-4 flex-shrink-0" />
                 <Link
                   href={link}
                   target="_blank"
@@ -132,39 +135,23 @@ export default function PdfDetailsPage({ params }: PdfPageProps) {
       <UploadSection
         ref={uploadSectionRef}
         onUploadSuccess={handleUploadSuccess}
-        buildFormData={buildFormData}
         disabled={false}
-        emptyQueueMessage="Uploaded PDFs will appear here."
+        showUploadButton={true}
         autoStart={false}
-        onStateChange={setUploadSnapshot}
         allowedFileExtension=".pdf"
+        hint="PDF files only"
+        uploadUrl={`/api/meerkat/reports/${reportId}/pdf`}
       />
       </div>
 
-      <div className="flex gap-2 mt-2">
-        <Button
-          type="button"
-          onClick={handleUpload}
-          disabled={isUploadDisabled}
-        >
-          Upload PDF
-        </Button>
-      </div>
-
-      {successMessage && (
-        <div className="mt-2 text-green-600 dark:text-green-400">
-          {successMessage}
-        </div>
-      )}
-
       {/* PDF Preview Section */}
       <div className="mt-6">
-        <h2 className="text-xl font-semibold mb-2">PDF Preview</h2>
         <iframe
+          key={iframeKey}
           src={`/api/meerkat/reports/${reportId}/pdf`}
           title="PDF Preview"
           width="100%"
-          height="380px"
+          height="500px"
           style={{ border: "1px solid #ccc", borderRadius: "8px" }}
         />
       </div>

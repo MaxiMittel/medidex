@@ -39,7 +39,6 @@ export function filterReports(
       if (!matchesSearch) return false;
     }
 
-    console.log("filter " + assignmentFilter );
     // Assignment filter
     if (assignmentFilter === "assigned") {
       return report.assignedStudies.length > 0;

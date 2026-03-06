@@ -19,11 +19,10 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
-import { ReportDetailDto } from "../../../types/apiDTOs";
 import { filterReports, ReportFilterType } from "@/lib/filterUtils";
+import { useReportStore } from "@/hooks/use-report-store";
 
 interface ReportListProps {
-  reports: ReportDetailDto[];
   baseUrl: string;
   useStudyBadges: boolean;
   filterOptions?: { value: string; label: string }[];
@@ -31,7 +30,6 @@ interface ReportListProps {
 }
 
 export function ReportList({
-  reports,
   baseUrl,
   queryParams = { }, 
   useStudyBadges,
@@ -75,7 +73,10 @@ export function ReportList({
   const storeResults = useGenAIEvaluationStore((state) => state.results);
   const runningEvaluations = useGenAIEvaluationStore((state) => state.runningEvaluations);
 
-  const filteredReports = filterReports(reports, searchQuery, assignmentFilter);
+  const reportsDict = useReportStore((state) => state.reports);
+  const reportsList = useMemo(() => Object.values(reportsDict), [reportsDict]);
+
+  const filteredReports = filterReports(reportsList, searchQuery, assignmentFilter);
 
   const handleDownloadPdf = async (reportId: number, title: string, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -119,7 +120,7 @@ export function ReportList({
           <h2 className="text-xl font-semibold">Reports</h2>
           <span className="text-sm text-muted-foreground">
             ({filteredReports.length})
-            {searchQuery && ` of ${reports.length}`}
+            {searchQuery && ` of ${reportsList.length}`}
           </span>
         </div>
 
@@ -256,7 +257,7 @@ export function ReportList({
                         </div>
                       </div>
                       <div className="flex items-start gap-2 shrink-0">
-                        {isSelected && (
+                        {isSelected && report.hasPdf && (
                           <Button
                             variant="ghost"
                             size="sm"

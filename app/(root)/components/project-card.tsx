@@ -14,6 +14,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Calendar, UserPlus, Check, Settings, FileUp, ClipboardCheck, Trash2, Download, Bot } from "lucide-react";
+import RelativeTime from "@/components/ui/relative-time";
 import type { ProjectDetailsDto, ProjectAssigneeDto } from "@/types/apiDTOs";
 import type { UserDto } from "@/types/user/user.dto";
 
@@ -205,22 +206,7 @@ export function ProjectCard({
     }
   };
 
-  const getRelativeTime = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-      if (diffDays === 0) return "Today";
-      if (diffDays === 1) return "Yesterday";
-      if (diffDays < 7) return `${diffDays} days ago`;
-      if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-      return formatDate(dateString);
-    } catch {
-      return formatDate(dateString);
-    }
-  };
+  // getRelativeTime removed; use <RelativeTime /> instead
 
   const totalReports = Math.max(project.numberReportsTotal, 1);
   const preprocessedCount = clamp(project.numberReportsPreProcessed ?? 0, 0, totalReports);
@@ -365,7 +351,7 @@ export function ProjectCard({
           </h3>
           <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5">
             <Calendar className="w-3 h-3" />
-            {getRelativeTime(project.createdAt)}
+            <RelativeTime date={project.createdAt} />
           </p>
         </div>
         <Button

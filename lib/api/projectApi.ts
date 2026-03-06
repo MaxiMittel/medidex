@@ -31,9 +31,11 @@ export const getTasks = (config?: AxiosRequestConfig): Promise<ProjectTaskDto[]>
 //create a new project by uploading a .ris file
 export const createProject = (
   file: File,
+  projectName: string,
   config?: AxiosRequestConfig
 ): Promise<string> => {
   const formData = new FormData();
+  formData.append("projectName", projectName)
   formData.append("file", file, file.name);
   
   // The apiClient has a request interceptor that automatically removes Content-Type

@@ -144,6 +144,27 @@ export const getReportPdf = (
     });
 }
 
+export const uploadPdf = (
+  reportId: number,
+  file: File | null,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+
+  const formData = new FormData();
+  if (file){
+    formData.append("file", file, file.name);
+  }
+
+  const path = `/reports/${reportId}/pdf`;
+  console.log("hit");
+  return apiClient.put<void>(path, formData, config)
+    .then(() => {})
+    .catch(error => {
+      console.error(`Error fetching PDF for report ${reportId}:`, error.message || error);
+      throw error;
+    });
+}
+
 export const getReportSources = (
   reportId: number,
   config?: AxiosRequestConfig

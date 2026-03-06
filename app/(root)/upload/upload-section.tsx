@@ -2,10 +2,9 @@
 
 import { useState, useRef, useCallback, useEffect, useImperativeHandle, forwardRef } from "react";
 import { Upload, FileText, X, CheckCircle2, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 interface UploadFile {
   id: string;
@@ -13,7 +12,6 @@ interface UploadFile {
   progress: number;
   status: "pending" | "uploading" | "completed" | "error";
   error?: string;
-  projectId?: string;
 }
 
 export interface UploadSectionHandle {
@@ -26,13 +24,15 @@ export interface UploadSectionSnapshot {
 }
 
 interface UploadSectionProps {
-  onUploadSuccess?: (projectId: string) => void;
+  onUploadSuccess?: () => void;
   buildFormData?: (file: File) => FormData;
   disabled?: boolean;
-  emptyQueueMessage?: string;
+  showUploadButton?: boolean;
   autoStart?: boolean;
   onStateChange?: (snapshot: UploadSectionSnapshot) => void;
   allowedFileExtension?: string;
+  hint?: string;
+  uploadUrl?: string;
 }
 
 export const UploadSection = forwardRef<UploadSectionHandle, UploadSectionProps>(function UploadSection(
@@ -40,10 +40,12 @@ export const UploadSection = forwardRef<UploadSectionHandle, UploadSectionProps>
     onUploadSuccess,
     buildFormData,
     disabled = false,
-    emptyQueueMessage,
+    showUploadButton = false,
     autoStart = true,
     onStateChange,
     allowedFileExtension = ".ris",
+    hint = "RIS files only",
+    uploadUrl = "/api/meerkat/projects"
   }: UploadSectionProps,
   ref,
 ) {
@@ -134,7 +136,7 @@ export const UploadSection = forwardRef<UploadSectionHandle, UploadSectionProps>
         return;
       }
 
-      const response = await fetch("/api/meerkat/projects/upload", {
+      const response = await fetch(uploadUrl, {
         method: "POST",
         body: formData,
         cache: "no-store",
@@ -146,10 +148,8 @@ export const UploadSection = forwardRef<UploadSectionHandle, UploadSectionProps>
 
       if (!response.ok) {
         const errorMessage = await response.text();
-        throw new Error(errorMessage || "Failed create project via proxy route.");
+        throw new Error(errorMessage || "Failed to upload file.");
       }
-
-      const { projectId } = (await response.json()) as { projectId: string };
 
       if (progressInterval) {
         clearInterval(progressInterval);
@@ -157,11 +157,11 @@ export const UploadSection = forwardRef<UploadSectionHandle, UploadSectionProps>
 
       setCurrentFile((prev) =>
         prev && prev.id === uploadFile.id
-          ? { ...prev, status: "completed", progress: 100, projectId }
+          ? { ...prev, status: "completed", progress: 100 }
           : prev,
       );
 
-      onUploadSuccess?.(projectId);
+      onUploadSuccess?.();
     } catch (error) {
       if (progressInterval) {
         clearInterval(progressInterval);
@@ -247,48 +247,12 @@ export const UploadSection = forwardRef<UploadSectionHandle, UploadSectionProps>
     [triggerUpload],
   );
 
-  const removeFile = (id: string) => {
-    if (currentFile?.id === id) {
-      setCurrentFile(null);
-    }
-  };
-
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return `${Math.round((bytes / Math.pow(k, i)) * 100) / 100} ${sizes[i]}`;
-  };
-
-  const getStatusColor = (status: UploadFile["status"]) => {
-    switch (status) {
-      case "completed":
-        return "bg-green-500";
-      case "uploading":
-        return "bg-blue-500";
-      case "pending":
-        return "bg-gray-500";
-      case "error":
-        return "bg-red-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
-
-  const getStatusLabel = (status: UploadFile["status"]) => {
-    switch (status) {
-      case "completed":
-        return "Completed";
-      case "uploading":
-        return "Uploading";
-      case "pending":
-        return "Pending";
-      case "error":
-        return "Error";
-      default:
-        return "Unknown";
-    }
   };
 
   return (
@@ -319,7 +283,7 @@ export const UploadSection = forwardRef<UploadSectionHandle, UploadSectionProps>
             )}
           </p>
           {!disabled && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">RIS files only</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{hint}</p>
           )}
         </div>
         <input
@@ -342,12 +306,15 @@ export const UploadSection = forwardRef<UploadSectionHandle, UploadSectionProps>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{currentFile.file.name}</p>
                   <p className="text-xs text-gray-500">{formatFileSize(currentFile.file.size)}</p>
-                  {currentFile.projectId && (
-                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                      Project: {currentFile.projectId}
-                    </p>
-                  )}
                 </div>
+                {showUploadButton && (
+                <Button
+                  type="button"
+                  onClick={triggerUpload}
+                  disabled={currentFile.status === "uploading" || currentFile.status === "completed"}
+                >
+                  Upload PDF
+                </Button>)}
               </div>
               
             </div>
@@ -366,17 +333,10 @@ export const UploadSection = forwardRef<UploadSectionHandle, UploadSectionProps>
                 <AlertDescription>{currentFile.error}</AlertDescription>
               </Alert>
             )}
-
-            {currentFile.status === "completed" && (
-              <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-                <CheckCircle2 className="h-4 w-4" />
-                <span>Upload successful</span>
-              </div>
-            )}
           </div>
         </div>
       ) : (
-        emptyQueueMessage && <p className="text-xs text-muted-foreground">{emptyQueueMessage}</p>
+        <></>
       )}
     </div>
   );

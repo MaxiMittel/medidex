@@ -10,10 +10,9 @@ import { UploadSection, type UploadSectionHandle, type UploadSectionSnapshot } f
 
 interface CreateProjectDialogProps {
   trigger: ReactNode;
-  onSuccess?: (projectId: string) => void;
 }
 
-export function CreateProjectDialog({ trigger, onSuccess }: CreateProjectDialogProps) {
+export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [projectName, setProjectName] = useState("");
@@ -26,13 +25,12 @@ export function CreateProjectDialog({ trigger, onSuccess }: CreateProjectDialogP
   }, []);
 
   const handleUploadSuccess = useCallback(
-    (projectId: string) => {
-      onSuccess?.(projectId);
+    () => {
       router.refresh();
       setOpen(false);
       resetState();
     },
-    [onSuccess, resetState, router],
+    [ resetState, router],
   );
 
   const buildFormData = useCallback(
@@ -89,7 +87,6 @@ export function CreateProjectDialog({ trigger, onSuccess }: CreateProjectDialogP
               onUploadSuccess={handleUploadSuccess}
               buildFormData={buildFormData}
               disabled={!canUpload}
-              emptyQueueMessage="Uploaded files will appear here."
               autoStart={false}
               onStateChange={setUploadSnapshot}
             />
