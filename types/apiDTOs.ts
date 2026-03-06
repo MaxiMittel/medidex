@@ -1,3 +1,8 @@
+export interface ReportSourcesDto {
+  doi: string;
+  links: string[];
+}
+
 export interface ProjectAssigneeDto {
   userId : string;
   numberReportsLinked: number;
@@ -25,6 +30,7 @@ export interface ProjectTaskDto {
 
 export interface ReportDetailDto {
   report: ReportDto;
+  hasPdf: boolean | undefined;
   assignedStudies: StudyDto[];
 }
 

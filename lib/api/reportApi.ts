@@ -1,6 +1,6 @@
 import apiClient from "./apiClient";
 import { AxiosRequestConfig } from "axios";
-import { SimilarTagDto, SimilarStudyDto, GetSimilarStudiesParams, GetSimilarTagsParams, StudyDto} from "../../types/apiDTOs";
+import { ReportSourcesDto, SimilarTagDto, SimilarStudyDto, GetSimilarStudiesParams, GetSimilarTagsParams, StudyDto} from "../../types/apiDTOs";
 import {serializeParams} from "./helpers";    
 
 export const getSimilarStudiesByReportId = (
@@ -137,9 +137,24 @@ export const getReportPdf = (
   return apiClient.get<ArrayBuffer>(path, { responseType: 'arraybuffer', ...config })
     .then(response => {
       return response.data;
-    })
+    })  
     .catch(error => {
       console.error(`Error fetching PDF for report ${reportId}:`, error.message || error);
+      throw error;
+    });
+}
+
+export const getReportSources = (
+  reportId: number,
+  config?: AxiosRequestConfig
+): Promise<ReportSourcesDto> => {
+  const path = `/reports/${reportId}/sources`;
+  return apiClient.get<ReportSourcesDto>(path, config)
+    .then(response => {
+      return response.data;
+    })
+    .catch(error => {
+      console.error(`Error fetching links for report ${reportId}:`, error.message || error);
       throw error;
     });
 }

@@ -32,6 +32,7 @@ interface UploadSectionProps {
   emptyQueueMessage?: string;
   autoStart?: boolean;
   onStateChange?: (snapshot: UploadSectionSnapshot) => void;
+  allowedFileExtension?: string;
 }
 
 export const UploadSection = forwardRef<UploadSectionHandle, UploadSectionProps>(function UploadSection(
@@ -42,6 +43,7 @@ export const UploadSection = forwardRef<UploadSectionHandle, UploadSectionProps>
     emptyQueueMessage,
     autoStart = true,
     onStateChange,
+    allowedFileExtension = ".ris",
   }: UploadSectionProps,
   ref,
 ) {
@@ -213,7 +215,7 @@ export const UploadSection = forwardRef<UploadSectionHandle, UploadSectionProps>
     if (!droppedFiles.length) return;
 
     const risFile = Array.from(droppedFiles).find((file) =>
-      file.name.toLowerCase().endsWith(".ris"),
+      file.name.toLowerCase().endsWith(allowedFileExtension),
     );
     if (!risFile) return;
 
@@ -325,7 +327,7 @@ export const UploadSection = forwardRef<UploadSectionHandle, UploadSectionProps>
           id="dropzone-file"
           type="file"
           className="hidden"
-          accept=".ris"
+          accept={allowedFileExtension}
           onChange={handleFileChange}
           disabled={disabled}
         />

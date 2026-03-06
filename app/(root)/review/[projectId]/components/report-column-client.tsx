@@ -1,22 +1,13 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { DetailsSheetProvider } from "@/app/context/details-sheet-context";
-import StudySheet from "../study-sheet";
 import { ReportDetailDto } from "@/types/apiDTOs";
 import { ReportList } from "@/components/ui/study-view/report-list";
-import { useReportStore } from "@/hooks/use-report-store";
-
-const reportFilterOptions = [
-  { value: "assigned", label: "Assigned" },
-  { value: "unassigned", label: "Unassigned" },
-  { value: "newStudy", label: "New" },
-];
 
 interface ReportColumnClientProps {
   children: ReactNode;
@@ -24,20 +15,18 @@ interface ReportColumnClientProps {
   projectId: string;
 }
 
+const reportFilterOptions = [
+  { value: "readyForReview", label: "Requireing Review" },
+  { value: "notReadyForReview", label: "Not Ready Yet" },
+];
+
 export function ReportColumnClient({ children, reports, projectId }: ReportColumnClientProps) {
   const panelBaseId = `project-panels-${projectId}`;
   const reportsPanelId = `${panelBaseId}-reports`;
   const detailsPanelId = `${panelBaseId}-details`;
   const resizeHandleId = `${panelBaseId}-resize-handle`;
-
-  const setReports = useReportStore((state) => state.setReports);
   
-  useEffect(() => {
-    setReports(reports);
-  }, [reports, setReports]);
-
   return (
-    <DetailsSheetProvider>
       <ResizablePanelGroup
         id={panelBaseId}
         direction="horizontal"
@@ -51,9 +40,8 @@ export function ReportColumnClient({ children, reports, projectId }: ReportColum
         >
           <ReportList
             reports={reports}
-            baseUrl="projects"
-            queryParams={{ k: 10 }}
-            useStudyBadges={true}
+            baseUrl="review"
+            useStudyBadges={false}
             filterOptions={reportFilterOptions}
           />
         </ResizablePanel>
@@ -72,7 +60,5 @@ export function ReportColumnClient({ children, reports, projectId }: ReportColum
           {children}
         </ResizablePanel>
       </ResizablePanelGroup>
-      <StudySheet />
-    </DetailsSheetProvider>
   );
 }

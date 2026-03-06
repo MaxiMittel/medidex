@@ -20,40 +20,25 @@ import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
 import { ReportDetailDto } from "../../../types/apiDTOs";
+import { filterReports, ReportFilterType } from "@/lib/filterUtils";
 
 interface ReportListProps {
   reports: ReportDetailDto[];
   baseUrl: string;
   useStudyBadges: boolean;
+  filterOptions?: { value: string; label: string }[];
+  queryParams?: Record<string, string | number | boolean | undefined>;
 }
-
-const toTimestamp = (value: Date | string | number | null | undefined): number | null => {
-  if (value === null || value === undefined) {
-    return null;
-  }
-  const date = value instanceof Date ? value : new Date(value);
-  const timestamp = date.getTime();
-  return Number.isFinite(timestamp) ? timestamp : null;
-};
-
-const isNewStudyAssignment = (
-  studyCreatedAt: Date | string | number | null | undefined,
-  reportCreatedAt: Date | string | number | null | undefined
-) => {
-  const studyTimestamp = toTimestamp(studyCreatedAt);
-  const reportTimestamp = toTimestamp(reportCreatedAt);
-  return studyTimestamp !== null && reportTimestamp !== null && studyTimestamp > reportTimestamp;
-};
 
 export function ReportList({
   reports,
   baseUrl,
+  queryParams = { }, 
   useStudyBadges,
+  filterOptions = [],
 }: ReportListProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [assignmentFilter, setAssignmentFilter] = useState<
-    "all" | "assigned" | "unassigned" | "newStudy"
-  >("all");
+  const [assignmentFilter, setAssignmentFilter] = useState<ReportFilterType>("all");
   const [downloadingPdf, setDownloadingPdf] = useState<Set<number>>(new Set());
   const params = useParams();
   const projectId =
@@ -90,32 +75,7 @@ export function ReportList({
   const storeResults = useGenAIEvaluationStore((state) => state.results);
   const runningEvaluations = useGenAIEvaluationStore((state) => state.runningEvaluations);
 
-  const filteredReports = reports.filter((report) => {
-    // Search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      const matchesSearch =
-        report.report.title.toLowerCase().includes(query) ||
-        report.report.abstract?.toLowerCase().includes(query) ||
-        report.report.reportId.toString().includes(query);
-      if (!matchesSearch) return false;
-    }
-
-    // Assignment filter
-    if (assignmentFilter === "assigned") {
-      return report.assignedStudies.length > 0;
-    }
-    if (assignmentFilter === "unassigned") {
-      return report.assignedStudies.length == 0;
-    }
-    if (assignmentFilter === "newStudy") {
-      return report.assignedStudies.some((study) =>
-        isNewStudyAssignment(study.createdAt, report.report.createdAt)
-      );
-    }
-
-    return true;
-  });
+  const filteredReports = filterReports(reports, searchQuery, assignmentFilter);
 
   const handleDownloadPdf = async (reportId: number, title: string, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -192,39 +152,25 @@ export function ReportList({
               </span>
               <div className="flex gap-1">
                 <Button
-                  variant={assignmentFilter === "all" ? "default" : "outline"}
-                  size="sm"
-                  className="h-7 text-xs px-3"
-                  onClick={() => setAssignmentFilter("all")}
-                >
-                  All
-                </Button>
-                <Button
-                  variant={assignmentFilter === "assigned" ? "default" : "outline"}
-                  size="sm"
-                  className="h-7 text-xs px-3"
-                  onClick={() => setAssignmentFilter("assigned")}
-                >
-                  Assigned
-                </Button>
-                <Button
-                  variant={
-                    assignmentFilter === "unassigned" ? "default" : "outline"
-                  }
-                  size="sm"
-                  className="h-7 text-xs px-3"
-                  onClick={() => setAssignmentFilter("unassigned")}
-                >
-                  Unassigned
-                </Button>
-                <Button
-                  variant={assignmentFilter === "newStudy" ? "default" : "outline"}
-                  size="sm"
-                  className="h-7 text-xs px-3"
-                  onClick={() => setAssignmentFilter("newStudy")}
-                >
-                  New
-                </Button>
+                    key="all"
+                    variant={assignmentFilter === "all" ? "default" : "outline"}
+                    size="sm"
+                    className="h-7 text-xs px-3"
+                    onClick={() => setAssignmentFilter("all" as ReportFilterType)}
+                  >
+                    {"All"}
+                  </Button>
+                {filterOptions.map((filter) => (
+                  <Button
+                    key={filter.value}
+                    variant={assignmentFilter === filter.value ? "default" : "outline"}
+                    size="sm"
+                    className="h-7 text-xs px-3"
+                    onClick={() => setAssignmentFilter(filter.value as ReportFilterType)}
+                  >
+                    {filter.label}
+                  </Button>
+                ))}
               </div>
             </div>
           </div>
@@ -254,7 +200,12 @@ export function ReportList({
               const isRunningEvaluation = runningEvaluations.includes(reportKey);
               const reportResults = storeResults[reportKey];
               const resultCount = reportResults ? Object.keys(reportResults).length : 0;
-              const reportHref = `/${baseUrl}/${projectId}/${report.report.reportId}?k=10`;
+              const params = new URLSearchParams(
+                Object.entries({ ...queryParams })
+                  .filter(([_, v]) => v !== undefined)
+                  .map(([k, v]) => [k, String(v)])
+              ).toString();
+              const reportHref = `/${baseUrl}/${projectId}/${report.report.reportId}${params ? `?${params}` : ''}`;
 
               // If projectId is not available, render as non-link
               if (!reportHref) {

@@ -230,25 +230,15 @@ export function ProjectCard({
 
   const progressPercent = totalReports > 0 ? Math.round((reviewCompletedCount / totalReports) * 100) : 0;
 
-  const buildReviewUrl = useCallback(
-    (intent?: "review" | "studification") => {
-      const params = new URLSearchParams({ project : project.projectId });
-      if (intent) {
-        params.set("intent", intent);
-      }
-      return `/reports?${params.toString()}`;
-    },
-    [project.projectId],
-  );
-
   const handleStartPdfUpload = useCallback(() => {
     const path = `/pdf-upload/${encodeURIComponent(project.projectId)}`;
     router.push(path);
   }, [project.projectId, router]);
 
   const handleStartReview = useCallback(() => {
-    router.push(buildReviewUrl("review"));
-  }, [buildReviewUrl, router]);
+    const path = `/review/${encodeURIComponent(project.projectId)}`;
+    router.push(path);
+  }, [project.projectId, router]);
 
   const handleStartExport = useCallback(() => {
     window.alert("Export is coming soon. We'll start the download once all reports are ready.");
