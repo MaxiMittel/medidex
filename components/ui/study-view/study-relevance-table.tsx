@@ -39,7 +39,6 @@ import { useReportStore } from "@/hooks/use-report-store";
 import { useDetailsSheet } from "@/app/context/details-sheet-context";
 
 interface StudyRelevanceTableProps {
-  projectId?: string;
   reportId?: number;
   studies: RelevanceStudy[];
 }
@@ -54,9 +53,8 @@ const formatParticipantCount = (value?: string | null) => {
 };
 
 export function StudyRelevanceTable({
-  studies,
-  projectId,
   reportId,
+  studies,
 }: StudyRelevanceTableProps) {
   
   const [resolvedStudies, setResolvedStudies] = useState<RelevanceStudy[]>(() => [...studies]);
@@ -80,10 +78,9 @@ export function StudyRelevanceTable({
   const getStudyResult = useGenAIEvaluationStore((state) => state.getStudyResult);
   const dismissSuggestion = useGenAIEvaluationStore((state) => state.dismissSuggestion);
 
-  const reportKey = projectId ? `${projectId}-${reportId}` : "";
-  const evalState = reportKey ? evaluationsByReport[reportKey] || null : null;
-  const isRunning = reportKey ? runningEvaluations.includes(reportKey) : false;
-  const studyResults = reportKey ? results[reportKey] : undefined;
+  const evalState = reportId ? evaluationsByReport[reportId] || null : null;
+  const isRunning = reportId ? runningEvaluations.includes(reportId) : false;
+  const studyResults = reportId ? results[reportId] : undefined;
 
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [reasonDialogOpen, setReasonDialogOpen] = useState(false);
@@ -120,7 +117,7 @@ export function StudyRelevanceTable({
   
 
   const suggestionKey = newStudySuggestion
-    ? `${reportKey}:${JSON.stringify(newStudySuggestion)}`
+    ? `${reportId}:${JSON.stringify(newStudySuggestion)}`
     : null;
 
   const markStudyLinkedState = useCallback((studyId: number, linked: boolean) => {
@@ -243,7 +240,7 @@ export function StudyRelevanceTable({
   // Reset evaluation state when report changes
   useEffect(() => {
     setAiDialogOpen(false);
-  }, [projectId, reportId]);
+  }, []);
 
   // Filter and sort studies
   const filteredStudies = useMemo(() => {
@@ -271,8 +268,8 @@ export function StudyRelevanceTable({
     includePdf?: boolean;
     promptOverrides?: PromptOverrides;
   }) => {
-    if (!projectId || reportId === undefined) {
-      toast.error("Missing project id or report context");
+    if (reportId === undefined) {
+      toast.error("Missing report id");
       return false;
     }
 
@@ -287,7 +284,6 @@ export function StudyRelevanceTable({
       toast.info(`Evaluating ${filteredStudies.length} studies with AI (${runningCount + 1}/4 running)...`);
       setHasEvaluated(true);
       evaluateStream(
-        projectId,
         currentReport.report,
         filteredStudies.map((study) => study.study),
         options,
@@ -436,9 +432,11 @@ export function StudyRelevanceTable({
             message={progressMessage}
             isStreaming={evalState?.isStreaming ?? false}
             hasSummary={Boolean(summaryEvent?.message)}
-            collapsed={progressCollapsedByReport[reportKey] ?? false}
+            collapsed={progressCollapsedByReport[reportId !== undefined ? String(reportId) : ""] ?? false}
             onCollapsedChange={(collapsed) => {
-              setProgressCollapsedByReport(prev => ({ ...prev, [reportKey]: collapsed }));
+              if (reportId !== undefined) {
+                setProgressCollapsedByReport(prev => ({ ...prev, [String(reportId)]: collapsed }));
+              }
             }}
           />
       ) : null}
@@ -613,21 +611,19 @@ export function StudyRelevanceTable({
     </div>
 
       {/* AI Reason Dialog */}
-      {selectedAIStudy && projectId !== undefined && reportId !== undefined && (
+      {selectedAIStudy && reportId !== undefined && (
         <StudyAIReasonDialog
           open={reasonDialogOpen}
           onOpenChange={setReasonDialogOpen}
           studyName={selectedAIStudy.studyName}
           classification={
             getStudyResult(
-              projectId,
               reportId,
               selectedAIStudy.studyId
             )?.classification || "unsure"
           }
           reason={
             getStudyResult(
-              projectId,
               reportId,
               selectedAIStudy.studyId
             )?.reason || "No reason available"

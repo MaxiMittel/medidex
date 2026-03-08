@@ -1,6 +1,6 @@
+import apiClient from "./apiClient";
 import { StudyDto, StudyCreateDto , ReportDto, InterventionDto, ConditionDto, OutcomeDto , GetPersonsResponseDto } from "../../types/apiDTOs";
 import { serializeParams } from "./helpers";
-import apiClient from "./apiClient";
 import { AxiosRequestConfig } from "axios";
 
 export const getStudyById = (

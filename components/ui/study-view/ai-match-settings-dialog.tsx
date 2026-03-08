@@ -89,7 +89,11 @@ export function AIMatchSettingsDialog({
   useEffect(() => {
     void (async () => {
       try {
-        const data = await fetchDefaultPrompts();
+        const response = await fetch("/api/genai/prompts");
+        if (!response.ok) {
+          throw new Error(`Failed to fetch default prompts: ${response.statusText}`);
+        }
+        const data = await response.json();
         setDefaultPrompts(data);
         setPromptsError(null);
       } catch (error) {

@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   UploadSection,
   type UploadSectionHandle,
-} from "@/app/(root)/upload/upload-section";
+} from "@/components/ui/upload/upload-section";
 import { ReportSourcesDto } from "@/types/apiDTOs";
 import { useReportStore } from "@/hooks/use-report-store";
 

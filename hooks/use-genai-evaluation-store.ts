@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { evaluateStudiesStream } from "@/lib/api/genaiStreamApi";
+// import { evaluateStudiesStream } from "@/lib/api/genaiStreamApi";
 import type { PromptOverrides, ReportDto, StreamEvent, StudyDto } from "@/types/apiDTOs";
 
 export type AIClassification = "match" | "likely_match" | "unsure" | "not_match" | "very_likely";
@@ -29,28 +29,26 @@ type EvaluationsMap = Record<string, ReportEvaluationState>;
 interface GenAIEvaluationStore {
   results: ResultsMap;
   evaluationsByReport: EvaluationsMap;
-  runningEvaluations: string[];
+  runningEvaluations: number[];
   streamCleanups: Record<string, () => void>;
   dismissedSuggestions: Set<string>;
 
-  getReportKey: (projectId: string, reportId: number) => string;
   canStartEvaluation: () => boolean;
   isSuggestionDismissed: (suggestionKey: string) => boolean;
   dismissSuggestion: (suggestionKey: string) => void;
-  getReportEvaluationState: (projectId: string, reportId: number) => ReportEvaluationState | null;
-  isEvaluationRunning: (projectId: string, reportId: number) => boolean;
+  getReportEvaluationState: (reportId: number) => ReportEvaluationState | null;
+  isEvaluationRunning: (reportId: number) => boolean;
   getRunningEvaluationsCount: () => number;
-  getStudyResult: (projectId: string, reportId: number, studyId: number) => StudyAIResult | null;
-  getResultsForReport: (projectId: string, reportId: number) => Record<number, StudyAIResult> | undefined;
+  getStudyResult: ( reportId: number, studyId: number) => StudyAIResult | null;
+  getResultsForReport: ( reportId: number) => Record<number, StudyAIResult> | undefined;
   
-  addStudyResult: (reportKey: string, studyId: number, classification: AIClassification, reason: string) => void;
-  updateClassification: (reportKey: string, studyId: number, classification: AIClassification, reason?: string) => void;
-  setEvaluationState: (reportKey: string, state: Partial<ReportEvaluationState>) => void;
-  startEvaluation: (reportKey: string, totalStudies: number) => void;
-  endEvaluation: (reportKey: string, error?: string) => void;
+  addStudyResult: (reportId: number, studyId: number, classification: AIClassification, reason: string) => void;
+  updateClassification: (reportId: number, studyId: number, classification: AIClassification, reason?: string) => void;
+  setEvaluationState: (reportId: number, state: Partial<ReportEvaluationState>) => void;
+  startEvaluation: (reportId: number, totalStudies: number) => void;
+  endEvaluation: (reportId: number, error?: string) => void;
   
   evaluateStream: (
-    projectId: string,
     report: ReportDto,
     studies: StudyDto[],
     options: { model?: AIModel; includePdf?: boolean; promptOverrides?: PromptOverrides },
@@ -68,8 +66,6 @@ export const useGenAIEvaluationStore = create<GenAIEvaluationStore>((set, get) =
   streamCleanups: {},
   dismissedSuggestions: new Set(),
 
-  getReportKey: (projectId: string, reportId: number) => `${projectId}-${reportId}`,
-
   canStartEvaluation: () => get().runningEvaluations.length < 4,
 
   isSuggestionDismissed: (suggestionKey: string) => get().dismissedSuggestions.has(suggestionKey),
@@ -82,59 +78,55 @@ export const useGenAIEvaluationStore = create<GenAIEvaluationStore>((set, get) =
     });
   },
 
-  getReportEvaluationState: (projectId: string, reportId: number) => {
-    const key = get().getReportKey(projectId, reportId);
-    return get().evaluationsByReport[key] || null;
+  getReportEvaluationState: (reportId: number) => {
+    return get().evaluationsByReport[reportId] || null;
   },
 
-  isEvaluationRunning: (projectId: string, reportId: number) => {
-    const key = get().getReportKey(projectId, reportId);
-    return get().runningEvaluations.includes(key);
+  isEvaluationRunning: (reportId: number) => {
+    return get().runningEvaluations.includes(reportId);
   },
 
   getRunningEvaluationsCount: () => get().runningEvaluations.length,
 
-  getStudyResult: (projectId: string, reportId: number, studyId: number) => {
-    const key = get().getReportKey(projectId, reportId);
-    return get().results[key]?.[studyId] || null;
+  getStudyResult: ( reportId: number, studyId: number) => {
+    return get().results[reportId]?.[studyId] || null;
   },
 
-  getResultsForReport: (projectId: string, reportId: number) => {
-    const key = get().getReportKey(projectId, reportId);
-    return get().results[key];
+  getResultsForReport: (reportId: number) => {
+    return get().results[reportId];
   },
 
-  addStudyResult: (reportKey: string, studyId: number, classification: AIClassification, reason: string) => {
+  addStudyResult: (reportId: number, studyId: number, classification: AIClassification, reason: string) => {
     set((state) => {
-      const existingResults = state.results[reportKey] || {};
+      const existingResults = state.results[reportId] || {};
       const newReportResults = { ...existingResults, [studyId]: { studyId, classification, reason } };
-      return { results: { ...state.results, [reportKey]: newReportResults } };
+      return { results: { ...state.results, [reportId]: newReportResults } };
     });
   },
 
-  updateClassification: (reportKey: string, studyId: number, classification: AIClassification, reason?: string) => {
+  updateClassification: (reportId: number, studyId: number, classification: AIClassification, reason?: string) => {
     set((state) => {
-      const existingResults = state.results[reportKey] || {};
+      const existingResults = state.results[reportId] || {};
       const existing = existingResults[studyId];
       if (existing) {
         const newReportResults = { 
           ...existingResults, 
           [studyId]: { ...existing, classification, reason: reason || existing.reason } 
         };
-        return { results: { ...state.results, [reportKey]: newReportResults } };
+        return { results: { ...state.results, [reportId]: newReportResults } };
       }
       return state;
     });
   },
 
-  setEvaluationState: (reportKey: string, newState: Partial<ReportEvaluationState>) => {
+  setEvaluationState: (reportId: number, newState: Partial<ReportEvaluationState>) => {
     set((state) => {
-      const existing = state.evaluationsByReport[reportKey];
+      const existing = state.evaluationsByReport[reportId];
       if (existing) {
         return { 
           evaluationsByReport: { 
             ...state.evaluationsByReport, 
-            [reportKey]: { ...existing, ...newState } 
+            [reportId]: { ...existing, ...newState } 
           } 
         };
       }
@@ -142,11 +134,11 @@ export const useGenAIEvaluationStore = create<GenAIEvaluationStore>((set, get) =
     });
   },
 
-  startEvaluation: (reportKey: string, totalStudies: number) => {
+  startEvaluation: (reportId: number, totalStudies: number) => {
     set((state) => ({
       evaluationsByReport: {
         ...state.evaluationsByReport,
-        [reportKey]: {
+        [reportId]: {
           isStreaming: true,
           streamMessages: [],
           currentMessage: null,
@@ -155,137 +147,174 @@ export const useGenAIEvaluationStore = create<GenAIEvaluationStore>((set, get) =
           error: null,
         },
       },
-      runningEvaluations: [...state.runningEvaluations, reportKey],
+      runningEvaluations: [...state.runningEvaluations, reportId],
     }));
   },
 
-  endEvaluation: (reportKey: string, error?: string) => {
+  endEvaluation: (reportId: number, error?: string) => {
     set((state) => {
-      const existing = state.evaluationsByReport[reportKey];
+      const existing = state.evaluationsByReport[reportId];
       return {
         evaluationsByReport: existing ? {
           ...state.evaluationsByReport,
-          [reportKey]: { ...existing, isStreaming: false, error: error || null },
+          [reportId]: { ...existing, isStreaming: false, error: error || null },
         } : state.evaluationsByReport,
-        runningEvaluations: state.runningEvaluations.filter(k => k !== reportKey),
+        runningEvaluations: state.runningEvaluations.filter(k => k !== reportId),
       };
     });
   },
 
-  evaluateStream: (projectId : string, report : ReportDto, studies : StudyDto[], options, onStreamComplete) => {
-    const { getReportKey, startEvaluation, addStudyResult, updateClassification, setEvaluationState, endEvaluation, streamCleanups } = get();
-    const reportKey = getReportKey(projectId, report.reportId);
 
-    if (streamCleanups[reportKey]) {
-      streamCleanups[reportKey]();
-      delete streamCleanups[reportKey];
+  evaluateStream: ( report: ReportDto, studies: StudyDto[], options, onStreamComplete) => {
+    const { startEvaluation, addStudyResult, updateClassification, setEvaluationState, endEvaluation, streamCleanups } = get();
+    const reportId = report.reportId;
+
+    if (streamCleanups[reportId]) {
+      streamCleanups[reportId]();
+      delete streamCleanups[reportId];
     }
 
-    startEvaluation(reportKey, studies.length);
+    startEvaluation(reportId, studies.length);
 
+    const abortController = new AbortController();
+    const cleanup = () => abortController.abort();
 
-    const reportDto = report;
+    (async () => {
+      try {
+        const response = await fetch("/api/genai/evaluate/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            report,
+            studies,
+            model: options.model || null,
+            include_pdf: options.includePdf ?? null,
+            prompt_overrides: options.promptOverrides || null,
+          }),
+          signal: abortController.signal,
+        });
 
-    const cleanup = evaluateStudiesStream(
-      {
-        report: reportDto,
-        studies: studies,
-        model: options.model || null,
-        include_pdf: options.includePdf ?? null,
-        prompt_overrides: options.promptOverrides || null,
-      },
-      {
-        onEvent: (event: StreamEvent) => {
-          const currentState = get().evaluationsByReport[reportKey];
-          setEvaluationState(reportKey, {
-            currentMessage: event.message || null,
-            streamMessages: [...(currentState?.streamMessages || []), event],
-          });
+        if (!response.ok || !response.body) {
+          throw new Error(`Stream request failed: ${response.status} ${response.statusText}`);
+        }
 
-          if (
-            (
-              event.node === "classify_initial" ||
-              event.node === "classify_unsure" ||
-              event.node === "classify_likely_review"
-            ) &&
-            event.details?.study_id &&
-            event.details?.decision
-          ) {
-            const studyId = typeof event.details.study_id === "string"
-              ? parseInt(event.details.study_id)
-              : event.details.study_id;
-            const reason = event.details.reason || "No reason provided";
-            const decision = event.details.decision as AIClassification;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
 
-            if (event.node === "classify_likely_review") {
-              if (decision === "match") {
-                const existingResult = get().results[reportKey]?.[studyId];
-                if (existingResult) {
-                  updateClassification(reportKey, studyId, "match", reason);
-                } else {
-                  addStudyResult(reportKey, studyId, "match", reason);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const data = line.slice(6).trim();
+              if (!data) continue;
+              try {
+                const event: StreamEvent = JSON.parse(data);
+                // Handle stream event as before
+                const currentState = get().evaluationsByReport[reportId];
+                setEvaluationState(reportId, {
+                  currentMessage: event.message || null,
+                  streamMessages: [...(currentState?.streamMessages || []), event],
+                });
+
+                if (
+                  (
+                    event.node === "classify_initial" ||
+                    event.node === "classify_unsure" ||
+                    event.node === "classify_likely_review"
+                  ) &&
+                  event.details?.study_id &&
+                  event.details?.decision
+                ) {
+                  const studyId = typeof event.details.study_id === "string"
+                    ? parseInt(event.details.study_id)
+                    : event.details.study_id;
+                  const reason = event.details.reason || "No reason provided";
+                  const decision = event.details.decision as AIClassification;
+
+                  if (event.node === "classify_likely_review") {
+                    if (decision === "match") {
+                      const existingResult = get().results[reportId]?.[studyId];
+                      if (existingResult) {
+                        updateClassification(reportId, studyId, "match", reason);
+                      } else {
+                        addStudyResult(reportId, studyId, "match", reason);
+                      }
+                    } else {
+                      const existingResult = get().results[reportId]?.[studyId];
+                      if (existingResult) {
+                        const stableClassification =
+                          existingResult.classification === "very_likely"
+                            ? "very_likely"
+                            : "likely_match";
+                        updateClassification(reportId, studyId, stableClassification, reason);
+                      } else {
+                        addStudyResult(reportId, studyId, "likely_match", reason);
+                      }
+                    }
+                  } else {
+                    addStudyResult(reportId, studyId, decision, reason);
+                  }
                 }
-              } else {
-                const existingResult = get().results[reportKey]?.[studyId];
-                if (existingResult) {
-                  const stableClassification =
-                    existingResult.classification === "very_likely"
-                      ? "very_likely"
-                      : "likely_match";
-                  updateClassification(reportKey, studyId, stableClassification, reason);
-                } else {
-                  addStudyResult(reportKey, studyId, "likely_match", reason);
+
+                if (event.node === "select_very_likely" && event.details?.very_likely_study_ids) {
+                  event.details.very_likely_study_ids.forEach((id: string | number) => {
+                    const studyId = typeof id === "string" ? parseInt(id) : id;
+                    updateClassification(reportId, studyId, "very_likely", event.details?.reason);
+                  });
                 }
+
+                if (event.node === "compare_very_likely" && event.details?.match_study_id) {
+                  const studyId = typeof event.details.match_study_id === "string"
+                    ? parseInt(event.details.match_study_id)
+                    : event.details.match_study_id;
+                  updateClassification(reportId, studyId, "match", event.details.reason);
+                }
+
+                if (event.event === "complete") {
+                  endEvaluation(reportId);
+                  const cleanups = get().streamCleanups;
+                  delete cleanups[reportId];
+                  set({ streamCleanups: { ...cleanups } });
+                  onStreamComplete?.();
+                  return;
+                }
+              } catch (err) {
+                // Ignore parse errors for non-JSON lines
               }
-            } else {
-              addStudyResult(reportKey, studyId, decision, reason);
             }
           }
-
-          if (event.node === "select_very_likely" && event.details?.very_likely_study_ids) {
-            event.details.very_likely_study_ids.forEach((id: string | number) => {
-              const studyId = typeof id === "string" ? parseInt(id) : id;
-              updateClassification(reportKey, studyId, "very_likely", event.details?.reason);
-            });
-          }
-
-          if (event.node === "compare_very_likely" && event.details?.match_study_id) {
-            const studyId = typeof event.details.match_study_id === "string"
-              ? parseInt(event.details.match_study_id)
-              : event.details.match_study_id;
-            updateClassification(reportKey, studyId, "match", event.details.reason);
-          }
-        },
-        onComplete: () => {
-          endEvaluation(reportKey);
-          const cleanups = get().streamCleanups;
-          delete cleanups[reportKey];
-          set({ streamCleanups: { ...cleanups } });
-          onStreamComplete?.();
-        },
-        onError: (error: Error) => {
-          endEvaluation(reportKey, error.message);
-          const cleanups = get().streamCleanups;
-          delete cleanups[reportKey];
-          set({ streamCleanups: { ...cleanups } });
-        },
+        }
+        // If we exit the loop without a complete event, treat as error
+        endEvaluation(reportId, "Stream ended unexpectedly");
+        const cleanups = get().streamCleanups;
+        delete cleanups[reportId];
+        set({ streamCleanups: { ...cleanups } });
+      } catch (error: any) {
+        endEvaluation(reportId, error?.message || "Stream error");
+        const cleanups = get().streamCleanups;
+        delete cleanups[reportId];
+        set({ streamCleanups: { ...cleanups } });
       }
-    );
+    })();
 
-    set((state) => ({ streamCleanups: { ...state.streamCleanups, [reportKey]: cleanup } }));
+    set((state) => ({ streamCleanups: { ...state.streamCleanups, [reportId]: cleanup } }));
     return cleanup;
   },
 
   cancelStream: (projectId?: string, reportId?: number) => {
-    const { getReportKey, streamCleanups, endEvaluation } = get();
+    const { streamCleanups, endEvaluation } = get();
     if (projectId !== undefined && reportId !== undefined) {
-      const reportKey = getReportKey(projectId, reportId);
-      if (streamCleanups[reportKey]) {
-        streamCleanups[reportKey]();
+      if (streamCleanups[reportId]) {
+        streamCleanups[reportId]();
         const newCleanups = { ...streamCleanups };
-        delete newCleanups[reportKey];
+        delete newCleanups[reportId];
         set({ streamCleanups: newCleanups });
-        endEvaluation(reportKey);
+        endEvaluation(reportId);
       }
     } else {
       Object.values(streamCleanups).forEach((cleanup) => cleanup());
@@ -294,12 +323,10 @@ export const useGenAIEvaluationStore = create<GenAIEvaluationStore>((set, get) =
   },
 
   clearResults: (projectId?: string, reportId?: number) => {
-    const { getReportKey } = get();
     if (projectId !== undefined && reportId !== undefined) {
-      const reportKey = getReportKey(projectId, reportId);
       set((state) => {
         const newResults = { ...state.results };
-        delete newResults[reportKey];
+        delete newResults[reportId];
         return { results: newResults };
       });
     } else {

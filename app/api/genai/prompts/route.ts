@@ -1,25 +1,21 @@
 import { NextResponse } from "next/server";
-
-const baseUrl = process.env.GENAI_API_URL;
+import { fetchDefaultPrompts } from "@/lib/api/genaiApi";
+import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
 export async function GET() {
-  if (!baseUrl) {
-    return NextResponse.json(
-      { detail: "GENAI_API_URL is not configured" },
-      { status: 500 }
-    );
-  }
 
-  const resp = await fetch(`${baseUrl}/prompts`, {
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
-
-  if (!resp.ok) {
-    const detail = await resp.text();
-    return NextResponse.json({ detail }, { status: resp.status });
-  }
-
-  const data = await resp.json();
-  return NextResponse.json(data);
+  try {
+      const headers = await getMeerkatHeaders();
+      const projects = await fetchDefaultPrompts({
+        headers,
+      });
+  
+      return NextResponse.json(projects);
+    } catch (error) {
+      console.error("Unexpected error while fetching default prompts:", error);
+      return NextResponse.json(
+        { error: "Unexpected error while fetching default prompts." },
+        { status: 500 }
+      );
+    }
 }

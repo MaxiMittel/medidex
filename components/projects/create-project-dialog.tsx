@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UploadSection, type UploadSectionHandle, type UploadSectionSnapshot } from "@/app/(root)/upload/upload-section";
+import { UploadSection, type UploadSectionHandle, type UploadSectionSnapshot } from "@/components/ui/upload/upload-section";
 
 interface CreateProjectDialogProps {
   trigger: ReactNode;

@@ -1,7 +1,7 @@
 import apiClient from "./apiClient";
 import { AxiosRequestConfig } from "axios";
 import { ReportSourcesDto, SimilarTagDto, SimilarStudyDto, GetSimilarStudiesParams, GetSimilarTagsParams, StudyDto} from "../../types/apiDTOs";
-import {serializeParams} from "./helpers";    
+import { serializeParams } from "./helpers";    
 
 export const getSimilarStudiesByReportId = (
   reportId: number,
@@ -39,7 +39,7 @@ export const assignStudyToReportByReportId = (
     ...config,
     paramsSerializer: { serialize: serializeParams } 
   };
-  return apiClient.put(path, null, requestConfig).then(response => response.data);
+  return apiClient.put<void>(path, null, requestConfig).then(response => response.data);
 }
 
 //remove studies from a report
@@ -50,7 +50,7 @@ export const removeStudyFromReportByReportId = (
 ): Promise<void> => {
   const path = `/reports/${reportId}/studies/${studyId}`;
   return apiClient
-    .delete(path, config)
+    .delete<void>(path, config)
     .then(response => {
       return;
     })
@@ -68,7 +68,7 @@ export const assignNewStudyToReportByReportId = (
 ): Promise<void> => {
   const path = `/reports/${reportId}/studies`;
   return apiClient
-    .post(path, study, config)
+    .post<void>(path, study, config)
     .then(response => {
       return response.data;
     })

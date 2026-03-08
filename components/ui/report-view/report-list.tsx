@@ -197,9 +197,8 @@ export function ReportList({
               const hasAbstract = report.report.abstract && report.report.abstract.length > 0;
               const isSelected = selectedReportId === report.report.reportId;
               const isExpanded = isSelected && hasAbstract;
-              const reportKey = `${report.report.reportId}`;
-              const isRunningEvaluation = runningEvaluations.includes(reportKey);
-              const reportResults = storeResults[reportKey];
+              const isRunningEvaluation = runningEvaluations.includes(report.report.reportId);
+              const reportResults = storeResults[report.report.reportId];
               const resultCount = reportResults ? Object.keys(reportResults).length : 0;
               const params = new URLSearchParams(
                 Object.entries({ ...queryParams })
