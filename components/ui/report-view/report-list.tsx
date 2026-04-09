@@ -17,7 +17,6 @@ import { ReportAssignedStudiesBadges } from "@/components/ui/study-view/report-a
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { toast } from "sonner";
 import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
 import { filterReports, ReportFilterType } from "@/lib/filterUtils";
 import { useReportStore } from "@/hooks/use-report-store";
@@ -37,7 +36,6 @@ export function ReportList({
 }: ReportListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [assignmentFilter, setAssignmentFilter] = useState<ReportFilterType>("all");
-  const [downloadingPdf, setDownloadingPdf] = useState<Set<number>>(new Set());
   const params = useParams();
   const projectId =
     typeof params.projectId === "string"
@@ -77,40 +75,6 @@ export function ReportList({
   const reportsList = useMemo(() => Object.values(reportsDict), [reportsDict]);
 
   const filteredReports = filterReports(reportsList, searchQuery, assignmentFilter);
-
-  const handleDownloadPdf = async (reportId: number, title: string, event: React.MouseEvent) => {
-    event.stopPropagation();
-    setDownloadingPdf((prev) => new Set(prev).add(reportId));
-
-    try {
-      const response = await fetch(`/api/meerkat/reports/${reportId}/pdf`);
-      if (!response.ok) {
-        throw new Error("Failed to download PDF");
-      }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `Report_${reportId}_${title.substring(0, 50).replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      toast.success(`Downloaded report ${reportId}`);
-    } catch (error) {
-      toast.error(
-        `Failed to download report ${reportId}: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    } finally {
-      setDownloadingPdf((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(reportId);
-        return newSet;
-      });
-    }
-  };
 
   return (
     <div className="h-full flex flex-col pt-5">
@@ -153,14 +117,14 @@ export function ReportList({
               </span>
               <div className="flex gap-1">
                 <Button
-                    key="all"
-                    variant={assignmentFilter === "all" ? "default" : "outline"}
-                    size="sm"
-                    className="h-7 text-xs px-3"
-                    onClick={() => setAssignmentFilter("all" as ReportFilterType)}
-                  >
-                    {"All"}
-                  </Button>
+                  key="all"
+                  variant={assignmentFilter === "all" ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 text-xs px-3"
+                  onClick={() => setAssignmentFilter("all" as ReportFilterType)}
+                >
+                  {"All"}
+                </Button>
                 {filterOptions.map((filter) => (
                   <Button
                     key={filter.value}
@@ -205,98 +169,96 @@ export function ReportList({
                   .filter(([_, v]) => v !== undefined)
                   .map(([k, v]) => [k, String(v)])
               ).toString();
-              const reportHref = `/${baseUrl}/${projectId}/${report.report.reportId}${params ? `?${params}` : ''}`;
+              const reportHref = `/${baseUrl}/${projectId}/${report.report.reportId}${params ? `?${params}` : ""}`;
+              const pdfParams = new URLSearchParams({
+                filename: `${report.report.reportId} - ${report.report.title}.pdf`,
+              }).toString();
+              const pdfUrl = `/api/meerkat/reports/${report.report.reportId}/pdf?${pdfParams}`;
 
-              // If projectId is not available, render as non-link
               if (!reportHref) {
                 return null;
               }
 
               return (
-                <Link
-                    key={report.report.reportId || idx}
+                <div key={report.report.reportId || idx} className="relative">
+                  <Link
                     href={reportHref}
                     scroll={true}
                     ref={isSelected ? selectedCardRef : undefined}
                     tabIndex={0}
                     aria-selected={isSelected}
-                    className={`block relative rounded-lg border bg-card hover:border-primary/20 transition-all first:mt-3 scroll-mt-4 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60 ${
+                    className={`block rounded-lg border bg-card hover:border-primary/20 transition-all first:mt-3 scroll-mt-4 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60 ${
                       isSelected
                         ? "border-primary bg-primary/5 outline outline-2 outline-primary/40"
                         : ""
-                    }`}
+                    } ${isSelected && report.hasPdf ? "pr-12" : ""}`}
                   >
-                  {/* Report Content */}
-                  <div className="p-4">
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold leading-snug mb-2.5 text-foreground">
-                          {isRunningEvaluation ? (
-                            <Spinner className="mr-1 inline h-3 w-3 text-primary" />
-                          ) : resultCount > 0 ? (
-                            <Sparkles className="mr-1 inline h-3 w-3" />
-                          ) : null}
-                          {report.report.title}
-                        </h3>
-                        <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground mb-2">
-                          {displayDate && (
-                            <div className="flex items-center gap-1.5">
-                              <Calendar className="h-3.5 w-3.5 shrink-0" />
-                              <span>{displayDate}</span>
-                            </div>
-                          )}
-                          {report.report.authors && report.report.authors.length > 0 && (
-                            <div className="flex items-center gap-1.5">
-                              <Users className="h-3.5 w-3.5 shrink-0" />
-                              <span className={isExpanded ? "" : "truncate max-w-[200px]"}>
-                                {report.report.authors.join(", ")}
-                              </span>
-                            </div>
-                          )}
+                    <div className="p-4">
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-semibold leading-snug mb-2.5 text-foreground">
+                            {isRunningEvaluation ? (
+                              <Spinner className="mr-1 inline h-3 w-3 text-primary" />
+                            ) : resultCount > 0 ? (
+                              <Sparkles className="mr-1 inline h-3 w-3" />
+                            ) : null}
+                            {report.report.title}
+                          </h3>
+                          <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground mb-2">
+                            {displayDate && (
+                              <div className="flex items-center gap-1.5">
+                                <Calendar className="h-3.5 w-3.5 shrink-0" />
+                                <span>{displayDate}</span>
+                              </div>
+                            )}
+                            {report.report.authors && report.report.authors.length > 0 && (
+                              <div className="flex items-center gap-1.5">
+                                <Users className="h-3.5 w-3.5 shrink-0" />
+                                <span className={isExpanded ? "" : "truncate max-w-[200px]"}>
+                                  {report.report.authors.join(", ")}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-start gap-2 shrink-0">
-                        {isSelected && report.hasPdf && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={(e) => handleDownloadPdf(report.report.reportId, report.report.title, e)}
-                            disabled={downloadingPdf.has(report.report.reportId)}
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        )}
+
+                      {hasAbstract && !isExpanded && (
+                        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 mt-2">
+                          {report.report.abstract}
+                        </p>
+                      )}
+                      {useStudyBadges && (
+                        <ReportAssignedStudiesBadges report={report} />
+                      )}
+                    </div>
+
+                    {isExpanded && hasAbstract && (
+                      <div className="px-4 pb-4 border-t bg-muted/30">
+                        <p className="text-xs text-muted-foreground leading-relaxed pt-3 whitespace-pre-wrap">
+                          {report.report.abstract}
+                        </p>
                       </div>
-                    </div>
-
-                    {/* Abstract Preview */}
-                    {hasAbstract && !isExpanded && (
-                      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 mt-2">
-                        {report.report.abstract}
-                      </p>
                     )}
-                    {useStudyBadges && (
-                    <ReportAssignedStudiesBadges
-                      report={report}
-                    />)}
-                  </div>
+                  </Link>
 
-                  {/* Expanded Abstract */}
-                  {isExpanded && hasAbstract && (
-                    <div className="px-4 pb-4 border-t bg-muted/30">
-                      <p className="text-xs text-muted-foreground leading-relaxed pt-3 whitespace-pre-wrap">
-                        {report.report.abstract}
-                      </p>
-                    </div>
+                  {isSelected && report.hasPdf && (
+                    <a
+                      href={pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Open PDF for ${report.report.title}`}
+                      className="absolute right-4 top-4 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60"
+                    >
+                      <Download className="h-4 w-4" />
+                    </a>
                   )}
-                </Link>
+                </div>
               );
             })
           )}
         </div>
       </ScrollArea>
-      
     </div>
   );
 }

@@ -53,9 +53,8 @@ export default async function StudyList({ params, searchParams }: StudyListProps
 
   return (
     <StudyRelevanceTable
-          studies={studies}
-          projectId={projectId}
           reportId={reportIdNumber}
+          studies={studies}
         />
   );
 }

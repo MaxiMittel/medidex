@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getReportPdf, uploadPdf } from "@/lib/api/reportApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
+function sanitizePdfFilename(value: string) {
+  return value
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function POST(request: NextRequest,
   { params }: { params: Promise<{ reportId: string }> }
 ) {
@@ -46,6 +53,9 @@ export async function GET(
   { params }: { params: Promise<{ reportId: string }> }
 ) {
   const { reportId } = await params;
+  const filename = sanitizePdfFilename(
+    _request.nextUrl.searchParams.get("filename") || `report-${reportId}.pdf`
+  ) || `report-${reportId}.pdf`;
 
   if (!reportId) {
     return NextResponse.json({ error: "Missing report id." }, { status: 400 });
@@ -62,6 +72,7 @@ export async function GET(
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="${filename}"`,
       },
     });
   } catch (error: any) {

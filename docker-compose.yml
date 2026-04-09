@@ -10,7 +10,6 @@ services:
       - STAGE=${STAGE}
       - MEERKAT_API_URL=${BACKEND_API_URL}
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@host.docker.internal:5432/medidex?schema=public
-      - GENAI_API_URL=${GENAI_API_URL}
       - INACTIVITY_DIALOG=${INACTIVITY_DIALOG}
     working_dir: /app
     volumes:
