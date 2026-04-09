@@ -1,10 +1,3 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Upload, FileSearch } from "lucide-react";
-import Link from "next/link";
-
 interface HomeHeroProps {
     userName: string;
 }
@@ -28,15 +21,9 @@ function getMotivationalMessage(): string {
 }
 
 export function HomeHero({ userName }: HomeHeroProps) {
-    const [greeting, setGreeting] = useState("Welcome");
-    const [message, setMessage] = useState("");
-
-    useEffect(() => {
-        setGreeting(getGreeting());
-        setMessage(getMotivationalMessage());
-    }, []);
-
     const firstName = userName.split(" ")[0];
+    const greeting = getGreeting();
+    const message = getMotivationalMessage();
 
     return (
         <div className="mb-8">
@@ -55,14 +42,6 @@ export function HomeHero({ userName }: HomeHeroProps) {
                     )}
                 </div>
 
-                <div className="flex gap-2">
-                    <Button asChild>
-                        <Link href="/upload">
-                            <Upload className="mr-2 h-4 w-4" />
-                            Upload Batch
-                        </Link>
-                    </Button>
-                </div>
             </div>
         </div>
     );

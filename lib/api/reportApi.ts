@@ -1,20 +1,20 @@
 import apiClient from "./apiClient";
 import { AxiosRequestConfig } from "axios";
-import { SimilarTagDto, SimilarStudyResponseDto, GetSimilarStudiesParams, GetSimilarTagsParams, StudyDto} from "../../types/apiDTOs";
-import {serializeParams} from "./helpers";    
+import { ReportSourcesDto, SimilarTagDto, SimilarStudyDto, GetSimilarStudiesParams, GetSimilarTagsParams, StudyDto} from "../../types/apiDTOs";
+import { serializeParams } from "./helpers";    
 
-export const getSimilarStudiesByReport = (
+export const getSimilarStudiesByReportId = (
   reportId: number,
   params: GetSimilarStudiesParams = {},
   config?: AxiosRequestConfig
-): Promise<SimilarStudyResponseDto[]> => { 
+): Promise<SimilarStudyDto[]> => { 
   const path = `/reports/${reportId}/similar-studies`;
   const { params: configParams, ...restConfig } = config ?? {};
   const requestParams = {
     ...(configParams ?? {}),
     ...params,
   };
-  return apiClient.get<SimilarStudyResponseDto[]>(path, {
+  return apiClient.get<SimilarStudyDto[]>(path, {
       ...restConfig,
       params: requestParams,
       paramsSerializer: { serialize: serializeParams }
@@ -39,7 +39,7 @@ export const assignStudyToReportByReportId = (
     ...config,
     paramsSerializer: { serialize: serializeParams } 
   };
-  return apiClient.put(path, null, requestConfig).then(response => response.data);
+  return apiClient.put<void>(path, null, requestConfig).then(response => response.data);
 }
 
 //remove studies from a report
@@ -50,7 +50,7 @@ export const removeStudyFromReportByReportId = (
 ): Promise<void> => {
   const path = `/reports/${reportId}/studies/${studyId}`;
   return apiClient
-    .delete(path, config)
+    .delete<void>(path, config)
     .then(response => {
       return;
     })
@@ -68,7 +68,7 @@ export const assignNewStudyToReportByReportId = (
 ): Promise<void> => {
   const path = `/reports/${reportId}/studies`;
   return apiClient
-    .post(path, study, config)
+    .post<void>(path, study, config)
     .then(response => {
       return response.data;
     })
@@ -104,4 +104,78 @@ export const getSimilarTagsByReportId = (
     });
 }
 
-//Endpoint to get studies related to a specific tag always gives server error 500 so not implemented yet
+export const getStudiesByReportId = (
+  reportId: number,
+  params?: { date_from?: string | null; date_to?: string | null },
+  config?: AxiosRequestConfig
+): Promise<StudyDto[]> => {
+  const path = `/reports/${reportId}/studies`;
+
+  const requestConfig: AxiosRequestConfig = {
+    ...config,
+    params: params,
+    paramsSerializer: { serialize: serializeParams },
+  };
+
+  return apiClient
+    .get<StudyDto[]>(path, requestConfig)
+    .then((response) => response.data)
+    .catch((error) => {
+      console.error(
+        `Error fetching studies for report ${reportId}:`,
+        error.message || error
+      );
+      throw error;
+    });
+};
+
+export const getReportPdf = (
+  reportId: number,
+  config?: AxiosRequestConfig
+): Promise<ArrayBuffer> => {
+  const path = `/reports/${reportId}/pdf`;
+  return apiClient.get<ArrayBuffer>(path, { responseType: 'arraybuffer', ...config })
+    .then(response => {
+      return response.data;
+    })  
+    .catch(error => {
+      console.error(`Error fetching PDF for report ${reportId}:`, error.message || error);
+      throw error;
+    });
+}
+
+export const uploadPdf = (
+  reportId: number,
+  file: File | null,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+
+  const formData = new FormData();
+  if (file){
+    formData.append("file", file, file.name);
+  }
+
+  const path = `/reports/${reportId}/pdf`;
+  console.log("hit");
+  return apiClient.put<void>(path, formData, config)
+    .then(() => {})
+    .catch(error => {
+      console.error(`Error fetching PDF for report ${reportId}:`, error.message || error);
+      throw error;
+    });
+}
+
+export const getReportSources = (
+  reportId: number,
+  config?: AxiosRequestConfig
+): Promise<ReportSourcesDto> => {
+  const path = `/reports/${reportId}/sources`;
+  return apiClient.get<ReportSourcesDto>(path, config)
+    .then(response => {
+      return response.data;
+    })
+    .catch(error => {
+      console.error(`Error fetching links for report ${reportId}:`, error.message || error);
+      throw error;
+    });
+}

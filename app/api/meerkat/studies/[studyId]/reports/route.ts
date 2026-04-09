@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getReportsByStudyId } from "@/lib/api/studiesApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
-import type { StudyReportSummary } from "@/types/reports";
 
 export async function GET(
   _request: NextRequest,
@@ -28,12 +27,7 @@ export async function GET(
     const headers = await getMeerkatHeaders();
     const reports = await getReportsByStudyId(id, undefined, { headers });
 
-    const summaries: StudyReportSummary[] = reports.map((report) => ({
-      reportId: report.reportId,
-      title: report.title,
-    }));
-
-    return NextResponse.json(summaries);
+    return NextResponse.json(reports);
   } catch (error) {
     console.error(`Unexpected error while fetching reports for study ${studyId}:`, error);
     return NextResponse.json(

@@ -28,7 +28,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { AddStudyDialog } from "./add-study-dialog";
 import { AIMatchSettingsDialog } from "./ai-match-settings-dialog";
 import { LoadMoreStudiesButton } from "./load-more-studies-button";
-import { sendReportEvent } from "@/lib/api/reportEventsApi";
 import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
 import type { AIModel } from "@/hooks/use-genai-evaluation-store";
 import type { NewStudySuggestion, PromptOverrides, StudyDto, StudyCreateDto } from "@/types/apiDTOs";
@@ -40,9 +39,8 @@ import { useReportStore } from "@/hooks/use-report-store";
 import { useDetailsSheet } from "@/app/context/details-sheet-context";
 
 interface StudyRelevanceTableProps {
+  reportId?: number;
   studies: RelevanceStudy[];
-  currentBatchHash?: string;
-  currentReportId?: number;
 }
 
 const formatParticipantCount = (value?: string | null) => {
@@ -55,9 +53,8 @@ const formatParticipantCount = (value?: string | null) => {
 };
 
 export function StudyRelevanceTable({
+  reportId,
   studies,
-  currentBatchHash,
-  currentReportId,
 }: StudyRelevanceTableProps) {
   
   const [resolvedStudies, setResolvedStudies] = useState<RelevanceStudy[]>(() => [...studies]);
@@ -67,7 +64,7 @@ export function StudyRelevanceTable({
   const addAssignedStudies = useReportStore((state) => state.addAssignedStudy);
   const removeAssignedStudies = useReportStore((state) => state.removeAssignedStudy);
   const currentReport = useReportStore((state) =>
-    currentReportId !== undefined ? state.reports[currentReportId] : undefined
+    reportId !== undefined ? state.reports[reportId] : undefined
   );
 
   const {openWithStudyItem } = useDetailsSheet()
@@ -81,10 +78,9 @@ export function StudyRelevanceTable({
   const getStudyResult = useGenAIEvaluationStore((state) => state.getStudyResult);
   const dismissSuggestion = useGenAIEvaluationStore((state) => state.dismissSuggestion);
 
-  const reportKey = currentBatchHash ? `${currentBatchHash}-${currentReportId}` : "";
-  const evalState = reportKey ? evaluationsByReport[reportKey] || null : null;
-  const isRunning = reportKey ? runningEvaluations.includes(reportKey) : false;
-  const studyResults = reportKey ? results[reportKey] : undefined;
+  const evalState = reportId ? evaluationsByReport[reportId] || null : null;
+  const isRunning = reportId ? runningEvaluations.includes(reportId) : false;
+  const studyResults = reportId ? results[reportId] : undefined;
 
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [reasonDialogOpen, setReasonDialogOpen] = useState(false);
@@ -121,7 +117,7 @@ export function StudyRelevanceTable({
   
 
   const suggestionKey = newStudySuggestion
-    ? `${reportKey}:${JSON.stringify(newStudySuggestion)}`
+    ? `${reportId}:${JSON.stringify(newStudySuggestion)}`
     : null;
 
   const markStudyLinkedState = useCallback((studyId: number, linked: boolean) => {
@@ -134,13 +130,13 @@ export function StudyRelevanceTable({
 
   const handleLinkedChange = useCallback(
     async (study: StudyDto, checked: boolean) => {
-      if (currentReportId === undefined) {
+      if (reportId === undefined) {
         return;
       }
 
       if (checked) {
         try {
-          await addAssignedStudies(currentReportId, study);
+          await addAssignedStudies(reportId, study);
           markStudyLinkedState(study.studyId, true);
           toast.success("Report assigned to study");
         } catch (error) {
@@ -153,7 +149,7 @@ export function StudyRelevanceTable({
         }
       } else {
         try {
-          await removeAssignedStudies(currentReportId, study.studyId);
+          await removeAssignedStudies(reportId, study.studyId);
           markStudyLinkedState(study.studyId, false);
           toast.success("Report unassigned from study");
         } catch (error) {
@@ -167,7 +163,7 @@ export function StudyRelevanceTable({
       }
     },
     [
-      currentReportId,
+      reportId,
       addAssignedStudies,
       removeAssignedStudies,
       markStudyLinkedState,
@@ -176,11 +172,11 @@ export function StudyRelevanceTable({
 
   const handleSaveNewStudy = useCallback(
     async (payload: StudyCreateDto) => {
-      if (currentReportId === undefined) {
+      if (reportId === undefined) {
         throw new Error("Select a report before adding a new study.");
       }
 
-      const response = await fetch(`/api/meerkat/reports/${currentReportId}/studies`, {
+      const response = await fetch(`/api/meerkat/reports/${reportId}/studies`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -226,7 +222,7 @@ export function StudyRelevanceTable({
         dismissSuggestion(suggestionKey);
       }
     },
-    [currentReportId, suggestionKey, dismissSuggestion, handleLinkedChange]
+    [reportId, suggestionKey, dismissSuggestion, handleLinkedChange]
   );
 
   useEffect(() => {
@@ -244,7 +240,7 @@ export function StudyRelevanceTable({
   // Reset evaluation state when report changes
   useEffect(() => {
     setAiDialogOpen(false);
-  }, [currentBatchHash, currentReportId]);
+  }, []);
 
   // Filter and sort studies
   const filteredStudies = useMemo(() => {
@@ -272,12 +268,12 @@ export function StudyRelevanceTable({
     includePdf?: boolean;
     promptOverrides?: PromptOverrides;
   }) => {
-    if (!currentBatchHash || currentReportId === undefined) {
-      toast.error("Missing batch or report context");
+    if (reportId === undefined) {
+      toast.error("Missing report id");
       return false;
     }
 
-    const currentReport = getReport(currentReportId);
+    const currentReport = getReport(reportId);
     if (!currentReport) {
       toast.error("Report not found");
       return false;
@@ -288,7 +284,6 @@ export function StudyRelevanceTable({
       toast.info(`Evaluating ${filteredStudies.length} studies with AI (${runningCount + 1}/4 running)...`);
       setHasEvaluated(true);
       evaluateStream(
-        currentBatchHash,
         currentReport.report,
         filteredStudies.map((study) => study.study),
         options,
@@ -397,7 +392,7 @@ export function StudyRelevanceTable({
                     </Button>
                   )}
                   <AddStudyDialog
-                    currentReportId={currentReportId}
+                    currentReportId={reportId}
                     suggestedValues={newStudySuggestion}
                     onSaveStudy={handleSaveNewStudy}
                   />
@@ -437,9 +432,11 @@ export function StudyRelevanceTable({
             message={progressMessage}
             isStreaming={evalState?.isStreaming ?? false}
             hasSummary={Boolean(summaryEvent?.message)}
-            collapsed={progressCollapsedByReport[reportKey] ?? false}
+            collapsed={progressCollapsedByReport[reportId !== undefined ? String(reportId) : ""] ?? false}
             onCollapsedChange={(collapsed) => {
-              setProgressCollapsedByReport(prev => ({ ...prev, [reportKey]: collapsed }));
+              if (reportId !== undefined) {
+                setProgressCollapsedByReport(prev => ({ ...prev, [String(reportId)]: collapsed }));
+              }
             }}
           />
       ) : null}
@@ -614,22 +611,20 @@ export function StudyRelevanceTable({
     </div>
 
       {/* AI Reason Dialog */}
-      {selectedAIStudy && currentBatchHash !== undefined && currentReportId !== undefined && (
+      {selectedAIStudy && reportId !== undefined && (
         <StudyAIReasonDialog
           open={reasonDialogOpen}
           onOpenChange={setReasonDialogOpen}
           studyName={selectedAIStudy.studyName}
           classification={
             getStudyResult(
-              currentBatchHash,
-              currentReportId,
+              reportId,
               selectedAIStudy.studyId
             )?.classification || "unsure"
           }
           reason={
             getStudyResult(
-              currentBatchHash,
-              currentReportId,
+              reportId,
               selectedAIStudy.studyId
             )?.reason || "No reason available"
           }

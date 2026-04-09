@@ -1,32 +1,7 @@
+import apiClient from "./apiClient";
 import { StudyDto, StudyCreateDto , ReportDto, InterventionDto, ConditionDto, OutcomeDto , GetPersonsResponseDto } from "../../types/apiDTOs";
 import { serializeParams } from "./helpers";
-import apiClient from "./apiClient";
 import { AxiosRequestConfig } from "axios";
-
-export const getStudies = (
-  study_ids: number[],
-  config?: AxiosRequestConfig
-): Promise<StudyDto[]> => {
-  const path = '/studies';
-
-  const requestConfig = {
-    ...config,
-    params: {
-      study_ids: study_ids,
-    },
-    paramsSerializer: {
-      serialize: serializeParams,
-    },
-  };
-  return apiClient.get<StudyDto[]>(path, requestConfig)
-    .then(response => {
-      return response.data;
-    })
-    .catch(error => {
-      console.error('Error fetching studies:', error);
-      throw error;
-    });
-}
 
 export const getStudyById = (
   studyId: number,
@@ -49,8 +24,6 @@ export const getStudyById = (
       throw error;
     });
 }
-
-//getStudybyID not really needed since getStudies can take multiple IDs or a single ID
 
 export const getReportsByStudyId = (
   studyId: number,
@@ -77,11 +50,6 @@ export const getReportsByStudyId = (
       throw error;
     });
 }
-
-//get studyID by trialID not implemented because it's confusing and not needed yet
-
-//getDateStudyEntered not implemented because it can be taken from StudyDto
-
 
 export const getInterventionsForStudy = (
   studyId: number,
@@ -167,46 +135,6 @@ export const getPersonsForStudy = (
     })
     .catch(error => {
       console.error(`Error fetching persons for study ${studyId}:`, error);
-      throw error;
-    });
-};
-
-export const getReportPdf = (
-  reportId: number,
-  config?: AxiosRequestConfig
-): Promise<ArrayBuffer> => {
-  const path = `/reports/${reportId}/pdf`;
-  return apiClient.get<ArrayBuffer>(path, { responseType: 'arraybuffer', ...config })
-    .then(response => {
-      return response.data;
-    })
-    .catch(error => {
-      console.error(`Error fetching PDF for report ${reportId}:`, error.message || error);
-      throw error;
-    });
-}
-
-export const getStudiesForReport = (
-  reportId: number,
-  params?: { date_from?: string | null; date_to?: string | null },
-  config?: AxiosRequestConfig
-): Promise<StudyDto[]> => {
-  const path = `/reports/${reportId}/studies`;
-
-  const requestConfig: AxiosRequestConfig = {
-    ...config,
-    params: params,
-    paramsSerializer: { serialize: serializeParams },
-  };
-
-  return apiClient
-    .get<StudyDto[]>(path, requestConfig)
-    .then((response) => response.data)
-    .catch((error) => {
-      console.error(
-        `Error fetching studies for report ${reportId}:`,
-        error.message || error
-      );
       throw error;
     });
 };

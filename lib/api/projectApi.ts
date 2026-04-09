@@ -1,0 +1,143 @@
+import apiClient from "./apiClient";
+import { AxiosRequestConfig } from "axios";
+import {ProjectAssigneeDto, ProjectDetailsDto, ProjectTaskDto, ReportDetailDto} from "../../types/apiDTOs";
+
+//get all projects
+export const getProjects = (config?: AxiosRequestConfig): Promise<ProjectDetailsDto[]> => {
+  return apiClient
+    .get<ProjectDetailsDto[]>("/projects", config)
+    .then(response => {
+      return response.data;
+    })
+    .catch(error => {
+      console.error("Error fetching project:", error);
+      throw error;
+    });
+}
+
+//get all projects
+export const getTasks = (config?: AxiosRequestConfig): Promise<ProjectTaskDto[]> => {
+  return apiClient
+    .get<ProjectTaskDto[]>("/tasks", config)
+    .then(response => {
+      return response.data;
+    })
+    .catch(error => {
+      console.error("Error fetching project:", error);
+      throw error;
+    });
+}
+
+//create a new project by uploading a .ris file
+export const createProject = (
+  file: File,
+  projectName: string,
+  config?: AxiosRequestConfig
+): Promise<string> => {
+  const formData = new FormData();
+  formData.append("projectName", projectName)
+  formData.append("file", file, file.name);
+  
+  // The apiClient has a request interceptor that automatically removes Content-Type
+  // when FormData is detected, allowing axios to set it with the correct boundary.
+  return apiClient.post<string>("/projects", formData, config)
+      .then(response => {
+          return response.data;
+      })
+      .catch(error => {
+          console.error("Error uploading project:", error);
+          // Extract error message from API response
+          if (error.response?.data?.detail) {
+              const errorMessage = typeof error.response.data.detail === 'string' 
+                  ? error.response.data.detail 
+                  : JSON.stringify(error.response.data.detail);
+              throw new Error(errorMessage);
+          }
+          throw error;
+      });
+}
+
+//delete a project by its id
+export const deleteProjectById = (
+  projectId: string,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+  return apiClient
+    .delete<void>(`/projects/${projectId}`, config)
+    .then(() => {
+      return;
+    })
+    .catch(error => {
+      console.error(`Error deleting project with id ${projectId}:`, error);
+      throw error;
+    });
+}
+
+//get all report details for a project
+export const getProjectReports = (
+  projectId: string,
+  readyOnly: boolean,
+  config?: AxiosRequestConfig
+): Promise<ReportDetailDto[]> => {
+  const requestConfig: AxiosRequestConfig = {
+    ...config,
+    params: {
+      ...config?.params,
+      ready_only: readyOnly,
+    },
+  };
+
+  return apiClient
+    .get<ReportDetailDto[]>(`/projects/${projectId}/reports`, requestConfig)
+    .then(response => {
+      return response.data;
+    })
+    .catch(error => {
+      console.error(`Error fetching reports for project ${projectId}:`, error);
+      throw error;
+    });
+}
+
+export const assignUserToProject = (
+  projectId: string,
+  userId: string,
+  config?: AxiosRequestConfig
+): Promise<ProjectAssigneeDto> => {
+  const path = `/projects/${projectId}/assignees`;
+
+  return apiClient
+    .post<ProjectAssigneeDto>(path, JSON.stringify(userId), config)
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error assigning user to project ${projectId}:`, error);
+      if (error.response?.data?.detail) {
+        const errorMessage = typeof error.response.data.detail === "string"
+          ? error.response.data.detail
+          : JSON.stringify(error.response.data.detail);
+        throw new Error(errorMessage);
+      }
+      throw error;
+    });
+};
+
+export const removeUserFromProject = (
+  projectId: string,
+  userId: string,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+  const path = `/projects/${projectId}/assignees/${userId}`;
+
+  return apiClient
+    .delete<void>(path, config)
+    .then(() => undefined)
+    .catch(error => {
+      console.error(`Error removing user ${userId} from project ${projectId}:`, error);
+      if (error.response?.data?.detail) {
+        const errorMessage = typeof error.response.data.detail === "string"
+          ? error.response.data.detail
+          : JSON.stringify(error.response.data.detail);
+        throw new Error(errorMessage);
+      }
+      throw error;
+    });
+};

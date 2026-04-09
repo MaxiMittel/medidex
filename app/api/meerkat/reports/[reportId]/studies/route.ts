@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStudiesForReport } from "@/lib/api/studiesApi";
-import { assignNewStudyToReportByReportId } from "@/lib/api/reportApi";
+import { assignNewStudyToReportByReportId, getStudiesByReportId } from "@/lib/api/reportApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 import { StudyDto } from "@/types/apiDTOs";
 
@@ -23,7 +22,7 @@ export async function GET(
 
   try {
     const headers = await getMeerkatHeaders();
-    const studies = await getStudiesForReport(Number(reportId), {
+    const studies = await getStudiesByReportId(Number(reportId), {
       date_from: date_from || undefined,
       date_to: date_to || undefined,
     }, { headers });

@@ -1,25 +1,41 @@
+import apiClient from "./apiClient";
+import { AxiosRequestConfig } from "axios";
 import type {
   EvaluateRequest,
   StreamEvent,
   StreamCallbacks,
 } from "@/types/apiDTOs";
 
-const STREAM_ENDPOINT = "/api/genai/evaluate/stream";
 
 export const evaluateStudiesStream = (
   request: EvaluateRequest,
-  callbacks: StreamCallbacks
+  callbacks: StreamCallbacks,
+  config?: AxiosRequestConfig
 ): (() => void) => {
   const { onEvent, onComplete, onError } = callbacks;
   const abortController = new AbortController();
 
+  const path = "/evaluate/stream";
+  const baseURL = apiClient.defaults.baseURL ?? "";
+  const url = `${baseURL}${path}`;
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (config?.headers) {
+    Object.entries(config.headers as Record<string, unknown>).forEach(([k, v]) => {
+      if (v !== null && v !== undefined) {
+        headers[k] = String(v);
+      }
+    });
+  }
+
   const startStream = async () => {
     try {
-      const response = await fetch(STREAM_ENDPOINT, {
+      const response = await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify(request),
         signal: abortController.signal,
       });

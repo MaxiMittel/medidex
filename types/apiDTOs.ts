@@ -1,19 +1,36 @@
-export interface TokenDto {
-  access_token: string;
-  token_type: string;
+export interface ReportSourcesDto {
+  doi: string;
+  links: string[];
 }
 
-export interface BatchDto {
-  batch_hash: string;
-  batch_description: string;
-  number_reports: number;
-  created_at: string;
-  embedded: number;
-  assigned: number;
+export interface ProjectAssigneeDto {
+  userId : string;
+  numberReportsLinked: number;
+}
+
+export interface ProjectDto {
+  projectId: string;
+  name: string;
+  createdAt: string;
+  owner: string;
+  numberReportsReadyForProcessing: number;
+}
+
+export interface ProjectDetailsDto extends ProjectDto{
+  numberReportsTotal: number;
+  numberReportsPreProcessed: number;
+  numberReportsReadyForReview: number;
+  assignees : ProjectAssigneeDto[]
+}
+
+export interface ProjectTaskDto {
+  project : ProjectDto;
+  numberReportsProcessed: number;
 }
 
 export interface ReportDetailDto {
   report: ReportDto;
+  hasPdf: boolean | undefined;
   assignedStudies: StudyDto[];
 }
 
@@ -29,7 +46,7 @@ export interface GetSimilarTagsParams {
   k?: number;
 }
 
-export interface SimilarStudyResponseDto {
+export interface SimilarStudyDto {
   relevance: number;
   study: StudyDto;
 }

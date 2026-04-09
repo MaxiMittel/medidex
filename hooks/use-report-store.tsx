@@ -1,5 +1,5 @@
 import { ReportDetailDto, StudyDto } from "@/types/apiDTOs"
-import {create} from "zustand"
+import { create } from "zustand"
 
 const getReportStudyPath = (reportId: number, studyId: number) =>
     `/api/meerkat/reports/${reportId}/studies/${studyId}`
@@ -49,6 +49,7 @@ type ReportState = {
     getReport: (reportId: number) => ReportDetailDto
     addAssignedStudy: (reportId: number, study: StudyDto) => Promise<void>
     removeAssignedStudy: (reportId: number, studyId: number) => Promise<void>
+    setHasPdf: (reportId: number, hasPdf : boolean) => void;
 }
 
 export const useReportStore = create<ReportState>((set, get) => ({
@@ -123,5 +124,23 @@ export const useReportStore = create<ReportState>((set, get) => ({
                 },
             }
         })
+    },
+
+    setHasPdf(reportId, hasPdf) {
+        set((state) => {
+            const updatedReport = state.reports[reportId];
+            if (!updatedReport) {
+                return state;
+            }
+            return {
+                reports: {
+                    ...state.reports,
+                    [reportId]: {
+                        ...updatedReport,
+                        hasPdf,
+                    },
+                },
+            };
+        });
     },
 }))
