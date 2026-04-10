@@ -7,28 +7,31 @@ import {
   ResizableHandle,
 } from "@/components/ui/resizable";
 import { DetailsSheetProvider } from "@/app/context/details-sheet-context";
-import { ReportDetailDto, ProjectAnnotationsDto } from "@/types/apiDTOs";
+import { ReportDetailDto } from "@/types/apiDTOs";
 import { ReportList } from "@/components/ui/report-view/report-list";
 import { useReportStore } from "@/hooks/use-report-store";
+import { useReviewAnnotations } from "./review-annotations-context";
 import StudySheet from "../../../projects/[projectId]/study-sheet";
 
 interface ReportColumnClientProps {
   children: ReactNode;
   reports: ReportDetailDto[];
-  annotations: ProjectAnnotationsDto;
   projectId: string;
 }
 
 const reportFilterOptions = [
   { value: "annotatorConsensus", label: "Consensus" },
   { value: "annotatorConflict", label: "Conflict" },
+  { value: "annotationsReview", label: "Reviewed" },
+  { value: "annotationsNoReview", label: "Pending Review" },
 ];
 
-export function ReportColumnClient({ children, reports, annotations, projectId}: ReportColumnClientProps) {
+export function ReportColumnClient({ children, reports, projectId}: ReportColumnClientProps) {
   const panelBaseId = `project-panels-${projectId}`;
   const reportsPanelId = `${panelBaseId}-reports`;
   const detailsPanelId = `${panelBaseId}-details`;
   const resizeHandleId = `${panelBaseId}-resize-handle`;
+  const annotations = useReviewAnnotations();
 
   const setReports = useReportStore((state) => state.setReports);
     

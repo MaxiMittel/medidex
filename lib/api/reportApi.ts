@@ -42,6 +42,36 @@ export const assignStudyToReportByReportId = (
   return apiClient.put<void>(path, null, requestConfig).then(response => response.data);
 }
 
+export const confirmStudyForReportByReportId = (
+  reportId: number,
+  studyId: number,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+  const path = `/reports/${reportId}/studies/${studyId}/confirmation`;
+  const requestConfig = {
+    ...config,
+    paramsSerializer: { serialize: serializeParams }
+  };
+
+  return apiClient.put<void>(path, null, requestConfig).then(response => response.data);
+}
+
+export const unconfirmStudyForReportByReportId = (
+  reportId: number,
+  studyId: number,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+  const path = `/reports/${reportId}/studies/${studyId}/confirmation`;
+
+  return apiClient
+    .delete<void>(path, config)
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error removing confirmation for study ${studyId} in report ${reportId}:`, error);
+      throw error;
+    });
+}
+
 //remove studies from a report
 export const removeStudyFromReportByReportId = (
   reportId: number,

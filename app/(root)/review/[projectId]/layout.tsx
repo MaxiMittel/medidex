@@ -67,7 +67,7 @@ export default async function AnnotationsReviewPage({ children, params }: PdfUpl
 
       <div className="flex-1 min-h-0 bg-background">
         <ReviewAnnotationsProvider annotations={annotations}>
-          <ReportColumnClient projectId={projectId} reports={reports} annotations={annotations}>
+          <ReportColumnClient projectId={projectId} reports={reports}>
             {children}
           </ReportColumnClient>
         </ReviewAnnotationsProvider>

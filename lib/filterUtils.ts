@@ -1,6 +1,6 @@
 import { AnnotationDto, ProjectAnnotationsDto, ReportDetailDto } from "@/types/apiDTOs";
 
-export type ReportFilterType = "all" | "assigned" | "unassigned" | "newStudy" | "withPdf" | "withoutPdf" | "annotatorConsensus" | "annotatorConflict";
+export type ReportFilterType = "all" | "assigned" | "unassigned" | "newStudy" | "withPdf" | "withoutPdf" | "annotatorConsensus" | "annotatorConflict" | "annotationsReview" | "annotationsNoReview";
 
 const toTimestamp = (value: Date | string | number | null | undefined): number | null => {
   if (value === null || value === undefined) {
@@ -50,6 +50,10 @@ const hasAnnotatorConflict = (annotations: AnnotationDto[]): boolean => {
   return getDistinctAnnotatedStudyCount(annotations) > 1;
 };
 
+const hasReviewedAnnotation = (annotations: AnnotationDto[]): boolean => {
+  return annotations.some((annotation) => annotation.confirmed);
+};
+
 export function filterReports(
   reports: ReportDetailDto[],
   annotations: ProjectAnnotationsDto|null,
@@ -92,6 +96,16 @@ export function filterReports(
     if (assignmentFilter === "annotatorConflict") {
       const reportAnnotations = getReportAnnotations(annotations, report.report.reportId);
       return hasAnnotatorConflict(reportAnnotations);
+    }
+
+    if (assignmentFilter === "annotationsReview") {
+      const reportAnnotations = getReportAnnotations(annotations, report.report.reportId);
+      return hasReviewedAnnotation(reportAnnotations);
+    }
+
+    if (assignmentFilter === "annotationsNoReview") {
+      const reportAnnotations = getReportAnnotations(annotations, report.report.reportId);
+      return !hasReviewedAnnotation(reportAnnotations);
     }
 
     return true;

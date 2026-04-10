@@ -225,6 +225,7 @@ export interface AnnotationDto {
   user: string;
   studyId: number;
   studyShortName: string;
+  confirmed: boolean,
 }
 
 export type ProjectAnnotationsDto = Record<string, AnnotationDto[]>;

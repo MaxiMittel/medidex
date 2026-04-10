@@ -15,11 +15,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
 import { useDetailsSheet } from "@/app/context/details-sheet-context";
-import { useReviewAnnotations } from "../components/review-annotations-context";
+import {
+  useReviewAnnotations,
+  useReviewAnnotationsActions,
+} from "../components/review-annotations-context";
 import type { StudyDto } from "@/types/apiDTOs";
-import { Calendar, Scale, CircleCheckBig, Users, Info } from "lucide-react";
+import { Calendar, Scale, CircleCheckBig, CircleAlert, Users, Info } from "lucide-react";
 
 interface GroupedUserStudy {
   userId: string;
@@ -46,8 +48,40 @@ const formatParticipantCount = (value?: string | null) => {
   return value;
 };
 
+const getStudyConfirmationPath = (reportId: string, studyId: number) =>
+  `/api/meerkat/reports/${reportId}/studies/${studyId}/confirmation`;
+
+const toggleStudyConfirmation = async (
+  reportId: string,
+  studyId: number,
+  shouldConfirm: boolean
+) => {
+  const response = await fetch(getStudyConfirmationPath(reportId, studyId), {
+    method: shouldConfirm ? "PUT" : "DELETE",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (response.ok) {
+    return;
+  }
+
+  let detail = `Failed to ${shouldConfirm ? "confirm" : "unconfirm"} study`;
+  try {
+    const payload = await response.json();
+    if (payload?.error) {
+      detail = payload.error;
+    }
+  } catch (error) {
+    console.error("Failed to parse confirmation toggle error payload", error);
+  }
+
+  throw new Error(detail);
+};
+
 export default function ReviewDetailsPage() {
   const annotations = useReviewAnnotations();
+  const { updateConfirmedForReportStudy } = useReviewAnnotationsActions();
   const params = useParams();
   const { openWithStudyId } = useDetailsSheet();
 
@@ -55,6 +89,7 @@ export default function ReviewDetailsPage() {
   const [studyById, setStudyById] = useState<Record<number, StudyDto>>({});
   const [loadingStudyIds, setLoadingStudyIds] = useState<Set<number>>(new Set());
   const [selectedFinalStudyIds, setSelectedFinalStudyIds] = useState<Set<number>>(new Set());
+  const [syncingFinalStudyIds, setSyncingFinalStudyIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     let isMounted = true;
@@ -92,6 +127,22 @@ export default function ReviewDetailsPage() {
       : Array.isArray(params.reportId)
       ? params.reportId[0]
       : undefined;
+
+  useEffect(() => {
+    if (!reportIdParam) {
+      setSelectedFinalStudyIds(new Set());
+      return;
+    }
+
+    const confirmedStudyIds = new Set<number>();
+    for (const annotation of annotations[reportIdParam] ?? []) {
+      if (annotation.confirmed) {
+        confirmedStudyIds.add(annotation.studyId);
+      }
+    }
+
+    setSelectedFinalStudyIds(confirmedStudyIds);
+  }, [annotations, reportIdParam]);
 
   const groupedByUser = useMemo<GroupedUserStudy[]>(() => {
     if (!reportIdParam) {
@@ -209,16 +260,54 @@ export default function ReviewDetailsPage() {
       .sort((a, b) => a.study.shortName.localeCompare(b.study.shortName));
   }, [groupedByUser, studyById, studyIdsToLoad]);
 
-  const toggleFinalStudySelection = (studyId: number) => {
+  const isLoadingFreshStudies = studyIdsToLoad.length > 0 && loadingStudyIds.size > 0;
+
+  const toggleFinalStudySelection = async (studyId: number) => {
+    if (!reportIdParam || syncingFinalStudyIds.has(studyId)) {
+      return;
+    }
+
+    const wasSelected = selectedFinalStudyIds.has(studyId);
+    const shouldConfirm = !wasSelected;
+
+    // Optimistic UI update, then roll back if the backend toggle fails.
     setSelectedFinalStudyIds((prev) => {
       const next = new Set(prev);
-      if (next.has(studyId)) {
-        next.delete(studyId);
-      } else {
+      if (shouldConfirm) {
         next.add(studyId);
+      } else {
+        next.delete(studyId);
       }
       return next;
     });
+    setSyncingFinalStudyIds((prev) => {
+      const next = new Set(prev);
+      next.add(studyId);
+      return next;
+    });
+    updateConfirmedForReportStudy(reportIdParam, studyId, shouldConfirm);
+
+    try {
+      await toggleStudyConfirmation(reportIdParam, studyId, shouldConfirm);
+    } catch (error) {
+      setSelectedFinalStudyIds((prev) => {
+        const next = new Set(prev);
+        if (wasSelected) {
+          next.add(studyId);
+        } else {
+          next.delete(studyId);
+        }
+        return next;
+      });
+      updateConfirmedForReportStudy(reportIdParam, studyId, wasSelected);
+      console.error("Failed to sync study confirmation state:", error);
+    } finally {
+      setSyncingFinalStudyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(studyId);
+        return next;
+      });
+    }
   };
 
   if (!reportIdParam) {
@@ -241,12 +330,12 @@ export default function ReviewDetailsPage() {
       <div className="px-4 pb-2 border-b border-border">
         <div className="flex items-center gap-2">
           <CircleCheckBig className="h-6 w-6 text-primary" />
-          <h2 className="text-xl font-semibold">Review Annotator Decisions</h2>
+          <h2 className="text-xl font-semibold">Review Annotations</h2>
         </div>
       </div>
 
       <div className="px-4 py-4">
-        <section className="mb-8 space-y-4 rounded-none border border-primary/20 bg-white p-4 shadow-sm">
+        <section className="mb-8 space-y-4 rounded-none border border-border bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">
@@ -279,8 +368,29 @@ export default function ReviewDetailsPage() {
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
+          ) : isLoadingFreshStudies && finalDecisionStudies.length === 0 ? (
+            <div className="space-y-3">
+              {studyIdsToLoad.slice(0, 4).map((studyId) => (
+                <div
+                  key={`loading-study-${studyId}`}
+                  className="h-32 rounded-lg border border-border bg-card p-4"
+                >
+                  <div className="flex h-full flex-col justify-between">
+                    <div className="space-y-3">
+                      <Skeleton className="h-5 w-48" />
+                      <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-4 w-56" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-4 w-64" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : finalDecisionStudies.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-primary/20 bg-background/60 p-4 text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed border-border/70 bg-background/60 p-4 text-sm text-muted-foreground">
               No study suggestions available yet.
             </div>
           ) : (
@@ -288,11 +398,12 @@ export default function ReviewDetailsPage() {
               {finalDecisionStudies.map((item) => {
                 const isLoading = loadingStudyIds.has(item.study.studyId) || !studyById[item.study.studyId];
                 const isSelected = selectedFinalStudyIds.has(item.study.studyId);
+                const isSyncing = syncingFinalStudyIds.has(item.study.studyId);
                 const rowClass = isSelected
-                  ? "border-emerald-200 bg-emerald-50"
+                  ? "border-emerald-300 bg-emerald-100"
                   : item.isUnanimous
-                  ? "border-emerald-300 bg-emerald-50/40 dark:border-emerald-800/60 dark:bg-emerald-950/20"
-                  : "border-border/60 hover:bg-muted/50 hover:border-border";
+                  ? "border-border bg-emerald-50/20 hover:bg-emerald-50/35"
+                  : "border-border bg-amber-50/40 hover:bg-amber-50/60";
 
                 return (
                   <div
@@ -301,14 +412,19 @@ export default function ReviewDetailsPage() {
                     tabIndex={0}
                     aria-pressed={isSelected}
                     aria-label={isSelected ? `Deselect ${item.study.shortName}` : `Select ${item.study.shortName}`}
-                    onClick={() => toggleFinalStudySelection(item.study.studyId)}
+                    onClick={() => {
+                      void toggleFinalStudySelection(item.study.studyId);
+                    }}
                     onKeyDown={(event) => {
+                      if (isSyncing) {
+                        return;
+                      }
                       if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
-                        toggleFinalStudySelection(item.study.studyId);
+                        void toggleFinalStudySelection(item.study.studyId);
                       }
                     }}
-                    className={`p-4 bg-card rounded-lg relative w-full max-w-full overflow-hidden transition-all duration-200 border flex items-center gap-4 text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${rowClass}`}
+                    className={`p-4 bg-card rounded-lg relative w-full max-w-full overflow-hidden transition-all duration-200 border flex items-center gap-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isSyncing ? "cursor-wait opacity-70" : "cursor-pointer"} ${rowClass}`}
                   >
                     {isLoading ? (
                       <div className="flex flex-col gap-3 flex-1 min-w-0">
@@ -401,21 +517,18 @@ export default function ReviewDetailsPage() {
                                 <span>Consensus (all annotators selected this study)</span>
                               </div>
                             ) : (
-                              <div className="flex flex-wrap gap-1.5">
-                                {item.selectedBy.map((name) => (
-                                  <Badge
-                                    key={`${item.study.studyId}-${name}`}
-                                    variant="outline"
-                                    className="text-[9px] leading-none px-1.5 py-0 font-normal"
-                                    style={{
-                                      backgroundColor: "#fee2e2",
-                                      borderColor: "#fca5a5",
-                                      color: "#991b1b",
-                                    }}
-                                  >
-                                    {name}
-                                  </Badge>
-                                ))}
+                              <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+                                <CircleAlert className="h-3.5 w-3.5" />
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="cursor-help">
+                                      No consensus ({item.selectedBy.length} of {groupedByUser.length} annotators selected this study)
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p>Selected by: {item.selectedBy.join(", ")}</p>
+                                  </TooltipContent>
+                                </Tooltip>
                               </div>
                             )}
                           </div>
