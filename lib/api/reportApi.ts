@@ -156,7 +156,6 @@ export const uploadPdf = (
   }
 
   const path = `/reports/${reportId}/pdf`;
-  console.log("hit");
   return apiClient.put<void>(path, formData, config)
     .then(() => {})
     .catch(error => {
@@ -164,6 +163,20 @@ export const uploadPdf = (
       throw error;
     });
 }
+
+export const deleteReportPdf = (
+  reportId: number,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+  const path = `/reports/${reportId}/pdf`;
+  return apiClient
+    .delete<void>(path, config)
+    .then(() => {})
+    .catch(error => {
+      console.error(`Error deleting PDF for report ${reportId}:`, error.message || error);
+      throw error;
+    });
+};
 
 export const getReportSources = (
   reportId: number,

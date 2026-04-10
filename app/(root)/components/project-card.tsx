@@ -226,12 +226,6 @@ export function ProjectCard({
     router.push(path);
   }, [project.projectId, router]);
 
-  const handleStartExport = useCallback(() => {
-    window.alert("Export is coming soon. We'll start the download once all reports are ready.");
-  }, []);
-
-  const isExportReady = reviewCompletedCount >= totalReports;
-
   const stageMetrics = [
     {
       id: "processing",
@@ -249,7 +243,7 @@ export function ProjectCard({
       total: totalReports,
       fillClass: "bg-sky-500/70",
       cta: {
-        label: "Start PDF Upload",
+        label: "Upload PDFs",
         variant: "secondary",
         onClick: handleStartPdfUpload,
       },
@@ -262,22 +256,8 @@ export function ProjectCard({
       total: totalReports,
       fillClass: "bg-emerald-500/70",
       cta: {
-        label: "Start Review",
+        label: "Review Results",
         onClick: handleStartReview,
-      },
-    },
-    {
-      id: "export",
-      label: "Ready for Export",
-      icon: Download,
-      value: reviewCompletedCount,
-      total: totalReports,
-      fillClass: "bg-amber-500/70",
-      cta: {
-        label: "Start Export",
-        variant: "secondary",
-        onClick: handleStartExport,
-        disabled: !isExportReady,
       },
     },
   ];
@@ -337,7 +317,7 @@ export function ProjectCard({
 
   return (
     <div
-      className="group relative min-w-[22rem] text-left bg-card border p-5 transition-all hover:border-primary/40 hover:shadow-md"
+      className="group relative text-left bg-card border p-5 transition-all hover:border-primary/40 hover:shadow-md"
       style={{ animationDelay: `${index * 50}ms` }}
     >
       <div className="absolute top-0 left-0 right-0 h-1 bg-muted overflow-hidden">
@@ -405,7 +385,7 @@ export function ProjectCard({
           })}
         </div>
 
-        <div className="grid grid-cols-1 gap-2 text-sm text-muted-foreground sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
           {actionableStageMetrics.map((stage) => {
             const StageIcon = stage.icon;
             return (
@@ -425,7 +405,6 @@ export function ProjectCard({
                     type="button"
                     size="sm"
                     className="mt-3 w-full"
-                    disabled={stage.cta?.disabled}
                     onClick={(event) => {
                       event.stopPropagation();
                       stage.cta?.onClick();

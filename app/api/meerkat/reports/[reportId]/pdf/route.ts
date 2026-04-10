@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getReportPdf, uploadPdf } from "@/lib/api/reportApi";
+import { deleteReportPdf, getReportPdf, uploadPdf } from "@/lib/api/reportApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 
 function sanitizePdfFilename(value: string) {
@@ -91,6 +91,30 @@ export async function GET(
     console.error("Unexpected error while fetching report PDF:", error);
     return NextResponse.json(
       { error: "Unexpected error while fetching report PDF." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ reportId: string }> }
+) {
+  const { reportId } = await params;
+
+  if (!reportId) {
+    return NextResponse.json({ error: "Missing report id." }, { status: 400 });
+  }
+
+  try {
+    const headers = await getMeerkatHeaders();
+    await deleteReportPdf(Number(reportId), { headers });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Unexpected error while deleting report PDF:", error);
+    return NextResponse.json(
+      { error: "Unexpected error while deleting report PDF." },
       { status: 500 }
     );
   }
