@@ -1,14 +1,13 @@
 "use client";
 
 import { StudyDto } from "@/types/apiDTOs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
   FileText, 
   MapPin, 
   Users, 
   Clock, 
-  CheckCircle2,
+  Scale,
   Calendar,
   Hash,
 } from "lucide-react";
@@ -54,21 +53,19 @@ export function StudyOverview({ study }: StudyOverviewProps) {
   const hasTrialIds = study.trialId !== null;
 
   return (
-    <Card className="border-none shadow-none py-0">
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between gap-4">
-          <CardTitle className="flex items-center gap-2.5 text-base">
+    <div className="space-y-4 px-4">
+      <div className="flex items-center justify-between gap-4">
+        <h3 className="text-base font-semibold flex items-center gap-2.5">
             <div className="p-1.5 rounded-md bg-muted">
               <FileText className="h-4 w-4" />
             </div>
             Study Overview
-          </CardTitle>
-          <div className="flex gap-2 flex-wrap justify-end">
-            <Badge variant={statusVariant}>{study.status}</Badge>
-          </div>
+        </h3>
+        <div className="flex gap-2 flex-wrap justify-end">
+          <Badge variant={statusVariant}>{study.status}</Badge>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-5 pt-0 px-4 pb-4">
+      </div>
+      <div className="space-y-5">
         {/* Key metrics grid */}
         <div className="grid grid-cols-3 gap-3">
           <div className={`flex flex-col gap-1.5 p-3.5 rounded-md border-l-2 ${metricConfig.participants.borderClass} ${metricConfig.participants.bgClass}`}>
@@ -120,7 +117,7 @@ export function StudyOverview({ study }: StudyOverviewProps) {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div className="p-1 rounded bg-violet-50 dark:bg-violet-950/30">
-                <CheckCircle2 className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+                <Scale className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
               </div>
               <span className="text-sm font-medium">Comparison</span>
             </div>
@@ -170,8 +167,8 @@ export function StudyOverview({ study }: StudyOverviewProps) {
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 

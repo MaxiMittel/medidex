@@ -193,9 +193,9 @@ export function StudyDetails({ study }: StudyDetailsProps) {
     >
       <>
         <SheetHeader className="border-b border-border/60">
-          <SheetTitle>{studyShortName}</SheetTitle>
+          <SheetTitle className="text-lg">{studyShortName}</SheetTitle>
         </SheetHeader>
-        <div className="mt-6 space-y-6">
+        <div className="space-y-6">
           <StudyOverview study={study} />
 
           <Separator />

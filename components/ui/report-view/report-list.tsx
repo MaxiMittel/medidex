@@ -20,12 +20,14 @@ import { Spinner } from "@/components/ui/spinner";
 import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
 import { filterReports, ReportFilterType } from "@/lib/filterUtils";
 import { useReportStore } from "@/hooks/use-report-store";
+import { ProjectAnnotationsDto } from "@/types/apiDTOs";
 
 interface ReportListProps {
   baseUrl: string;
   useStudyBadges: boolean;
   filterOptions?: { value: string; label: string }[];
   queryParams?: Record<string, string | number | boolean | undefined>;
+  annotations?: ProjectAnnotationsDto;
 }
 
 export function ReportList({
@@ -33,6 +35,7 @@ export function ReportList({
   queryParams = { }, 
   useStudyBadges,
   filterOptions = [],
+  annotations = { },
 }: ReportListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [assignmentFilter, setAssignmentFilter] = useState<ReportFilterType>("all");
@@ -74,7 +77,7 @@ export function ReportList({
   const reportsDict = useReportStore((state) => state.reports);
   const reportsList = useMemo(() => Object.values(reportsDict), [reportsDict]);
 
-  const filteredReports = filterReports(reportsList, searchQuery, assignmentFilter);
+  const filteredReports = filterReports(reportsList, annotations, searchQuery, assignmentFilter);
 
   return (
     <div className="h-full flex flex-col pt-5">

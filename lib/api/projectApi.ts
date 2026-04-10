@@ -1,6 +1,12 @@
 import apiClient from "./apiClient";
 import { AxiosRequestConfig } from "axios";
-import {ProjectAssigneeDto, ProjectDetailsDto, ProjectTaskDto, ReportDetailDto} from "../../types/apiDTOs";
+import {
+  ProjectAnnotationsDto,
+  ProjectAssigneeDto,
+  ProjectDetailsDto,
+  ProjectTaskDto,
+  ReportDetailDto,
+} from "../../types/apiDTOs";
 
 //get all projects
 export const getProjects = (config?: AxiosRequestConfig): Promise<ProjectDetailsDto[]> => {
@@ -97,6 +103,21 @@ export const getProjectReports = (
       throw error;
     });
 }
+
+export const getAnnotations = (
+  projectId: string,
+  config?: AxiosRequestConfig
+): Promise<ProjectAnnotationsDto> => {
+  return apiClient
+    .get<ProjectAnnotationsDto>(`/projects/${projectId}/annotations`, config)
+    .then(response => {
+      return response.data;
+    })
+    .catch(error => {
+      console.error(`Error fetching annotations for project ${projectId}:`, error);
+      throw error;
+    });
+};
 
 export const assignUserToProject = (
   projectId: string,

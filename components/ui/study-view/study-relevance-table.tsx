@@ -19,7 +19,7 @@ import {
   Calendar,
   X,
   Sparkles,
-  CheckCircle2,
+  Scale,
   Plus,
   Link,
   Microscope,
@@ -581,7 +581,7 @@ export function StudyRelevanceTable({
                             {study.study.comparison && (
                               <div className="flex items-center gap-1.5 text-muted-foreground flex-1 min-w-0 basis-0 max-w-full overflow-hidden">
                                 <div className="p-0.5 rounded bg-violet-50 dark:bg-violet-950/30 shrink-0">
-                                  <CheckCircle2 className="h-3 w-3 text-violet-600 dark:text-violet-400" />
+                                  <Scale className="h-3 w-3 text-violet-600 dark:text-violet-400" />
                                 </div>
                                 <TooltipProvider>
                                   <Tooltip>

@@ -1,6 +1,6 @@
-import { ReportDetailDto } from "@/types/apiDTOs";
+import { AnnotationDto, ProjectAnnotationsDto, ReportDetailDto } from "@/types/apiDTOs";
 
-export type ReportFilterType = "all" | "assigned" | "unassigned" | "newStudy" | "withPdf" | "withoutPdf";
+export type ReportFilterType = "all" | "assigned" | "unassigned" | "newStudy" | "withPdf" | "withoutPdf" | "annotatorConsensus" | "annotatorConflict";
 
 const toTimestamp = (value: Date | string | number | null | undefined): number | null => {
   if (value === null || value === undefined) {
@@ -23,8 +23,36 @@ const isNewStudyAssignment = (
 // Fallback type for StudyDto if not imported
 type StudyDto = { createdAt: Date | string | number | null | undefined };
 
+const getReportAnnotations = (
+  annotations: ProjectAnnotationsDto | null,
+  reportId: number
+): AnnotationDto[] => {
+  return annotations?.[String(reportId)] ?? [];
+};
+
+const getDistinctAnnotatedStudyCount = (annotations: AnnotationDto[]): number => {
+  return new Set(annotations.map((annotation) => annotation.studyId)).size;
+};
+
+const hasAnnotatorConsensus = (annotations: AnnotationDto[]): boolean => {
+  if (annotations.length < 2) {
+    return true;
+  }
+
+  return getDistinctAnnotatedStudyCount(annotations) === 1;
+};
+
+const hasAnnotatorConflict = (annotations: AnnotationDto[]): boolean => {
+  if (annotations.length < 2) {
+    return false;
+  }
+
+  return getDistinctAnnotatedStudyCount(annotations) > 1;
+};
+
 export function filterReports(
   reports: ReportDetailDto[],
+  annotations: ProjectAnnotationsDto|null,
   searchQuery: string,
   assignmentFilter: ReportFilterType
 ): ReportDetailDto[] {
@@ -56,6 +84,14 @@ export function filterReports(
       return report.assignedStudies.some((study: StudyDto) =>
         isNewStudyAssignment(study.createdAt, report.report.createdAt)
       );
+    }
+    if (assignmentFilter === "annotatorConsensus") {
+      const reportAnnotations = getReportAnnotations(annotations, report.report.reportId);
+      return hasAnnotatorConsensus(reportAnnotations);
+    }
+    if (assignmentFilter === "annotatorConflict") {
+      const reportAnnotations = getReportAnnotations(annotations, report.report.reportId);
+      return hasAnnotatorConflict(reportAnnotations);
     }
 
     return true;

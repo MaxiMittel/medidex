@@ -44,7 +44,6 @@ export function DetailsSheetProvider({ children }: DetailsSheetProviderProps) {
 
   function close() {
     setIsOpen(false)
-    setStudy(null)
   }
 
   return (

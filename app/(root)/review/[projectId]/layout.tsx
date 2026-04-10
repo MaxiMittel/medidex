@@ -3,9 +3,13 @@ import { type ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { adminGuard } from "@/guards/role.guard";
 import { ReportColumnClient } from "./components/report-column-client";
-import type { ReportDetailDto } from "@/types/apiDTOs";
-import { getProjectReports as fetchProjectReports } from "@/lib/api/projectApi";
+import type { ProjectAnnotationsDto, ReportDetailDto } from "@/types/apiDTOs";
+import {
+  getAnnotations as fetchProjectAnnotations,
+  getProjectReports as fetchProjectReports,
+} from "@/lib/api/projectApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
+import { ReviewAnnotationsProvider } from "./components/review-annotations-context";
 
 interface PdfUploadPageProps {
   children: ReactNode;
@@ -14,22 +18,39 @@ interface PdfUploadPageProps {
   }>;
 }
 
-async function loadProjectReports(projectId: string): Promise<ReportDetailDto[]> {
+interface ProjectReviewData {
+  reports: ReportDetailDto[];
+  annotations: ProjectAnnotationsDto;
+}
+
+async function loadProjectReports(projectId: string): Promise<ProjectReviewData> {
   const headers = await getMeerkatHeaders();
 
   try {
-    const reports = await fetchProjectReports(projectId, false, { headers });
-    return reports ?? [];
+    const [reports, annotations] = await Promise.all([
+      fetchProjectReports(projectId, false, { headers }),
+      fetchProjectAnnotations(projectId, { headers }),
+    ]);
+
+    const annotatedReportIds = new Set(Object.keys(annotations ?? {}));
+    const filteredReports = (reports ?? []).filter((report) =>
+      annotatedReportIds.has(String(report.report.reportId))
+    );
+
+    return {
+      reports: filteredReports,
+      annotations: annotations ?? {},
+    };
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) {
       notFound();
     }
 
-    throw new Error("Failed to load project reports.");
+    throw new Error("Failed to load project reports and annotations.");
   }
 }
 
-export default async function PdfUploadPage({ children, params }: PdfUploadPageProps) {
+export default async function AnnotationsReviewPage({ children, params }: PdfUploadPageProps) {
   await adminGuard();
 
   const resolvedParams = await params;
@@ -39,28 +60,17 @@ export default async function PdfUploadPage({ children, params }: PdfUploadPageP
     notFound();
   }
 
-  const reports = await loadProjectReports(projectId);
+  const { reports, annotations } = await loadProjectReports(projectId);
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
 
       <div className="flex-1 min-h-0 bg-background">
-        <ReportColumnClient projectId={projectId} reports={reports}>
-          {children}
-        </ReportColumnClient>
-      </div>
-    </div>
-  );
-}
-
-function PdfUploadPlaceholder() {
-  return (
-    <div className="h-full flex flex-col items-center justify-center px-8 text-center gap-3">
-      <div className="space-y-2 max-w-md">
-        <h2 className="text-lg font-semibold text-foreground">Select a report</h2>
-        <p className="text-sm text-muted-foreground">
-          Choose a report from the list to view its metadata, attach PDFs, or confirm that uploads are complete.
-        </p>
+        <ReviewAnnotationsProvider annotations={annotations}>
+          <ReportColumnClient projectId={projectId} reports={reports} annotations={annotations}>
+            {children}
+          </ReportColumnClient>
+        </ReviewAnnotationsProvider>
       </div>
     </div>
   );

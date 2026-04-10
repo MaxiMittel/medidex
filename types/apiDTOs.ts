@@ -220,3 +220,11 @@ export interface StreamCallbacks {
   onComplete: () => void;
   onError: (error: Error) => void;
 }
+
+export interface AnnotationDto {
+  user: string;
+  studyId: number;
+  studyShortName: string;
+}
+
+export type ProjectAnnotationsDto = Record<string, AnnotationDto[]>;
