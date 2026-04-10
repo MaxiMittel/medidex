@@ -13,7 +13,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Calendar, UserPlus, Check, Settings, FileUp, ClipboardCheck, Trash2, Download, Bot } from "lucide-react";
+import { Calendar, UserPlus, Check, Settings, FileUp, ClipboardCheck, Trash2, Bot, ArrowDown , Microscope} from "lucide-react";
 import RelativeTime from "@/components/ui/relative-time";
 import type { ProjectDetailsDto, ProjectAssigneeDto } from "@/types/apiDTOs";
 import type { UserDto } from "@/types/user/user.dto";
@@ -233,7 +233,7 @@ export function ProjectCard({
       icon: Settings,
       value: preprocessedCount,
       total: totalReports,
-      fillClass: "bg-primary/70",
+      fillClass: "bg-primary/60",
     },
     {
       id: "pdf",
@@ -241,12 +241,8 @@ export function ProjectCard({
       icon: FileUp,
       value: readyForProcessingCount,
       total: totalReports,
-      fillClass: "bg-sky-500/70",
-      cta: {
-        label: "Upload PDFs",
-        variant: "secondary",
-        onClick: handleStartPdfUpload,
-      },
+      fillClass: "bg-primary",
+      onClick: handleStartPdfUpload,
     },
     {
       id: "review",
@@ -255,15 +251,14 @@ export function ProjectCard({
       value: readyForReviewCount,
       total: totalReports,
       fillClass: "bg-emerald-500/70",
-      cta: {
-        label: "Review Results",
-        onClick: handleStartReview,
-      },
+      onClick: handleStartReview,
     },
   ];
 
   const processingStage = stageMetrics.find((stage) => stage.id === "processing");
   const actionableStageMetrics = stageMetrics.filter((stage) => stage.id !== "processing");
+  const pdfStage = actionableStageMetrics.find((stage) => stage.id === "pdf");
+  const reviewStage = actionableStageMetrics.find((stage) => stage.id === "review");
   const ProcessingStageIcon = processingStage?.icon;
   const processingStagePercent = processingStage && processingStage.total > 0
     ? Math.round((processingStage.value / processingStage.total) * 100)
@@ -288,6 +283,7 @@ export function ProjectCard({
       ]
     : assigneeProgressPanels;
   const hasAssigneePanels = orderedAssigneePanels.length > 0;
+  const isSingleAssigneePanel = orderedAssigneePanels.length === 1;
 
   const renderUserCommandItem = (user: UserDto) => {
     const isSelected = assigneeIds.includes(user.id);
@@ -358,7 +354,7 @@ export function ProjectCard({
                 <ProcessingStageIcon className="h-3.5 w-3.5" />
                 <span>{processingStage.label}</span>
               </div>
-              <span className="text-sm font-semibold text-foreground">
+              <span className="text-sm font-semibold text-muted-foreground">
                 {processingStage.value} / {processingStage.total}
               </span>
             </div>
@@ -372,97 +368,116 @@ export function ProjectCard({
           </div>
         )}
 
-        <div className="flex items-center gap-3">
-          {actionableStageMetrics.map((stage) => {
-            const percent = stage.total > 0 ? Math.round((stage.value / stage.total) * 100) : 0;
-            return (
-              <div key={stage.id} className="flex-1">
-                <div className="relative h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div className={`absolute inset-y-0 left-0 ${stage.fillClass}`} style={{ width: `${percent}%` }} />
-                </div>
-              </div>
-            );
-          })}
+        <div className="flex justify-center py-0.5 text-muted-foreground/70" aria-hidden>
+          <ArrowDown className="h-4 w-4" />
         </div>
 
-        <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
-          {actionableStageMetrics.map((stage) => {
-            const StageIcon = stage.icon;
-            return (
+        {pdfStage && (
+          <button
+            type="button"
+            className="w-full rounded-md border border-dashed border-border/60 bg-muted/20 px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted/30"
+            onClick={(event) => {
+              event.stopPropagation();
+              pdfStage.onClick?.();
+            }}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-foreground">
+              <div className="flex items-center gap-1 font-semibold uppercase tracking-wide">
+                <FileUp className="h-3.5 w-3.5" />
+                <span>{pdfStage.label}</span>
+              </div>
+              <span className="text-sm font-semibold text-foreground">
+                {pdfStage.value} / {pdfStage.total}
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
               <div
-                key={stage.id}
-                className="rounded-lg border bg-muted/30 p-3 transition-colors group-hover:border-primary/30"
-              >
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <StageIcon className="h-3.5 w-3.5" />
-                  {stage.label}
-                </div>
-                <div className="mt-2 text-base font-semibold text-foreground">
-                  {stage.value} / {stage.total}
-                </div>
-                {stage.cta && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="mt-3 w-full"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      stage.cta?.onClick();
-                    }}
-                  >
-                    {stage.cta.label}
-                  </Button>
-                )}
-              </div>
-            );
-          })}
+                className={`h-full ${pdfStage.fillClass}`}
+                style={{ width: `${pdfStage.total > 0 ? Math.round((pdfStage.value / pdfStage.total) * 100) : 0}%` }}
+              />
+            </div>
+          </button>
+        )}
+
+        <div className="flex justify-center py-0.5 text-muted-foreground/70" aria-hidden>
+          <ArrowDown className="h-4 w-4" />
         </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            <span>Studification Progress</span>
+        <div className="rounded-md border border-dashed border-border/60 bg-muted/20 px-3 py-2">
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1 font-semibold uppercase tracking-wide">
+              <Microscope className="h-3.5 w-3.5" aria-hidden />
+              <span>Studification</span>
+            </div>
           </div>
+
           <div
-            className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory items-stretch"
-            style={{ height: "5.5rem" }}
+            className={`mt-2 flex w-full gap-3 overflow-x-auto pb-1 snap-x snap-mandatory items-stretch ${
+              isSingleAssigneePanel ? "justify-center" : "justify-start"
+            }`}
           >
             {hasAssigneePanels ? (
               orderedAssigneePanels.map((panel) => {
                 const isMediBot = panel.userId === MEDIBOT_USER.id;
-                const description = readyForProcessingCount <= 0
-                  ? "No reports available"
-                  : panel.linkedReports >= readyForProcessingCount
-                    ? "All reports linked"
-                    : `${panel.linkedReports} of ${readyForProcessingCount} reports linked`;
-
+                
                 return (
                   <div
                     key={panel.userId}
-                    className="min-w-[15rem] rounded-lg border bg-muted/40 p-4 text-left flex flex-col justify-between h-full"
+                    className="min-w-[15rem] rounded-md border border-border/60 bg-background/80 px-3 py-2 text-left flex flex-col justify-between h-full snap-start"
                   >
-                    <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <div className="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       <span className="truncate flex items-center gap-1.5">
-                        {isMediBot && <Bot className="h-4 w-4" aria-hidden />}
+                        {isMediBot && <Bot className="h-3.5 w-3.5" aria-hidden />}
                         <span className="truncate">{panel.name}</span>
                       </span>
+                        <span className="shrink-0 text-foreground">
+                          {panel.linkedReports} / {readyForProcessingCount}
+                        </span>
                     </div>
-                    <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full rounded-full bg-primary" style={{ width: `${panel.percent}%` }} />
+                    <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full rounded-full bg-primary/60" style={{ width: `${panel.percent}%` }} />
                     </div>
-                    <p className="mt-1.5 text-xs text-muted-foreground/80">{description}</p>
                   </div>
                 );
               })
             ) : (
-              <div className="flex-1 min-w-full flex-shrink-0 rounded-lg border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground flex flex-col justify-between h-full">
-                
-                <p className="mt-3 text-xs text-muted-foreground/80 text-center">
-                  Assign at least one studificator to start tracking progress.
-                </p>
+              <div className="flex-1 min-w-full flex-shrink-0 rounded-md border border-dashed border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground flex items-center justify-center text-center h-full">
+                Assign at least one studificator to start tracking progress.
               </div>
             )}
           </div>
         </div>
+
+        <div className="flex justify-center py-0.5 text-muted-foreground/70" aria-hidden>
+          <ArrowDown className="h-4 w-4" />
+        </div>
+
+        {reviewStage && (
+          <button
+            type="button"
+            className="w-full rounded-md border border-dashed border-border/60 bg-muted/20 px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted/30"
+            onClick={(event) => {
+              event.stopPropagation();
+              reviewStage.onClick?.();
+            }}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-foreground">
+              <div className="flex items-center gap-1 font-semibold uppercase tracking-wide">
+                <ClipboardCheck className="h-3.5 w-3.5" />
+                <span>{reviewStage.label}</span>
+              </div>
+              <span className="text-sm font-semibold text-foreground">
+                {reviewStage.value} / {reviewStage.total}
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+              <div
+                className={`h-full ${reviewStage.fillClass}`}
+                style={{ width: `${reviewStage.total > 0 ? Math.round((reviewStage.value / reviewStage.total) * 100) : 0}%` }}
+              />
+            </div>
+          </button>
+        )}
       </div>
 
       <div className="mt-4 space-y-3 border-t border-border/50 pt-3">
