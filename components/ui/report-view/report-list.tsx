@@ -205,11 +205,12 @@ export function ReportList({
                     <div className="p-4">
                       <div className="flex items-start justify-between gap-3 mb-2.5">
                         <h3 className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground">
-                          {isRunningEvaluation ? (
-                            <Spinner className="mr-1 inline h-3 w-3 text-primary" />
-                          ) : resultCount > 0 ? (
-                            <Sparkles className="mr-1 inline h-3 w-3" />
-                          ) : null}
+                          {useStudyBadges &&
+                            (isRunningEvaluation ? (
+                              <Spinner className="mr-1 inline h-3 w-3 text-primary" />
+                            ) : resultCount > 0 ? (
+                              <Sparkles className="mr-1 inline h-3 w-3" />
+                            ) : null)}
                           {report.report.title}
                         </h3>
                         {isSelected && report.hasPdf && (
