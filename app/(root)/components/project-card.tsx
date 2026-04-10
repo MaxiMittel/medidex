@@ -316,10 +316,6 @@ export function ProjectCard({
       className="group relative text-left bg-card border p-5 transition-all hover:border-primary/40 hover:shadow-md"
       style={{ animationDelay: `${index * 50}ms` }}
     >
-      <div className="absolute top-0 left-0 right-0 h-1 bg-muted overflow-hidden">
-        <div className="h-full bg-primary/60 transition-all duration-500" style={{ width: `${progressPercent}%` }} />
-      </div>
-
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-base group-hover:text-primary transition-colors line-clamp-2 leading-snug">
