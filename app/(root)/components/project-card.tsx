@@ -13,7 +13,18 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Calendar, UserPlus, Check, Settings, FileUp, ClipboardCheck, Trash2, Bot, ArrowDown , Microscope} from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Calendar, UserPlus, Check, Settings, FileUp, ClipboardCheck, Trash2, Bot, ArrowDown, Microscope, AlertTriangle } from "lucide-react";
 import RelativeTime from "@/components/ui/relative-time";
 import type { ProjectDetailsDto, ProjectAssigneeDto } from "@/types/apiDTOs";
 import type { UserDto } from "@/types/user/user.dto";
@@ -66,6 +77,7 @@ export function ProjectCard({
   );
   const [isAssigneePopoverOpen, setIsAssigneePopoverOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [pendingAssigneeId, setPendingAssigneeId] = useState<string | null>(null);
   const availableUsers = useMemo(() => withMediBot(assignableUsers), [assignableUsers]);
   const isUpdatingAssignees = pendingAssigneeId !== null;
@@ -168,17 +180,17 @@ export function ProjectCard({
         const response = await fetch(endpoint, requestInit);
         if (!response.ok) {
           let detail = "Failed to update project assignees.";
-          try {
-            const data = await response.json();
-            if (typeof data?.detail === "string") {
-              detail = data.detail;
-            } else if (data) {
-              detail = JSON.stringify(data);
-            }
-          } catch {
-            const text = await response.text();
-            if (text) {
-              detail = text;
+          const bodyText = await response.text();
+          if (bodyText) {
+            try {
+              const data = JSON.parse(bodyText);
+              if (typeof data?.detail === "string") {
+                detail = data.detail;
+              } else {
+                detail = bodyText;
+              }
+            } catch {
+              detail = bodyText;
             }
           }
           throw new Error(detail);
@@ -207,8 +219,6 @@ export function ProjectCard({
 
   const handleDeleteProject = useCallback(async () => {
     if (isDeleting) return;
-    const confirmed = window.confirm(`Delete project "${project.name}"? This cannot be undone.`);
-    if (!confirmed) return;
 
     setIsDeleting(true);
     try {
@@ -221,6 +231,7 @@ export function ProjectCard({
         throw new Error(errorText || "Failed to delete project");
       }
 
+      setIsDeleteDialogOpen(false);
       router.refresh();
     } catch (error) {
       console.error("Failed to delete project", error);
@@ -362,20 +373,51 @@ export function ProjectCard({
             <RelativeTime date={project.createdAt} />
           </p>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={(event) => {
-            event.stopPropagation();
-            handleDeleteProject();
-          }}
-          disabled={isDeleting}
-        >
-          <Trash2 className="w-4 h-4 text-destructive" />
-          <span className="sr-only">Delete project</span>
-        </Button>
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+              disabled={isDeleting}
+            >
+              <Trash2 className="w-4 h-4 text-destructive" />
+              <span className="sr-only">Delete project</span>
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent
+            className="sm:max-w-md"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <AlertDialogHeader>
+              <div className="mb-2 flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-4 w-4" aria-hidden />
+                <span className="text-xs font-semibold uppercase tracking-wide">Danger Zone</span>
+              </div>
+              <AlertDialogTitle>Delete project?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently remove all data for this project.
+              </AlertDialogDescription>
+              <div className="mt-2 rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-sm text-foreground">
+                {project.name}
+              </div>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2 sm:gap-2">
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteProject}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? "Deleting..." : "Delete project"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       <div className="mt-4 space-y-3">
