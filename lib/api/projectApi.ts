@@ -6,6 +6,8 @@ import {
   ProjectDetailsDto,
   ProjectTaskDto,
   ReportDetailDto,
+  StreamCallbacks,
+  StreamEvent,
 } from "../../types/apiDTOs";
 
 //get all projects
@@ -161,4 +163,125 @@ export const removeUserFromProject = (
       }
       throw error;
     });
+};
+
+export const streamProjectUpdates = (
+  projectId: string,
+  callbacks: StreamCallbacks,
+  config?: AxiosRequestConfig
+): (() => void) => {
+  const { onEvent, onComplete, onError } = callbacks;
+  const abortController = new AbortController();
+
+  const path = `/projects/${projectId}/stream`;
+  const baseURL = apiClient.defaults.baseURL ?? "";
+  const url = `${baseURL}${path}`;
+
+  const headers: Record<string, string> = {
+    Accept: "text/event-stream",
+  };
+
+  if (config?.headers) {
+    Object.entries(config.headers as Record<string, unknown>).forEach(([k, v]) => {
+      if (v !== null && v !== undefined) {
+        headers[k] = String(v);
+      }
+    });
+  }
+
+  const startStream = async () => {
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        headers,
+        signal: abortController.signal,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Project stream request failed: ${response.status} ${response.statusText}. ${errorText}`
+        );
+      }
+
+      if (!response.body) {
+        throw new Error("Response body is null");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data:")) {
+            continue;
+          }
+
+          const data = line.slice(5).trim();
+
+          if (!data) {
+            continue;
+          }
+
+          try {
+            const parsed = JSON.parse(data) as Partial<StreamEvent>;
+
+            if (parsed.event === "complete") {
+              onComplete();
+              return;
+            }
+
+            const streamEvent: StreamEvent = {
+              event: parsed.event ?? "unknown",
+              node: parsed.node,
+              message: parsed.message,
+              details: parsed.details,
+              timestamp: Date.now(),
+            };
+
+            onEvent(streamEvent);
+          } catch {
+            const streamEvent: StreamEvent = {
+              event: "unknown",
+              message: data,
+              timestamp: Date.now(),
+            };
+
+            onEvent(streamEvent);
+          }
+        }
+      }
+
+      onComplete();
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
+
+      console.error(`Error streaming updates for project ${projectId}:`, error);
+      onError(
+        error instanceof Error
+          ? error
+          : new Error("Unknown project stream error occurred")
+      );
+    }
+  };
+
+  startStream();
+
+  return () => {
+    abortController.abort();
+  };
 };

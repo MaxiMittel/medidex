@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -20,7 +20,7 @@ import type { UserDto } from "@/types/user/user.dto";
 
 const EMPTY_USERS: UserDto[] = [];
 const MEDIBOT_USER: UserDto = {
-  id: "medibot",
+  id: "bot",
   name: "MediBot",
   email: "",
   roles: [],
@@ -60,6 +60,7 @@ export function ProjectCard({
   onAssigneesChange,
 }: ProjectCardProps) {
   const router = useRouter();
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [assigneeIds, setAssigneeIds] = useState<string[]>(() =>
     (project.assignees ?? []).map((assignee) => assignee.userId),
   );
@@ -72,6 +73,41 @@ export function ProjectCard({
   useEffect(() => {
     setAssigneeIds((project.assignees ?? []).map((assignee) => assignee.userId));
   }, [project.assignees]);
+
+  useEffect(() => {
+    const streamUrl = `/api/meerkat/projects/${encodeURIComponent(project.projectId)}/stream`;
+    const eventSource = new EventSource(streamUrl);
+
+    const handleMessage = (event: MessageEvent) => {
+      console.log(`Project update received for ${project.projectId}:`, event.data);
+
+      if (refreshTimeoutRef.current !== null) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+
+      refreshTimeoutRef.current = setTimeout(() => {
+        refreshTimeoutRef.current = null;
+        router.refresh();
+      }, 200);
+    };
+
+    const handleError = (event: Event) => {
+      console.error(`Project stream error for ${project.projectId}:`, event);
+    };
+
+    eventSource.addEventListener("message", handleMessage);
+    eventSource.addEventListener("error", handleError);
+
+    return () => {
+      if (refreshTimeoutRef.current !== null) {
+        clearTimeout(refreshTimeoutRef.current);
+        refreshTimeoutRef.current = null;
+      }
+      eventSource.removeEventListener("message", handleMessage);
+      eventSource.removeEventListener("error", handleError);
+      eventSource.close();
+    };
+  }, [project.projectId, router]);
 
   const sortedUsers = useMemo(
     () => [...availableUsers].sort((a, b) => a.email.localeCompare(b.email)),
