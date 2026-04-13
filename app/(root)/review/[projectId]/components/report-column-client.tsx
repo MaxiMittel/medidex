@@ -6,9 +6,12 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
+import { DetailsSheetProvider } from "@/app/context/details-sheet-context";
 import { ReportDetailDto } from "@/types/apiDTOs";
 import { ReportList } from "@/components/ui/report-view/report-list";
 import { useReportStore } from "@/hooks/use-report-store";
+import { useReviewAnnotations } from "./review-annotations-context";
+import StudySheet from "../../../projects/[projectId]/study-sheet";
 
 interface ReportColumnClientProps {
   children: ReactNode;
@@ -17,15 +20,18 @@ interface ReportColumnClientProps {
 }
 
 const reportFilterOptions = [
-  { value: "readyForReview", label: "Ready For Review" },
-  { value: "notReadyForReview", label: "Not Ready Yet" },
+  { value: "annotatorConsensus", label: "Consensus" },
+  { value: "annotatorConflict", label: "Conflict" },
+  { value: "annotationsReview", label: "Reviewed" },
+  { value: "annotationsNoReview", label: "Pending Review" },
 ];
 
-export function ReportColumnClient({ children, reports, projectId }: ReportColumnClientProps) {
+export function ReportColumnClient({ children, reports, projectId}: ReportColumnClientProps) {
   const panelBaseId = `project-panels-${projectId}`;
   const reportsPanelId = `${panelBaseId}-reports`;
   const detailsPanelId = `${panelBaseId}-details`;
   const resizeHandleId = `${panelBaseId}-resize-handle`;
+  const annotations = useReviewAnnotations();
 
   const setReports = useReportStore((state) => state.setReports);
     
@@ -34,37 +40,41 @@ export function ReportColumnClient({ children, reports, projectId }: ReportColum
   }, [reports, setReports]);
   
   return (
-      <ResizablePanelGroup
-        id={panelBaseId}
-        direction="horizontal"
-        className="h-full"
-      >
-        <ResizablePanel
-          id={reportsPanelId}
-          defaultSize={55}
-          minSize={25}
-          className="border-r bg-background min-w-0 flex-[0_0_55%]"
+      <DetailsSheetProvider>
+        <ResizablePanelGroup
+          id={panelBaseId}
+          direction="horizontal"
+          className="h-full"
         >
-          <ReportList
-            baseUrl="review"
-            useStudyBadges={false}
-            filterOptions={reportFilterOptions}
+          <ResizablePanel
+            id={reportsPanelId}
+            defaultSize={55}
+            minSize={25}
+            className="border-r bg-background min-w-0 flex-[0_0_55%]"
+          >
+            <ReportList
+              baseUrl="review"
+              useStudyBadges={false}
+              filterOptions={reportFilterOptions}
+              annotations={annotations}
+            />
+          </ResizablePanel>
+
+          <ResizableHandle
+            id={resizeHandleId}
+            className="w-1 bg-border hover:bg-primary transition-colors cursor-col-resize"
           />
-        </ResizablePanel>
 
-        <ResizableHandle
-          id={resizeHandleId}
-          className="w-1 bg-border hover:bg-primary transition-colors cursor-col-resize"
-        />
-
-        <ResizablePanel
-          id={detailsPanelId}
-          defaultSize={45}
-          minSize={35}
-          className="min-w-0 flex-[0_0_45%]"
-        >
-          {children}
-        </ResizablePanel>
-      </ResizablePanelGroup>
+          <ResizablePanel
+            id={detailsPanelId}
+            defaultSize={45}
+            minSize={35}
+            className="min-w-0 flex-[0_0_45%]"
+          >
+            {children}
+          </ResizablePanel>
+        </ResizablePanelGroup>
+        <StudySheet />
+      </DetailsSheetProvider>
   );
 }

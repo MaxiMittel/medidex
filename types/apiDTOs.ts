@@ -3,6 +3,16 @@ export interface ReportSourcesDto {
   links: string[];
 }
 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+export type ReportChatDto = JsonValue;
+
 export interface ProjectAssigneeDto {
   userId : string;
   numberReportsLinked: number;
@@ -220,3 +230,12 @@ export interface StreamCallbacks {
   onComplete: () => void;
   onError: (error: Error) => void;
 }
+
+export interface AnnotationDto {
+  user: string;
+  studyId: number;
+  studyShortName: string;
+  confirmed: boolean,
+}
+
+export type ProjectAnnotationsDto = Record<string, AnnotationDto[]>;

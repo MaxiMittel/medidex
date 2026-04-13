@@ -23,9 +23,6 @@ export function TaskCard({ task, ownerName }: TaskCardProps) {
       className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
     >
       <div className="group relative border bg-card p-5 transition hover:border-primary/40">
-        <div className="absolute inset-x-0 top-0 h-1 bg-muted overflow-hidden">
-          <div className="h-full bg-primary/70 transition-all" style={{ width: `${progressPercent}%` }} />
-        </div>
 
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -46,9 +43,9 @@ export function TaskCard({ task, ownerName }: TaskCardProps) {
               {processed} / {totalProcessable}
             </span>
           </div>
-          <div className="mt-2 h-2 bg-muted">
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full bg-primary transition-all"
+              className="h-full rounded-full bg-primary transition-all"
               style={{ width: `${progressPercent}%` }}
             />
           </div>

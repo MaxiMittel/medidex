@@ -10,8 +10,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ReportAssignedStudiesBadges } from "@/components/ui/study-view/report-assigned-studies-badges";
 import { Input } from "@/components/ui/input";
@@ -20,12 +19,14 @@ import { Spinner } from "@/components/ui/spinner";
 import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
 import { filterReports, ReportFilterType } from "@/lib/filterUtils";
 import { useReportStore } from "@/hooks/use-report-store";
+import { ProjectAnnotationsDto } from "@/types/apiDTOs";
 
 interface ReportListProps {
   baseUrl: string;
   useStudyBadges: boolean;
   filterOptions?: { value: string; label: string }[];
   queryParams?: Record<string, string | number | boolean | undefined>;
+  annotations?: ProjectAnnotationsDto;
 }
 
 export function ReportList({
@@ -33,6 +34,7 @@ export function ReportList({
   queryParams = { }, 
   useStudyBadges,
   filterOptions = [],
+  annotations = { },
 }: ReportListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [assignmentFilter, setAssignmentFilter] = useState<ReportFilterType>("all");
@@ -57,7 +59,8 @@ export function ReportList({
     return Number.isNaN(parsed) ? null : parsed;
   }, [reportIdParam]);
 
-  const selectedCardRef = useRef<HTMLAnchorElement | null>(null);
+  const selectedCardRef = useRef<HTMLDivElement | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     if (selectedReportId !== null && selectedCardRef.current) {
@@ -74,7 +77,7 @@ export function ReportList({
   const reportsDict = useReportStore((state) => state.reports);
   const reportsList = useMemo(() => Object.values(reportsDict), [reportsDict]);
 
-  const filteredReports = filterReports(reportsList, searchQuery, assignmentFilter);
+  const filteredReports = filterReports(reportsList, annotations, searchQuery, assignmentFilter);
 
   return (
     <div className="h-full flex flex-col pt-5">
@@ -181,46 +184,63 @@ export function ReportList({
 
               return (
                 <div key={report.report.reportId || idx} className="relative">
-                  <Link
-                    href={reportHref}
-                    scroll={true}
+                  <div
                     ref={isSelected ? selectedCardRef : undefined}
                     tabIndex={0}
+                    role="link"
                     aria-selected={isSelected}
-                    className={`block rounded-lg border bg-card hover:border-primary/20 transition-all first:mt-3 scroll-mt-4 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60 ${
+                    onClick={() => router.push(reportHref, { scroll: true })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        router.push(reportHref, { scroll: true });
+                      }
+                    }}
+                    className={`rounded-lg border bg-card hover:border-primary/20 transition-all first:mt-3 scroll-mt-4 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60 ${
                       isSelected
                         ? "border-primary bg-primary/5 outline outline-2 outline-primary/40"
                         : ""
-                    } ${isSelected && report.hasPdf ? "pr-12" : ""}`}
+                    }`}
                   >
                     <div className="p-4">
-                      <div className="flex items-start justify-between gap-3 mb-3">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-semibold leading-snug mb-2.5 text-foreground">
-                            {isRunningEvaluation ? (
+                      <div className="flex items-start justify-between gap-3 mb-2.5">
+                        <h3 className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground">
+                          {useStudyBadges &&
+                            (isRunningEvaluation ? (
                               <Spinner className="mr-1 inline h-3 w-3 text-primary" />
                             ) : resultCount > 0 ? (
                               <Sparkles className="mr-1 inline h-3 w-3" />
-                            ) : null}
-                            {report.report.title}
-                          </h3>
-                          <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground mb-2">
-                            {displayDate && (
-                              <div className="flex items-center gap-1.5">
-                                <Calendar className="h-3.5 w-3.5 shrink-0" />
-                                <span>{displayDate}</span>
-                              </div>
-                            )}
-                            {report.report.authors && report.report.authors.length > 0 && (
-                              <div className="flex items-center gap-1.5">
-                                <Users className="h-3.5 w-3.5 shrink-0" />
-                                <span className={isExpanded ? "" : "truncate max-w-[200px]"}>
-                                  {report.report.authors.join(", ")}
-                                </span>
-                              </div>
-                            )}
+                            ) : null)}
+                          {report.report.title}
+                        </h3>
+                        {isSelected && report.hasPdf && (
+                          <a
+                            href={pdfUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`Open PDF for ${report.report.title}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60"
+                          >
+                            <Download className="h-4 w-4" />
+                          </a>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground mb-2">
+                        {displayDate && (
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="h-3.5 w-3.5 shrink-0" />
+                            <span>{displayDate}</span>
                           </div>
-                        </div>
+                        )}
+                        {report.report.authors && report.report.authors.length > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <Users className="h-3.5 w-3.5 shrink-0" />
+                            <span className={isExpanded ? "" : "truncate max-w-[200px]"}>
+                              {report.report.authors.join(", ")}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {hasAbstract && !isExpanded && (
@@ -240,19 +260,7 @@ export function ReportList({
                         </p>
                       </div>
                     )}
-                  </Link>
-
-                  {isSelected && report.hasPdf && (
-                    <a
-                      href={pdfUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`Open PDF for ${report.report.title}`}
-                      className="absolute right-4 top-4 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60"
-                    >
-                      <Download className="h-4 w-4" />
-                    </a>
-                  )}
+                  </div>
                 </div>
               );
             })

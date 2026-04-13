@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Activity,
   Stethoscope,
   Target,
-  Beaker,
+  Syringe,
   Info,
   UserRound,
   CircleDashed,
@@ -32,7 +31,7 @@ interface StudyDetailsProps {
 
 const categoryConfig = {
   interventions: {
-    icon: Beaker,
+    icon: Syringe,
     label: "Interventions",
     accentClass: "text-blue-600 dark:text-blue-400",
     bgClass: "bg-blue-50 dark:bg-blue-950/30",
@@ -194,16 +193,16 @@ export function StudyAspects({ study }: StudyDetailsProps) {
 
   if (loading) {
     return (
-      <Card className="border-none shadow-none py-0">
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2.5 text-base">
+      <div className="space-y-4 px-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold flex items-center gap-2.5">
             <div className="p-1.5 rounded-md bg-muted">
               <Info className="h-4 w-4" />
             </div>
             Study Details
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0 px-4 pb-4 space-y-4">
+          </h3>
+        </div>
+        <div className="space-y-4">
           {Object.keys(categoryConfig).map((category) => (
             <div key={category} className="space-y-2 px-1">
               <div className="flex items-center gap-3">
@@ -221,8 +220,8 @@ export function StudyAspects({ study }: StudyDetailsProps) {
               </div>
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
@@ -298,16 +297,16 @@ export function StudyAspects({ study }: StudyDetailsProps) {
   };
 
   return (
-    <Card className="border-none shadow-none py-0">
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2.5 text-base">
+    <div className="space-y-4 px-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-semibold flex items-center gap-2.5">
           <div className="p-1.5 rounded-md bg-muted">
             <Info className="h-4 w-4" />
           </div>
           Study Details
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0 px-4 pb-4">
+        </h3>
+      </div>
+      <div>
         {error && (
           <div className="mb-4 px-1 text-sm text-destructive">
             {error}
@@ -369,7 +368,7 @@ export function StudyAspects({ study }: StudyDetailsProps) {
             )
           )}
         </Accordion>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

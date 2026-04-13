@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -13,14 +13,25 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Calendar, UserPlus, Check, Settings, FileUp, ClipboardCheck, Trash2, Download, Bot } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Calendar, UserPlus, Check, Settings, FileUp, ClipboardCheck, Trash2, Bot, ArrowDown, Microscope, AlertTriangle } from "lucide-react";
 import RelativeTime from "@/components/ui/relative-time";
 import type { ProjectDetailsDto, ProjectAssigneeDto } from "@/types/apiDTOs";
 import type { UserDto } from "@/types/user/user.dto";
 
 const EMPTY_USERS: UserDto[] = [];
 const MEDIBOT_USER: UserDto = {
-  id: "medibot",
+  id: "bot",
   name: "MediBot",
   email: "",
   roles: [],
@@ -60,11 +71,13 @@ export function ProjectCard({
   onAssigneesChange,
 }: ProjectCardProps) {
   const router = useRouter();
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [assigneeIds, setAssigneeIds] = useState<string[]>(() =>
     (project.assignees ?? []).map((assignee) => assignee.userId),
   );
   const [isAssigneePopoverOpen, setIsAssigneePopoverOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [pendingAssigneeId, setPendingAssigneeId] = useState<string | null>(null);
   const availableUsers = useMemo(() => withMediBot(assignableUsers), [assignableUsers]);
   const isUpdatingAssignees = pendingAssigneeId !== null;
@@ -72,6 +85,41 @@ export function ProjectCard({
   useEffect(() => {
     setAssigneeIds((project.assignees ?? []).map((assignee) => assignee.userId));
   }, [project.assignees]);
+
+  useEffect(() => {
+    const streamUrl = `/api/meerkat/projects/${encodeURIComponent(project.projectId)}/stream`;
+    const eventSource = new EventSource(streamUrl);
+
+    const handleMessage = (event: MessageEvent) => {
+      console.log(`Project update received for ${project.projectId}:`, event.data);
+
+      if (refreshTimeoutRef.current !== null) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+
+      refreshTimeoutRef.current = setTimeout(() => {
+        refreshTimeoutRef.current = null;
+        router.refresh();
+      }, 200);
+    };
+
+    const handleError = (event: Event) => {
+      console.error(`Project stream error for ${project.projectId}:`, event);
+    };
+
+    eventSource.addEventListener("message", handleMessage);
+    eventSource.addEventListener("error", handleError);
+
+    return () => {
+      if (refreshTimeoutRef.current !== null) {
+        clearTimeout(refreshTimeoutRef.current);
+        refreshTimeoutRef.current = null;
+      }
+      eventSource.removeEventListener("message", handleMessage);
+      eventSource.removeEventListener("error", handleError);
+      eventSource.close();
+    };
+  }, [project.projectId, router]);
 
   const sortedUsers = useMemo(
     () => [...availableUsers].sort((a, b) => a.email.localeCompare(b.email)),
@@ -132,17 +180,17 @@ export function ProjectCard({
         const response = await fetch(endpoint, requestInit);
         if (!response.ok) {
           let detail = "Failed to update project assignees.";
-          try {
-            const data = await response.json();
-            if (typeof data?.detail === "string") {
-              detail = data.detail;
-            } else if (data) {
-              detail = JSON.stringify(data);
-            }
-          } catch {
-            const text = await response.text();
-            if (text) {
-              detail = text;
+          const bodyText = await response.text();
+          if (bodyText) {
+            try {
+              const data = JSON.parse(bodyText);
+              if (typeof data?.detail === "string") {
+                detail = data.detail;
+              } else {
+                detail = bodyText;
+              }
+            } catch {
+              detail = bodyText;
             }
           }
           throw new Error(detail);
@@ -171,8 +219,6 @@ export function ProjectCard({
 
   const handleDeleteProject = useCallback(async () => {
     if (isDeleting) return;
-    const confirmed = window.confirm(`Delete project "${project.name}"? This cannot be undone.`);
-    if (!confirmed) return;
 
     setIsDeleting(true);
     try {
@@ -185,6 +231,7 @@ export function ProjectCard({
         throw new Error(errorText || "Failed to delete project");
       }
 
+      setIsDeleteDialogOpen(false);
       router.refresh();
     } catch (error) {
       console.error("Failed to delete project", error);
@@ -226,12 +273,6 @@ export function ProjectCard({
     router.push(path);
   }, [project.projectId, router]);
 
-  const handleStartExport = useCallback(() => {
-    window.alert("Export is coming soon. We'll start the download once all reports are ready.");
-  }, []);
-
-  const isExportReady = reviewCompletedCount >= totalReports;
-
   const stageMetrics = [
     {
       id: "processing",
@@ -239,7 +280,7 @@ export function ProjectCard({
       icon: Settings,
       value: preprocessedCount,
       total: totalReports,
-      fillClass: "bg-primary/70",
+      fillClass: "bg-primary/60",
     },
     {
       id: "pdf",
@@ -247,12 +288,8 @@ export function ProjectCard({
       icon: FileUp,
       value: readyForProcessingCount,
       total: totalReports,
-      fillClass: "bg-sky-500/70",
-      cta: {
-        label: "Start PDF Upload",
-        variant: "secondary",
-        onClick: handleStartPdfUpload,
-      },
+      fillClass: "bg-primary",
+      onClick: handleStartPdfUpload,
     },
     {
       id: "review",
@@ -261,29 +298,14 @@ export function ProjectCard({
       value: readyForReviewCount,
       total: totalReports,
       fillClass: "bg-emerald-500/70",
-      cta: {
-        label: "Start Review",
-        onClick: handleStartReview,
-      },
-    },
-    {
-      id: "export",
-      label: "Ready for Export",
-      icon: Download,
-      value: reviewCompletedCount,
-      total: totalReports,
-      fillClass: "bg-amber-500/70",
-      cta: {
-        label: "Start Export",
-        variant: "secondary",
-        onClick: handleStartExport,
-        disabled: !isExportReady,
-      },
+      onClick: handleStartReview,
     },
   ];
 
   const processingStage = stageMetrics.find((stage) => stage.id === "processing");
   const actionableStageMetrics = stageMetrics.filter((stage) => stage.id !== "processing");
+  const pdfStage = actionableStageMetrics.find((stage) => stage.id === "pdf");
+  const reviewStage = actionableStageMetrics.find((stage) => stage.id === "review");
   const ProcessingStageIcon = processingStage?.icon;
   const processingStagePercent = processingStage && processingStage.total > 0
     ? Math.round((processingStage.value / processingStage.total) * 100)
@@ -308,6 +330,7 @@ export function ProjectCard({
       ]
     : assigneeProgressPanels;
   const hasAssigneePanels = orderedAssigneePanels.length > 0;
+  const isSingleAssigneePanel = orderedAssigneePanels.length === 1;
 
   const renderUserCommandItem = (user: UserDto) => {
     const isSelected = assigneeIds.includes(user.id);
@@ -337,13 +360,9 @@ export function ProjectCard({
 
   return (
     <div
-      className="group relative min-w-[22rem] text-left bg-card border p-5 transition-all hover:border-primary/40 hover:shadow-md"
+      className="group relative text-left bg-card border p-5 transition-all hover:border-primary/40 hover:shadow-md"
       style={{ animationDelay: `${index * 50}ms` }}
     >
-      <div className="absolute top-0 left-0 right-0 h-1 bg-muted overflow-hidden">
-        <div className="h-full bg-primary/60 transition-all duration-500" style={{ width: `${progressPercent}%` }} />
-      </div>
-
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-base group-hover:text-primary transition-colors line-clamp-2 leading-snug">
@@ -354,20 +373,51 @@ export function ProjectCard({
             <RelativeTime date={project.createdAt} />
           </p>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={(event) => {
-            event.stopPropagation();
-            handleDeleteProject();
-          }}
-          disabled={isDeleting}
-        >
-          <Trash2 className="w-4 h-4 text-destructive" />
-          <span className="sr-only">Delete project</span>
-        </Button>
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+              disabled={isDeleting}
+            >
+              <Trash2 className="w-4 h-4 text-destructive" />
+              <span className="sr-only">Delete project</span>
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent
+            className="sm:max-w-md"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <AlertDialogHeader>
+              <div className="mb-2 flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-4 w-4" aria-hidden />
+                <span className="text-xs font-semibold uppercase tracking-wide">Danger Zone</span>
+              </div>
+              <AlertDialogTitle>Delete project?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently remove all data for this project.
+              </AlertDialogDescription>
+              <div className="mt-2 rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-sm text-foreground">
+                {project.name}
+              </div>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2 sm:gap-2">
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteProject}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? "Deleting..." : "Delete project"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       <div className="mt-4 space-y-3">
@@ -378,7 +428,7 @@ export function ProjectCard({
                 <ProcessingStageIcon className="h-3.5 w-3.5" />
                 <span>{processingStage.label}</span>
               </div>
-              <span className="text-sm font-semibold text-foreground">
+              <span className="text-sm font-semibold text-muted-foreground">
                 {processingStage.value} / {processingStage.total}
               </span>
             </div>
@@ -392,98 +442,116 @@ export function ProjectCard({
           </div>
         )}
 
-        <div className="flex items-center gap-3">
-          {actionableStageMetrics.map((stage) => {
-            const percent = stage.total > 0 ? Math.round((stage.value / stage.total) * 100) : 0;
-            return (
-              <div key={stage.id} className="flex-1">
-                <div className="relative h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div className={`absolute inset-y-0 left-0 ${stage.fillClass}`} style={{ width: `${percent}%` }} />
-                </div>
-              </div>
-            );
-          })}
+        <div className="flex justify-center py-0.5 text-muted-foreground/70" aria-hidden>
+          <ArrowDown className="h-4 w-4" />
         </div>
 
-        <div className="grid grid-cols-1 gap-2 text-sm text-muted-foreground sm:grid-cols-3">
-          {actionableStageMetrics.map((stage) => {
-            const StageIcon = stage.icon;
-            return (
+        {pdfStage && (
+          <button
+            type="button"
+            className="w-full rounded-md border border-dashed border-border/60 bg-muted/20 px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted/30"
+            onClick={(event) => {
+              event.stopPropagation();
+              pdfStage.onClick?.();
+            }}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-foreground">
+              <div className="flex items-center gap-1 font-semibold uppercase tracking-wide">
+                <FileUp className="h-3.5 w-3.5" />
+                <span>{pdfStage.label}</span>
+              </div>
+              <span className="text-sm font-semibold text-foreground">
+                {pdfStage.value} / {pdfStage.total}
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
               <div
-                key={stage.id}
-                className="rounded-lg border bg-muted/30 p-3 transition-colors group-hover:border-primary/30"
-              >
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <StageIcon className="h-3.5 w-3.5" />
-                  {stage.label}
-                </div>
-                <div className="mt-2 text-base font-semibold text-foreground">
-                  {stage.value} / {stage.total}
-                </div>
-                {stage.cta && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="mt-3 w-full"
-                    disabled={stage.cta?.disabled}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      stage.cta?.onClick();
-                    }}
-                  >
-                    {stage.cta.label}
-                  </Button>
-                )}
-              </div>
-            );
-          })}
+                className={`h-full ${pdfStage.fillClass}`}
+                style={{ width: `${pdfStage.total > 0 ? Math.round((pdfStage.value / pdfStage.total) * 100) : 0}%` }}
+              />
+            </div>
+          </button>
+        )}
+
+        <div className="flex justify-center py-0.5 text-muted-foreground/70" aria-hidden>
+          <ArrowDown className="h-4 w-4" />
         </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            <span>Studification Progress</span>
+        <div className="rounded-md border border-dashed border-border/60 bg-muted/20 px-3 py-2">
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1 font-semibold uppercase tracking-wide">
+              <Microscope className="h-3.5 w-3.5" aria-hidden />
+              <span>Studification</span>
+            </div>
           </div>
+
           <div
-            className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory items-stretch"
-            style={{ height: "5.5rem" }}
+            className={`mt-2 flex w-full gap-3 overflow-x-auto pb-1 snap-x snap-mandatory items-stretch ${
+              isSingleAssigneePanel ? "justify-center" : "justify-start"
+            }`}
           >
             {hasAssigneePanels ? (
               orderedAssigneePanels.map((panel) => {
                 const isMediBot = panel.userId === MEDIBOT_USER.id;
-                const description = readyForProcessingCount <= 0
-                  ? "No reports available"
-                  : panel.linkedReports >= readyForProcessingCount
-                    ? "All reports linked"
-                    : `${panel.linkedReports} of ${readyForProcessingCount} reports linked`;
-
+                
                 return (
                   <div
                     key={panel.userId}
-                    className="min-w-[15rem] rounded-lg border bg-muted/40 p-4 text-left flex flex-col justify-between h-full"
+                    className="min-w-[15rem] rounded-md border border-border/60 bg-background/80 px-3 py-2 text-left flex flex-col justify-between h-full snap-start"
                   >
-                    <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <div className="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       <span className="truncate flex items-center gap-1.5">
-                        {isMediBot && <Bot className="h-4 w-4" aria-hidden />}
+                        {isMediBot && <Bot className="h-3.5 w-3.5" aria-hidden />}
                         <span className="truncate">{panel.name}</span>
                       </span>
+                        <span className="shrink-0 text-foreground">
+                          {panel.linkedReports} / {readyForProcessingCount}
+                        </span>
                     </div>
-                    <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full rounded-full bg-primary" style={{ width: `${panel.percent}%` }} />
+                    <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full rounded-full bg-primary/60" style={{ width: `${panel.percent}%` }} />
                     </div>
-                    <p className="mt-1.5 text-xs text-muted-foreground/80">{description}</p>
                   </div>
                 );
               })
             ) : (
-              <div className="flex-1 min-w-full flex-shrink-0 rounded-lg border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground flex flex-col justify-between h-full">
-                
-                <p className="mt-3 text-xs text-muted-foreground/80 text-center">
-                  Assign at least one studificator to start tracking progress.
-                </p>
+              <div className="flex-1 min-w-full flex-shrink-0 rounded-md border border-dashed border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground flex items-center justify-center text-center h-full">
+                Assign at least one studificator to start tracking progress.
               </div>
             )}
           </div>
         </div>
+
+        <div className="flex justify-center py-0.5 text-muted-foreground/70" aria-hidden>
+          <ArrowDown className="h-4 w-4" />
+        </div>
+
+        {reviewStage && (
+          <button
+            type="button"
+            className="w-full rounded-md border border-dashed border-border/60 bg-muted/20 px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted/30"
+            onClick={(event) => {
+              event.stopPropagation();
+              reviewStage.onClick?.();
+            }}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-foreground">
+              <div className="flex items-center gap-1 font-semibold uppercase tracking-wide">
+                <ClipboardCheck className="h-3.5 w-3.5" />
+                <span>{reviewStage.label}</span>
+              </div>
+              <span className="text-sm font-semibold text-foreground">
+                {reviewStage.value} / {reviewStage.total}
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+              <div
+                className={`h-full ${reviewStage.fillClass}`}
+                style={{ width: `${reviewStage.total > 0 ? Math.round((reviewStage.value / reviewStage.total) * 100) : 0}%` }}
+              />
+            </div>
+          </button>
+        )}
       </div>
 
       <div className="mt-4 space-y-3 border-t border-border/50 pt-3">

@@ -1,4 +1,4 @@
-import StudyList, {StudyListSkeleton} from "./components/study-list";
+import StudyList, {StudyListSkeleton, } from "./components/study-list";
 import { Suspense } from "react";
 
 interface ProjectStudyPageProps {

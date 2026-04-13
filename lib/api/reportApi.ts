@@ -1,6 +1,6 @@
 import apiClient from "./apiClient";
 import { AxiosRequestConfig } from "axios";
-import { ReportSourcesDto, SimilarTagDto, SimilarStudyDto, GetSimilarStudiesParams, GetSimilarTagsParams, StudyDto} from "../../types/apiDTOs";
+import { ReportChatDto, ReportSourcesDto, SimilarTagDto, SimilarStudyDto, GetSimilarStudiesParams, GetSimilarTagsParams, StudyDto} from "../../types/apiDTOs";
 import { serializeParams } from "./helpers";    
 
 export const getSimilarStudiesByReportId = (
@@ -40,6 +40,36 @@ export const assignStudyToReportByReportId = (
     paramsSerializer: { serialize: serializeParams } 
   };
   return apiClient.put<void>(path, null, requestConfig).then(response => response.data);
+}
+
+export const confirmStudyForReportByReportId = (
+  reportId: number,
+  studyId: number,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+  const path = `/reports/${reportId}/studies/${studyId}/confirmation`;
+  const requestConfig = {
+    ...config,
+    paramsSerializer: { serialize: serializeParams }
+  };
+
+  return apiClient.put<void>(path, null, requestConfig).then(response => response.data);
+}
+
+export const unconfirmStudyForReportByReportId = (
+  reportId: number,
+  studyId: number,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+  const path = `/reports/${reportId}/studies/${studyId}/confirmation`;
+
+  return apiClient
+    .delete<void>(path, config)
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error removing confirmation for study ${studyId} in report ${reportId}:`, error);
+      throw error;
+    });
 }
 
 //remove studies from a report
@@ -156,7 +186,6 @@ export const uploadPdf = (
   }
 
   const path = `/reports/${reportId}/pdf`;
-  console.log("hit");
   return apiClient.put<void>(path, formData, config)
     .then(() => {})
     .catch(error => {
@@ -164,6 +193,20 @@ export const uploadPdf = (
       throw error;
     });
 }
+
+export const deleteReportPdf = (
+  reportId: number,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+  const path = `/reports/${reportId}/pdf`;
+  return apiClient
+    .delete<void>(path, config)
+    .then(() => {})
+    .catch(error => {
+      console.error(`Error deleting PDF for report ${reportId}:`, error.message || error);
+      throw error;
+    });
+};
 
 export const getReportSources = (
   reportId: number,
@@ -176,6 +219,57 @@ export const getReportSources = (
     })
     .catch(error => {
       console.error(`Error fetching links for report ${reportId}:`, error.message || error);
+      throw error;
+    });
+}
+
+export const getReportChat = (
+  reportId: number,
+  config?: AxiosRequestConfig
+): Promise<ReportChatDto> => {
+  const path = `/reports/${reportId}/chat`;
+  return apiClient
+    .get<ReportChatDto>(path, config)
+    .then((response) => response.data)
+    .catch((error) => {
+      console.error(`Error fetching chat for report ${reportId}:`, error.message || error);
+      throw error;
+    });
+}
+
+export const postReportChat = (
+  reportId: number,
+  message: string,
+  config?: AxiosRequestConfig
+): Promise<ReportChatDto> => {
+  const path = `/reports/${reportId}/chat`;
+  const requestConfig: AxiosRequestConfig = {
+    ...config,
+    headers: {
+      "Content-Type": "text/plain",
+      ...config?.headers,
+    },
+  };
+
+  return apiClient
+    .post<ReportChatDto>(path, message, requestConfig)
+    .then((response) => response.data)
+    .catch((error) => {
+      console.error(`Error posting chat message for report ${reportId}:`, error.message || error);
+      throw error;
+    });
+}
+
+export const deleteReportChat = (
+  reportId: number,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+  const path = `/reports/${reportId}/chat`;
+  return apiClient
+    .delete<void>(path, config)
+    .then(() => {})
+    .catch((error) => {
+      console.error(`Error deleting chat for report ${reportId}:`, error.message || error);
       throw error;
     });
 }

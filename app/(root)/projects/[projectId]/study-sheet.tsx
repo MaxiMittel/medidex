@@ -18,7 +18,7 @@ export default function StudySheet() {
                 }
             }}
         >
-            <StudyDetails study={study} />
+            <StudyDetails study={study} isActive={isOpen} />
         </Sheet>
     );
 }

@@ -31,9 +31,10 @@ const normalizeReports = (
 
 interface StudyDetailsProps {
   study: StudyDto | null;
+  isActive: boolean;
 }
 
-export function StudyDetails({ study }: StudyDetailsProps) {
+export function StudyDetails({ study, isActive }: StudyDetailsProps) {
   const [reports, setReports] = useState<ReportListItem[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
   const [reportsError, setReportsError] = useState<string | null>(null);
@@ -43,14 +44,14 @@ export function StudyDetails({ study }: StudyDetailsProps) {
   );
 
   useEffect(() => {
-    if (!study) {
+    if (!study || !isActive) {
       setReports([]);
       setReportsLoading(false);
       setReportsError(null);
       return;
     }
 
-    let isActive = true;
+    let requestActive = true;
     const studyId = study.studyId;
 
     setReportsLoading(true);
@@ -68,16 +69,16 @@ export function StudyDetails({ study }: StudyDetailsProps) {
         }
 
         const data: ReportListItem[] = await response.json();
-        if (!isActive) return;
+        if (!requestActive) return;
         setReports(normalizeReports(data));
       } catch (error) {
-        if (!isActive) return;
+        if (!requestActive) return;
         const message =
           error instanceof Error ? error.message : "Unable to load reports";
         setReportsError(message);
         toast.error(`Failed to load reports: ${message}`);
       } finally {
-        if (!isActive) return;
+        if (!requestActive) return;
         setReportsLoading(false);
       }
     };
@@ -85,9 +86,9 @@ export function StudyDetails({ study }: StudyDetailsProps) {
     void fetchReports();
 
     return () => {
-      isActive = false;
+      requestActive = false;
     };
-  }, [study]);
+  }, [study, isActive]);
 
   if (!study) {
     return null;
@@ -193,9 +194,9 @@ export function StudyDetails({ study }: StudyDetailsProps) {
     >
       <>
         <SheetHeader className="border-b border-border/60">
-          <SheetTitle>{studyShortName}</SheetTitle>
+          <SheetTitle className="text-lg">{studyShortName}</SheetTitle>
         </SheetHeader>
-        <div className="mt-6 space-y-6">
+        <div className="space-y-6">
           <StudyOverview study={study} />
 
           <Separator />

@@ -62,6 +62,7 @@ export function StudyRelevanceTable({
 
   const getReport = useReportStore((state) => state.getReport);
   const addAssignedStudies = useReportStore((state) => state.addAssignedStudy);
+  const syncAssignedStudy = useReportStore((state) => state.syncAssignedStudy);
   const removeAssignedStudies = useReportStore((state) => state.removeAssignedStudy);
   const currentReport = useReportStore((state) =>
     reportId !== undefined ? state.reports[reportId] : undefined
@@ -216,13 +217,14 @@ export function StudyRelevanceTable({
         throw new Error("Invalid study response payload.");
       }
 
-      await handleLinkedChange(createdStudy, true);
+      syncAssignedStudy(reportId, createdStudy);
+      markStudyLinkedState(createdStudy.studyId, true);
 
       if (suggestionKey) {
         dismissSuggestion(suggestionKey);
       }
     },
-    [reportId, suggestionKey, dismissSuggestion, handleLinkedChange]
+    [reportId, suggestionKey, dismissSuggestion, syncAssignedStudy, markStudyLinkedState]
   );
 
   useEffect(() => {

@@ -184,7 +184,7 @@ export function ReportAssignedStudiesBadges({
               <AlertDialogTitle>Remove study assignment?</AlertDialogTitle>
               <AlertDialogDescription>
                 <span>
-                  This will remove study <strong>{studyToRemove.study.shortName}</strong> from report <strong>{studyToRemove.report.title}</strong>.
+                  This will remove report <strong>{studyToRemove.report.title}</strong> from study <strong>{studyToRemove.study.shortName}</strong>.
                 </span>
               </AlertDialogDescription>
             </AlertDialogHeader>
