@@ -20,8 +20,9 @@ import {
   useReviewAnnotations,
   useReviewAnnotationsActions,
 } from "../components/review-annotations-context";
+import { useReportStore } from "@/hooks/use-report-store";
 import type { StudyDto } from "@/types/apiDTOs";
-import { Calendar, Scale, CircleCheckBig, CircleAlert, Users, Info } from "lucide-react";
+import { Calendar, Scale, CircleCheckBig, CircleAlert, TriangleAlert, Users, Info } from "lucide-react";
 
 interface GroupedUserStudy {
   userId: string;
@@ -91,6 +92,15 @@ export default function ReviewDetailsPage() {
   const [selectedFinalStudyIds, setSelectedFinalStudyIds] = useState<Set<number>>(new Set());
   const [syncingFinalStudyIds, setSyncingFinalStudyIds] = useState<Set<number>>(new Set());
 
+  const toTimestamp = (value: Date | string | number | null | undefined): number | null => {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    const date = value instanceof Date ? value : new Date(value);
+    const timestamp = date.getTime();
+    return Number.isFinite(timestamp) ? timestamp : null;
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -127,6 +137,16 @@ export default function ReviewDetailsPage() {
       : Array.isArray(params.reportId)
       ? params.reportId[0]
       : undefined;
+
+  const reportId = useMemo(() => {
+    if (!reportIdParam) return null;
+    const parsed = Number.parseInt(reportIdParam, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  }, [reportIdParam]);
+
+  const reportCreatedAt = useReportStore((state) =>
+    reportId === null ? undefined : state.reports[reportId]?.report.createdAt
+  );
 
   useEffect(() => {
     if (!reportIdParam) {
@@ -399,6 +419,12 @@ export default function ReviewDetailsPage() {
                 const isLoading = loadingStudyIds.has(item.study.studyId) || !studyById[item.study.studyId];
                 const isSelected = selectedFinalStudyIds.has(item.study.studyId);
                 const isSyncing = syncingFinalStudyIds.has(item.study.studyId);
+                const studyTimestamp = toTimestamp(item.study.createdAt);
+                const reportTimestamp = toTimestamp(reportCreatedAt);
+                const shouldShowNewHint =
+                  studyTimestamp !== null &&
+                  reportTimestamp !== null &&
+                  studyTimestamp > reportTimestamp;
                 const rowClass = isSelected
                   ? "border-emerald-300 bg-emerald-100"
                   : item.isUnanimous
@@ -442,8 +468,10 @@ export default function ReviewDetailsPage() {
                             <div className="flex-1 min-w-0">
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <h4 className="text-base font-semibold truncate max-w-full">
-                                    {item.study.shortName}
+                                  <h4 className="text-base font-semibold max-w-full">
+                                    <span className="inline-flex w-full min-w-0 items-center">
+                                      <span className="truncate">{item.study.shortName}</span>
+                                    </span>
                                   </h4>
                                 </TooltipTrigger>
                                 <TooltipContent>
@@ -458,7 +486,7 @@ export default function ReviewDetailsPage() {
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  className="h-6 w-6 shrink-0"
+                                  className="h-6 w-6 shrink-0 text-muted-foreground hover:bg-transparent hover:text-black"
                                   aria-label={`Open details for ${item.study.shortName}`}
                                   onClick={(event) => {
                                     event.stopPropagation();
@@ -513,11 +541,28 @@ export default function ReviewDetailsPage() {
                           <div className="border-t border-border/60 pt-2">
                             {item.isUnanimous ? (
                               <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+                                {shouldShowNewHint ? (
+                                  <span
+                                    className="mr-2 inline-flex items-center gap-1.5 text-amber-700"
+                                  >
+                                    <TriangleAlert className="h-3.5 w-3.5" />
+                                    <span className="italic">new</span>
+                                  </span>
+                                ) : null}
                                 <CircleCheckBig className="h-3.5 w-3.5" />
                                 <span>Consensus (all annotators selected this study)</span>
                               </div>
                             ) : (
-                              <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+                              <div
+                                className="flex items-center gap-1.5 text-xs font-medium"
+                                style={{ color: isSelected ? "black" : "sienna" }}
+                              >
+                                {shouldShowNewHint ? (
+                                  <span className="mr-2 inline-flex items-center gap-1.5">
+                                    <TriangleAlert className="h-3.5 w-3.5" />
+                                    <span className="italic">new</span>
+                                  </span>
+                                ) : null}
                                 <CircleAlert className="h-3.5 w-3.5" />
                                 <Tooltip>
                                   <TooltipTrigger asChild>
