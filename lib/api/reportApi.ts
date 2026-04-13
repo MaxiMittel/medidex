@@ -1,6 +1,6 @@
 import apiClient from "./apiClient";
 import { AxiosRequestConfig } from "axios";
-import { ReportSourcesDto, SimilarTagDto, SimilarStudyDto, GetSimilarStudiesParams, GetSimilarTagsParams, StudyDto} from "../../types/apiDTOs";
+import { ReportChatDto, ReportSourcesDto, SimilarTagDto, SimilarStudyDto, GetSimilarStudiesParams, GetSimilarTagsParams, StudyDto} from "../../types/apiDTOs";
 import { serializeParams } from "./helpers";    
 
 export const getSimilarStudiesByReportId = (
@@ -219,6 +219,20 @@ export const getReportSources = (
     })
     .catch(error => {
       console.error(`Error fetching links for report ${reportId}:`, error.message || error);
+      throw error;
+    });
+}
+
+export const getReportChat = (
+  reportId: number,
+  config?: AxiosRequestConfig
+): Promise<ReportChatDto> => {
+  const path = `/reports/${reportId}/chat`;
+  return apiClient
+    .get<ReportChatDto>(path, config)
+    .then((response) => response.data)
+    .catch((error) => {
+      console.error(`Error fetching chat for report ${reportId}:`, error.message || error);
       throw error;
     });
 }

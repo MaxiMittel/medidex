@@ -3,6 +3,16 @@ export interface ReportSourcesDto {
   links: string[];
 }
 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+export type ReportChatDto = JsonValue;
+
 export interface ProjectAssigneeDto {
   userId : string;
   numberReportsLinked: number;
