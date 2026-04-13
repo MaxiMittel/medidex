@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { MessageSquareText, RefreshCw } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LoaderCircle, MessageSquareText, RefreshCw, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -101,18 +100,6 @@ function stripReasonFromStructuredResponse(structuredResponse: unknown): unknown
 
   const { reason: _reason, ...rest } = structuredResponse as Record<string, unknown>;
   return rest;
-}
-
-function roleBadgeVariant(type?: string): "default" | "secondary" | "outline" {
-  if (type === "human") {
-    return "default";
-  }
-
-  if (type === "tool") {
-    return "outline";
-  }
-
-  return "secondary";
 }
 
 function prettyJson(value: unknown): string {
@@ -255,16 +242,24 @@ function resolveToolDisplayName(message: ChatMessage, toolCallLookup: ToolCallLo
   return effectiveToolName;
 }
 
-interface ReportChatFabProps {
+interface ReportChatProps {
   reportId: number;
 }
 
-export default function ReportChatFab({ reportId }: ReportChatFabProps) {
+export default function ReportChat({ reportId }: ReportChatProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [messageInput, setMessageInput] = useState("");
   const [payload, setPayload] = useState<unknown>(null);
+  const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
   const [expandedToolMessages, setExpandedToolMessages] = useState<Record<string, boolean>>({});
+  const messageListRef = useRef<HTMLDivElement | null>(null);
+  const messageListEndRef = useRef<HTMLDivElement | null>(null);
 
   const messages = useMemo(() => extractMessages(payload), [payload]);
   const structuredResponse = useMemo(() => extractStructuredResponse(payload), [payload]);
@@ -318,6 +313,10 @@ export default function ReportChatFab({ reportId }: ReportChatFabProps) {
   const visibleMessages = useMemo(
     () =>
       messages.filter((message) => {
+        if (message.type === "system") {
+          return false;
+        }
+
         const content = (message.content || "").trim();
         if (content.length > 0) {
           return true;
@@ -335,7 +334,7 @@ export default function ReportChatFab({ reportId }: ReportChatFabProps) {
 
   const fetchChat = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
+    setLoadError(null);
 
     try {
       const response = await fetch(`/api/meerkat/reports/${reportId}/chat`, {
@@ -351,11 +350,77 @@ export default function ReportChatFab({ reportId }: ReportChatFabProps) {
       setPayload(data);
     } catch (fetchError) {
       console.error("Failed to fetch report chat:", fetchError);
-      setError("Unable to load the report chat. Please try again.");
+      setLoadError("Unable to load the report chat. Please try again.");
     } finally {
       setIsLoading(false);
     }
   }, [reportId]);
+
+  const sendMessage = useCallback(async () => {
+    const message = messageInput.trim();
+    if (!message || isSending) {
+      return;
+    }
+
+    setIsSending(true);
+    setSendError(null);
+    setPendingUserMessage(message);
+
+    try {
+      const response = await fetch(`/api/meerkat/reports/${reportId}/chat`, {
+        method: "POST",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "text/plain",
+        },
+        body: message,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+
+      const data = (await response.json()) as unknown;
+      setPayload(data);
+      setMessageInput("");
+    } catch (postError) {
+      console.error("Failed to post chat message:", postError);
+      setSendError("Unable to send message. Please try again.");
+    } finally {
+      setIsSending(false);
+      setPendingUserMessage(null);
+    }
+  }, [isSending, messageInput, reportId]);
+
+  const deleteChat = useCallback(async () => {
+    if (isDeleting) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const response = await fetch(`/api/meerkat/reports/${reportId}/chat`, {
+        method: "DELETE",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+
+      setPayload(null);
+      setExpandedToolMessages({});
+      setMessageInput("");
+      await fetchChat();
+    } catch (deleteChatError) {
+      console.error("Failed to delete report chat:", deleteChatError);
+      setDeleteError("Unable to refresh chat history. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [fetchChat, isDeleting, reportId]);
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -375,6 +440,20 @@ export default function ReportChatFab({ reportId }: ReportChatFabProps) {
     }));
   }, []);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      messageListEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+      messageListRef.current?.scrollTo({
+        top: messageListRef.current.scrollHeight,
+        behavior: "auto",
+      });
+    });
+  }, [isLoading, isSending, open, pendingUserMessage, visibleMessages.length]);
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
@@ -384,18 +463,28 @@ export default function ReportChatFab({ reportId }: ReportChatFabProps) {
           type="button"
         >
           <MessageSquareText className="h-4 w-4" />
-          View Chat
+          Ask MediBot
         </Button>
       </DialogTrigger>
       <DialogContent className="h-[85vh] max-h-[85vh] overflow-hidden sm:max-w-4xl p-0 flex flex-col">
         <DialogHeader className="border-b px-6 pt-6 pb-4 shrink-0">
-          <DialogTitle>Report Chat</DialogTitle>
-          <DialogDescription>
-            Conversation history for report {reportId}.
-          </DialogDescription>
+          <div className="flex items-center justify-start gap-3">
+            <DialogTitle>Ask MediBot about the current report</DialogTitle>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void deleteChat()}
+              disabled={isDeleting || isLoading}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {isDeleting ? "Clearing..." : "Clear Chat"}
+            </Button>
+          </div>
+          {deleteError && <p className="mt-2 text-sm text-destructive">{deleteError}</p>}
         </DialogHeader>
 
-        <div className="h-full w-full flex-1 min-h-0 overflow-y-auto">
+        <div ref={messageListRef} className="h-full w-full flex-1 min-h-0 overflow-y-auto">
           <div className="w-full px-6 py-4 space-y-4">
             {isLoading && (
               <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
@@ -403,9 +492,9 @@ export default function ReportChatFab({ reportId }: ReportChatFabProps) {
               </div>
             )}
 
-            {!isLoading && error && (
+            {!isLoading && loadError && (
               <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-                <p>{error}</p>
+                <p>{loadError}</p>
                 <Button
                   className="mt-3"
                   onClick={() => void fetchChat()}
@@ -419,7 +508,7 @@ export default function ReportChatFab({ reportId }: ReportChatFabProps) {
               </div>
             )}
 
-            {!isLoading && !error && visibleMessages.length > 0 && (
+            {!isLoading && !loadError && visibleMessages.length > 0 && (
               <div className="w-full space-y-3">
                 {visibleMessages.map((message, index) => {
                   const role = message.type || "unknown";
@@ -432,24 +521,25 @@ export default function ReportChatFab({ reportId }: ReportChatFabProps) {
                     !!effectiveToolName && FINAL_RESPONSE_TOOL_NAMES.has(effectiveToolName);
                   const isToolMessageExpanded = !!expandedToolMessages[messageKey];
                   const toolDisplayName = resolveToolDisplayName(message, toolCallLookup);
+                  const isHumanMessage = message.type === "user" || message.type === "human";
+                  const messageStripeClass = isHumanMessage
+                    ? "border-l-4 border-l-emerald-500"
+                    : "border-r-4 border-r-sky-500";
                   const finalResponseSummary =
                     effectiveToolName === "ExistingStudy"
                       ? `I think this report belongs to an existing study because: ${finalResponseReason}`
                       : `I think this report belongs to a new study because: ${finalResponseReason}`;
 
                   return (
-                    <div key={messageKey} className="w-full rounded-lg border bg-card p-4">
-                      <div className="mb-3 flex items-center gap-2">
-                        {!isToolMessage && <Badge variant={roleBadgeVariant(message.type)}>{role}</Badge>}
-                        {isStructuredFinalResponse && (
-                          <Badge variant={roleBadgeVariant("ai")}>ai</Badge>
-                        )}
+                    <div key={messageKey} className={`w-full ${isHumanMessage ? "pl-6" : ""}`}>
+                      <div className={`w-full rounded-lg border bg-card p-4 ${messageStripeClass}`}>
+                      <div className="flex items-center gap-2">
                         {(isStructuredFinalResponse
                           ? finalResponseSummary
                           : isToolMessage
                             ? toolDisplayName
                             : message.name) && (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="mb-3 text-xs text-muted-foreground">
                             {isStructuredFinalResponse
                               ? finalResponseSummary
                               : isToolMessage
@@ -463,7 +553,7 @@ export default function ReportChatFab({ reportId }: ReportChatFabProps) {
                           {structuredResponseWithoutReasonText || structuredResponseText || formattedToolContent}
                         </pre>
                       ) : isToolMessage ? (
-                        <div className="space-y-3">
+                        <div >
                           <div
                             aria-expanded={isToolMessageExpanded}
                             className="cursor-pointer rounded-md border border-dashed bg-muted/20 px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/30"
@@ -493,10 +583,55 @@ export default function ReportChatFab({ reportId }: ReportChatFabProps) {
                         </pre>
                       )}
                     </div>
+                    </div>
                   );
                 })}
               </div>
             )}
+
+            {!isLoading && !loadError && isSending && pendingUserMessage && (
+              <div className="w-full pl-6">
+                <div className="w-full rounded-lg border border-l-4 border-l-emerald-500 bg-card p-4">
+                  <pre className="overflow-x-auto whitespace-pre-wrap break-all text-sm leading-relaxed">
+                    {pendingUserMessage}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+            {!isLoading && !loadError && isSending && (
+              <div className="w-full">
+                <div className="w-full rounded-lg border border-r-4 border-r-sky-500 bg-card p-4">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    MediBot is thinking...
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messageListEndRef} aria-hidden="true" />
+          </div>
+        </div>
+
+        <div className="shrink-0 border-t bg-background px-6 py-4">
+          <Textarea
+            className="min-h-[88px] resize-none"
+            id="report-chat-message"
+            placeholder="Write a message..."
+            value={messageInput}
+            onChange={(event) => setMessageInput(event.target.value)}
+          />
+          {sendError && <p className="mt-2 text-sm text-destructive">{sendError}</p>}
+          <div className="mt-3 flex justify-end">
+            <Button
+              type="button"
+              onClick={() => void sendMessage()}
+              disabled={isSending || messageInput.trim().length === 0}
+            >
+              <Send className="h-4 w-4" />
+              {isSending ? "Waiting..." : "Send"}
+            </Button>
           </div>
         </div>
       </DialogContent>

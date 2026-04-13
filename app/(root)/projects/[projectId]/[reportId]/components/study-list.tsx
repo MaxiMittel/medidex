@@ -6,7 +6,7 @@ import type { SimilarStudyDto } from "@/types/apiDTOs";
 import type { RelevanceStudy } from "@/types/reports";
 import { getSimilarStudiesByReportId } from "@/lib/api/reportApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
-import ReportChatFab from "./report-chat-fab";
+import ReportChat from "./report-chat";
 
 interface StudyListProps {
   params: {
@@ -58,7 +58,7 @@ export default async function StudyList({ params, searchParams }: StudyListProps
         reportId={reportIdNumber}
         studies={studies}
       />
-      <ReportChatFab reportId={reportIdNumber} />
+      <ReportChat reportId={reportIdNumber} />
     </>
   );
 }

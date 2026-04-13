@@ -236,3 +236,40 @@ export const getReportChat = (
       throw error;
     });
 }
+
+export const postReportChat = (
+  reportId: number,
+  message: string,
+  config?: AxiosRequestConfig
+): Promise<ReportChatDto> => {
+  const path = `/reports/${reportId}/chat`;
+  const requestConfig: AxiosRequestConfig = {
+    ...config,
+    headers: {
+      "Content-Type": "text/plain",
+      ...config?.headers,
+    },
+  };
+
+  return apiClient
+    .post<ReportChatDto>(path, message, requestConfig)
+    .then((response) => response.data)
+    .catch((error) => {
+      console.error(`Error posting chat message for report ${reportId}:`, error.message || error);
+      throw error;
+    });
+}
+
+export const deleteReportChat = (
+  reportId: number,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+  const path = `/reports/${reportId}/chat`;
+  return apiClient
+    .delete<void>(path, config)
+    .then(() => {})
+    .catch((error) => {
+      console.error(`Error deleting chat for report ${reportId}:`, error.message || error);
+      throw error;
+    });
+}
