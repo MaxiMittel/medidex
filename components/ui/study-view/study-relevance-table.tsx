@@ -19,7 +19,7 @@ import {
   Calendar,
   X,
   Sparkles,
-  Scale,
+  CheckCircle2,
   Plus,
   Link,
   Microscope,
@@ -62,6 +62,7 @@ export function StudyRelevanceTable({
 
   const getReport = useReportStore((state) => state.getReport);
   const addAssignedStudies = useReportStore((state) => state.addAssignedStudy);
+  const syncAssignedStudy = useReportStore((state) => state.syncAssignedStudy);
   const removeAssignedStudies = useReportStore((state) => state.removeAssignedStudy);
   const currentReport = useReportStore((state) =>
     reportId !== undefined ? state.reports[reportId] : undefined
@@ -216,13 +217,14 @@ export function StudyRelevanceTable({
         throw new Error("Invalid study response payload.");
       }
 
-      await handleLinkedChange(createdStudy, true);
+      syncAssignedStudy(reportId, createdStudy);
+      markStudyLinkedState(createdStudy.studyId, true);
 
       if (suggestionKey) {
         dismissSuggestion(suggestionKey);
       }
     },
-    [reportId, suggestionKey, dismissSuggestion, handleLinkedChange]
+    [reportId, suggestionKey, dismissSuggestion, syncAssignedStudy, markStudyLinkedState]
   );
 
   useEffect(() => {
@@ -581,7 +583,7 @@ export function StudyRelevanceTable({
                             {study.study.comparison && (
                               <div className="flex items-center gap-1.5 text-muted-foreground flex-1 min-w-0 basis-0 max-w-full overflow-hidden">
                                 <div className="p-0.5 rounded bg-violet-50 dark:bg-violet-950/30 shrink-0">
-                                  <Scale className="h-3 w-3 text-violet-600 dark:text-violet-400" />
+                                  <CheckCircle2 className="h-3 w-3 text-violet-600 dark:text-violet-400" />
                                 </div>
                                 <TooltipProvider>
                                   <Tooltip>
