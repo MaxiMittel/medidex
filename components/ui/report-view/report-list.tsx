@@ -6,6 +6,8 @@ import {
   Calendar,
   Users,
   Download,
+  Flag,
+  MoreHorizontal,
   Sparkles,
   Search,
   X,
@@ -16,10 +18,26 @@ import { ReportAssignedStudiesBadges } from "@/components/ui/study-view/report-a
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
 import { filterReports, ReportFilterType } from "@/lib/filterUtils";
 import { useReportStore } from "@/hooks/use-report-store";
 import { ProjectAnnotationsDto } from "@/types/apiDTOs";
+import { toast } from "sonner";
 
 interface ReportListProps {
   baseUrl: string;
@@ -38,6 +56,10 @@ export function ReportList({
 }: ReportListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [assignmentFilter, setAssignmentFilter] = useState<ReportFilterType>("all");
+  const [flagDialogOpen, setFlagDialogOpen] = useState(false);
+  const [selectedFlagReport, setSelectedFlagReport] = useState<{ id: number; title: string } | null>(null);
+  const [flagDetails, setFlagDetails] = useState("");
+  const [isSubmittingFlag, setIsSubmittingFlag] = useState(false);
   const params = useParams();
   const projectId =
     typeof params.projectId === "string"
@@ -78,6 +100,57 @@ export function ReportList({
   const reportsList = useMemo(() => Object.values(reportsDict), [reportsDict]);
 
   const filteredReports = filterReports(reportsList, annotations, searchQuery, assignmentFilter);
+
+  const handleFlagDialogChange = (open: boolean) => {
+    setFlagDialogOpen(open);
+    if (!open) {
+      setFlagDetails("");
+      setSelectedFlagReport(null);
+    }
+  };
+
+  const handleOpenFlagDialog = (reportId: number, reportTitle: string) => {
+    setSelectedFlagReport({ id: reportId, title: reportTitle });
+    setFlagDialogOpen(true);
+  };
+
+  const handleSubmitFlag = async () => {
+    if (!selectedFlagReport) {
+      return;
+    }
+
+    if (!flagDetails.trim()) {
+      toast.error("Please add a short description before submitting.");
+      return;
+    }
+
+    setIsSubmittingFlag(true);
+    try {
+      const response = await fetch(`/api/meerkat/reports/${selectedFlagReport.id}/flag`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          reportId: selectedFlagReport.id,
+          details: flagDetails.trim(),
+          reportTitle: selectedFlagReport.title,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to submit report flag.");
+      }
+
+      toast.success("Report submitted. Thanks for the feedback.");
+      handleFlagDialogChange(false);
+    } catch (error) {
+      console.error("Error submitting report flag:", error);
+      toast.error("Could not submit your report. Please try again.");
+    } finally {
+      setIsSubmittingFlag(false);
+    }
+  };
 
   return (
     <div className="h-full flex flex-col pt-5">
@@ -213,17 +286,49 @@ export function ReportList({
                             ) : null)}
                           {report.report.title}
                         </h3>
-                        {isSelected && report.hasPdf && (
-                          <a
-                            href={pdfUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label={`Open PDF for ${report.report.title}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60"
-                          >
-                            <Download className="h-4 w-4" />
-                          </a>
+                        {isSelected && (
+                          <div className="inline-flex items-center gap-1">
+                            {report.hasPdf && (
+                              <a
+                                href={pdfUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`Open PDF for ${report.report.title}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60"
+                              >
+                                <Download className="h-4 w-4" />
+                              </a>
+                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 shrink-0 text-muted-foreground"
+                                  aria-label={`More actions for ${report.report.title}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                align="end"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <DropdownMenuItem
+                                  onSelect={(e) => {
+                                    e.preventDefault();
+                                    handleOpenFlagDialog(report.report.reportId, report.report.title);
+                                  }}
+                                >
+                                  <Flag className="h-4 w-4" />
+                                  Flag report
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         )}
                       </div>
                       <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground mb-2">
@@ -267,6 +372,60 @@ export function ReportList({
           )}
         </div>
       </ScrollArea>
+
+      <Dialog open={flagDialogOpen} onOpenChange={handleFlagDialogChange}>
+        <DialogContent
+          className="sm:max-w-[560px]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <DialogHeader>
+            <DialogTitle>Flag report</DialogTitle>
+            <DialogDescription>
+              Report issues with this item so your team can review it.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedFlagReport && (
+            <div className="space-y-4">
+              <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Report:</span>{" "}
+                {selectedFlagReport.title}
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="flag-details" className="text-sm font-medium">
+                  Details
+                </label>
+                <Textarea
+                  id="flag-details"
+                  value={flagDetails}
+                  onChange={(e) => setFlagDetails(e.target.value)}
+                  placeholder="Tell us what is wrong with this report..."
+                  className="h-28 min-h-28 resize-none"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleFlagDialogChange(false)}
+              disabled={isSubmittingFlag}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSubmitFlag}
+              disabled={isSubmittingFlag}
+            >
+              {isSubmittingFlag ? "Submitting..." : "Submit report"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

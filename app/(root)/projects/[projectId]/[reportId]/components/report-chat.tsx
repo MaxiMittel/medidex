@@ -16,7 +16,7 @@ type ChatMessage = {
   id?: string;
   type?: string;
   name?: string | null;
-  content?: string;
+  content?: unknown;
   tool_call_id?: string;
   tool_calls?: ToolCall[];
 };
@@ -110,6 +110,22 @@ function prettyJson(value: unknown): string {
   }
 }
 
+function normalizeMessageContent(content: unknown): string {
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (content === null || typeof content === "undefined") {
+    return "";
+  }
+
+  if (typeof content === "number" || typeof content === "boolean") {
+    return String(content);
+  }
+
+  return prettyJson(content);
+}
+
 function formatToolMessageContent(content: string): string {
   try {
     return prettyJson(JSON.parse(content));
@@ -158,7 +174,7 @@ function resolveToolDisplayName(message: ChatMessage, toolCallLookup: ToolCallLo
   const linkedToolCall = message.tool_call_id ? toolCallLookup[message.tool_call_id] : undefined;
   const linkedArgs = linkedToolCall?.args;
   const effectiveToolName = linkedToolCall?.name || message.name;
-  const parsedContent = tryParseObject((message.content || "").trim());
+  const parsedContent = tryParseObject(normalizeMessageContent(message.content).trim());
 
   if (effectiveToolName === "fetch_next_candidate_study") {
     const reason =
@@ -239,6 +255,51 @@ function resolveToolDisplayName(message: ChatMessage, toolCallLookup: ToolCallLo
     return `Checking persons associated with study ${String(studyId)}`;
   }
 
+  if (effectiveToolName === "search_for_study_by_shortname") {
+    const shortName =
+      (linkedArgs && getNestedValue(linkedArgs, ["short_name"])) ??
+      (parsedContent &&
+        (getNestedValue(parsedContent, ["short_name"]) ??
+          getNestedValue(parsedContent, ["args", "short_name"]) ??
+          getNestedValue(parsedContent, ["input", "short_name"])));
+
+    if (shortName === null || typeof shortName === "undefined" || shortName === "") {
+      return "Searched for studies with shortname";
+    }
+
+    return `Searched for studies with shortname ${String(shortName)}`;
+  }
+
+  if (effectiveToolName === "fetch_study_outcomes") {
+    const studyId =
+      (linkedArgs && getNestedValue(linkedArgs, ["study_id"])) ??
+      (parsedContent &&
+        (getNestedValue(parsedContent, ["study_id"]) ??
+          getNestedValue(parsedContent, ["args", "study_id"]) ??
+          getNestedValue(parsedContent, ["input", "study_id"])));
+
+    if (studyId === null || typeof studyId === "undefined" || studyId === "") {
+      return "Reading outcomes associated with study";
+    }
+
+    return `Reading outcomes associated with study ${String(studyId)}`;
+  }
+
+  if (effectiveToolName === "fetch_study_conditions") {
+    const studyId =
+      (linkedArgs && getNestedValue(linkedArgs, ["study_id"])) ??
+      (parsedContent &&
+        (getNestedValue(parsedContent, ["study_id"]) ??
+          getNestedValue(parsedContent, ["args", "study_id"]) ??
+          getNestedValue(parsedContent, ["input", "study_id"])));
+
+    if (studyId === null || typeof studyId === "undefined" || studyId === "") {
+      return "Reading conditions associated with study";
+    }
+
+    return `Reading conditions associated with study ${String(studyId)}`;
+  }
+
   return effectiveToolName;
 }
 
@@ -317,7 +378,7 @@ export default function ReportChat({ reportId }: ReportChatProps) {
           return false;
         }
 
-        const content = (message.content || "").trim();
+        const content = normalizeMessageContent(message.content).trim();
         if (content.length > 0) {
           return true;
         }
@@ -512,7 +573,7 @@ export default function ReportChat({ reportId }: ReportChatProps) {
               <div className="w-full space-y-3">
                 {visibleMessages.map((message, index) => {
                   const role = message.type || "unknown";
-                  const content = (message.content || "").trim();
+                  const content = normalizeMessageContent(message.content).trim();
                   const formattedToolContent = formatToolMessageContent(content);
                   const messageKey = message.id ?? `${role}-${index}`;
                   const isToolMessage = message.type === "tool";
