@@ -27,7 +27,7 @@ const getReportAnnotations = (
   annotations: ProjectAnnotationsDto | null,
   reportId: number
 ): AnnotationDto[] => {
-  return annotations?.[String(reportId)] ?? [];
+  return annotations?.[String(reportId)]?.studies ?? [];
 };
 
 const getDistinctAnnotatedStudyCount = (annotations: AnnotationDto[]): number => {

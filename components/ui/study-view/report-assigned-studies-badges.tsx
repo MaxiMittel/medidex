@@ -129,7 +129,7 @@ export function ReportAssignedStudiesBadges({
   };
 
   return (
-    <div className="flex flex-wrap gap-1 mt-1">
+    <div className="flex flex-wrap gap-1 mt-4">
       {assignedStudies.map((study) => {
         const assignmentKey = getAssignmentKey(report.report.reportId, study.studyId);
         // Use local removing state in addition to parent removingAssignments

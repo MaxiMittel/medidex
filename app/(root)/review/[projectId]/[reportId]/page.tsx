@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   Empty,
   EmptyDescription,
@@ -10,6 +10,17 @@ import {
 } from "@/components/ui/empty";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -22,7 +33,7 @@ import {
 } from "../components/review-annotations-context";
 import { useReportStore } from "@/hooks/use-report-store";
 import type { StudyDto } from "@/types/apiDTOs";
-import { Calendar, Scale, CircleCheckBig, CircleAlert, TriangleAlert, Users, Info } from "lucide-react";
+import { Calendar, Scale, CircleCheckBig, CircleAlert, TriangleAlert, Users, Info, AlertTriangle } from "lucide-react";
 
 interface GroupedUserStudy {
   userId: string;
@@ -84,6 +95,7 @@ export default function ReviewDetailsPage() {
   const annotations = useReviewAnnotations();
   const { updateConfirmedForReportStudy } = useReviewAnnotationsActions();
   const params = useParams();
+  const router = useRouter();
   const { openWithStudyId } = useDetailsSheet();
 
   const [userNameById, setUserNameById] = useState<Map<string, string>>(new Map());
@@ -91,6 +103,9 @@ export default function ReviewDetailsPage() {
   const [loadingStudyIds, setLoadingStudyIds] = useState<Set<number>>(new Set());
   const [selectedFinalStudyIds, setSelectedFinalStudyIds] = useState<Set<number>>(new Set());
   const [syncingFinalStudyIds, setSyncingFinalStudyIds] = useState<Set<number>>(new Set());
+  const [isDeletingReport, setIsDeletingReport] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteReportError, setDeleteReportError] = useState<string | null>(null);
 
   const toTimestamp = (value: Date | string | number | null | undefined): number | null => {
     if (value === null || value === undefined) {
@@ -138,6 +153,13 @@ export default function ReviewDetailsPage() {
       ? params.reportId[0]
       : undefined;
 
+  const projectIdParam =
+    typeof params.projectId === "string"
+      ? params.projectId
+      : Array.isArray(params.projectId)
+      ? params.projectId[0]
+      : undefined;
+
   const reportId = useMemo(() => {
     if (!reportIdParam) return null;
     const parsed = Number.parseInt(reportIdParam, 10);
@@ -155,7 +177,7 @@ export default function ReviewDetailsPage() {
     }
 
     const confirmedStudyIds = new Set<number>();
-    for (const annotation of annotations[reportIdParam] ?? []) {
+    for (const annotation of annotations[reportIdParam]?.studies ?? []) {
       if (annotation.confirmed) {
         confirmedStudyIds.add(annotation.studyId);
       }
@@ -169,7 +191,7 @@ export default function ReviewDetailsPage() {
       return [];
     }
 
-    const reportAnnotations = annotations[reportIdParam] ?? [];
+    const reportAnnotations = annotations[reportIdParam]?.studies ?? [];
     const userToStudies = new Map<string, Map<number, string>>();
 
     for (const annotation of reportAnnotations) {
@@ -191,6 +213,26 @@ export default function ReviewDetailsPage() {
       }))
       .sort((a, b) => a.userName.localeCompare(b.userName));
   }, [annotations, reportIdParam, userNameById]);
+
+  const reportFlags = useMemo<string[]>(() => {
+    if (!reportIdParam) {
+      return [];
+    }
+
+    const flags = annotations[reportIdParam]?.flags ?? [];
+    const uniqueFlags = new Set<string>();
+
+    for (const annotationFlag of flags) {
+      const trimmedFlag = annotationFlag.flag?.trim();
+      if (!trimmedFlag) {
+        continue;
+      }
+
+      uniqueFlags.add(trimmedFlag);
+    }
+
+    return Array.from(uniqueFlags.values()).sort((a, b) => a.localeCompare(b));
+  }, [annotations, reportIdParam]);
 
   const studyIdsToLoad = useMemo(() => {
     const ids = new Set<number>();
@@ -335,6 +377,38 @@ export default function ReviewDetailsPage() {
     }
   };
 
+  const handleDeleteReport = async () => {
+    if (!reportIdParam || isDeletingReport) {
+      return;
+    }
+
+    setIsDeletingReport(true);
+    setDeleteReportError(null);
+    try {
+      const response = await fetch(`/api/meerkat/reports/${reportIdParam}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete report.");
+      }
+
+      setIsDeleteDialogOpen(false);
+
+      if (projectIdParam) {
+        router.push(`/review/${projectIdParam}`);
+      } else {
+        router.push("/review");
+      }
+      router.refresh();
+    } catch (error) {
+      console.error("Failed to delete report:", error);
+      setDeleteReportError("Unable to delete report. Please try again.");
+    } finally {
+      setIsDeletingReport(false);
+    }
+  };
+
   if (!reportIdParam) {
     return (
       <div className="h-full p-6">
@@ -360,11 +434,38 @@ export default function ReviewDetailsPage() {
       </div>
 
       <div className="px-4 py-4">
+        {reportFlags.length > 0 ? (
+          <section className="mb-8 space-y-4 rounded-none border border-border bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">
+                  Report Flags
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Flags raised by annotators that may influence your final decision.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {reportFlags.map((flag) => (
+                <div
+                  key={`report-flag-${flag}`}
+                  className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary/10 p-2"
+                >
+                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <p className="text-sm font-medium text-primary">{flag}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         <section className="mb-8 space-y-4 rounded-none border border-border bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">
-                Final Decision
+                Final Selection
               </h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 Select one or more studies from the annotator suggestions.
@@ -377,7 +478,7 @@ export default function ReviewDetailsPage() {
                 size="sm"
                 className="h-8"
                 onClick={() => setSelectedFinalStudyIds(new Set())}
-                disabled={selectedFinalStudyIds.size === 0}
+                disabled={selectedFinalStudyIds.size === 0 || isDeletingReport}
               >
                 Clear
               </Button>
@@ -400,17 +501,17 @@ export default function ReviewDetailsPage() {
                   key={`loading-study-${studyId}`}
                   className="rounded-lg border border-border bg-card p-4"
                 >
-                  <div className="flex min-h-[132px] flex-col gap-3">
+                  <div className="flex flex-col gap-3">
                     <div className="flex items-start gap-3">
                       <Skeleton className="h-6 flex-1" />
                       <Skeleton className="h-6 w-6 shrink-0" />
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-                        <Skeleton className="h-4 w-28" />
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-4 w-56" />
+                      <Skeleton className="h-4 w-28" />
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-4 w-56" />
                     </div>
-                    <div className="mt-auto border-t border-border/60 pt-2">
+                    <div className="border-t border-border/60 pt-2">
                       <Skeleton className="h-4 w-64" />
                     </div>
                   </div>
@@ -461,7 +562,7 @@ export default function ReviewDetailsPage() {
                     className={`p-4 bg-card rounded-lg relative w-full max-w-full overflow-hidden transition-all duration-200 border flex items-center gap-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isSyncing ? "cursor-wait opacity-70" : "cursor-pointer"} ${rowClass}`}
                   >
                     {isLoading ? (
-                      <div className="flex min-h-[132px] flex-1 min-w-0 flex-col gap-3">
+                      <div className="flex flex-1 min-w-0 flex-col gap-3">
                         <div className="flex items-start gap-3">
                           <Skeleton className="h-6 flex-1" />
                           <Skeleton className="h-6 w-6 shrink-0" />
@@ -471,7 +572,7 @@ export default function ReviewDetailsPage() {
                           <Skeleton className="h-4 w-24" />
                           <Skeleton className="h-4 w-64" />
                         </div>
-                        <div className="mt-auto border-t border-border/60 pt-2">
+                        <div className="border-t border-border/60 pt-2">
                           <Skeleton className="h-4 w-64" />
                         </div>
                       </div>
@@ -601,6 +702,63 @@ export default function ReviewDetailsPage() {
             </div>
           )}
         </section>
+
+        <div className="mt-4 flex justify-center">
+          <AlertDialog
+            open={isDeleteDialogOpen}
+            onOpenChange={(nextOpen) => {
+              setIsDeleteDialogOpen(nextOpen);
+              if (!nextOpen) {
+                setDeleteReportError(null);
+              }
+            }}
+          >
+            <AlertDialogTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 border-destructive/30 bg-white px-6 text-destructive shadow-none hover:bg-destructive/10 hover:shadow-none"
+                disabled={isDeletingReport}
+              >
+                Delete Report
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent
+              className="sm:max-w-md"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <AlertDialogHeader>
+                <div className="mb-2 flex items-center gap-2 text-destructive">
+                  <AlertTriangle className="h-4 w-4" aria-hidden />
+                  <span className="text-xs font-semibold uppercase tracking-wide">Danger Zone</span>
+                </div>
+                <AlertDialogTitle>Delete this report?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently remove all data for this report.
+                </AlertDialogDescription>
+                <div className="mt-2 rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-sm text-foreground">
+                  Report ID: {reportIdParam}
+                </div>
+                {deleteReportError ? (
+                  <p className="mt-2 text-sm text-destructive">{deleteReportError}</p>
+                ) : null}
+              </AlertDialogHeader>
+              <AlertDialogFooter className="gap-2 sm:gap-2">
+                <AlertDialogCancel disabled={isDeletingReport}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void handleDeleteReport();
+                  }}
+                  disabled={isDeletingReport}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {isDeletingReport ? "Deleting..." : "Delete"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
     </div>
   );

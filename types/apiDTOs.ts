@@ -239,4 +239,15 @@ export interface AnnotationDto {
   confirmed: boolean,
 }
 
-export type ProjectAnnotationsDto = Record<string, AnnotationDto[]>;
+export interface AnnotationFlagDto {
+  user: string;
+  flag: string;
+  public: boolean;
+}
+
+export interface ReportAnnotationsDto {
+  studies: AnnotationDto[];
+  flags: AnnotationFlagDto[];
+}
+
+export type ProjectAnnotationsDto = Record<string, ReportAnnotationsDto>;

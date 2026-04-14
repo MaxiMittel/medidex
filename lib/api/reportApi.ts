@@ -326,3 +326,17 @@ export const deleteReportFlagByReportId = (
       throw error;
     });
 }
+
+export const deleteReportById = (
+  reportId: number,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+  const path = `/reports/${reportId}`;
+  return apiClient
+    .delete<void>(path, config)
+    .then(() => {})
+    .catch((error) => {
+      console.error(`Error deleting report ${reportId}:`, error.message || error);
+      throw error;
+    });
+};

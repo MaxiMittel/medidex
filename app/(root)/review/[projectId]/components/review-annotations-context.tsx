@@ -34,12 +34,12 @@ export function ReviewAnnotationsProvider({
       updateConfirmedForReportStudy: (reportId, studyId, confirmed) => {
         setAnnotationsState((prev) => {
           const reportAnnotations = prev[reportId];
-          if (!reportAnnotations || reportAnnotations.length === 0) {
+          if (!reportAnnotations || reportAnnotations.studies.length === 0) {
             return prev;
           }
 
           let hasChanges = false;
-          const nextReportAnnotations = reportAnnotations.map((annotation) => {
+          const nextStudyAnnotations = reportAnnotations.studies.map((annotation) => {
             if (annotation.studyId !== studyId || annotation.confirmed === confirmed) {
               return annotation;
             }
@@ -56,7 +56,10 @@ export function ReviewAnnotationsProvider({
 
           return {
             ...prev,
-            [reportId]: nextReportAnnotations,
+            [reportId]: {
+              ...reportAnnotations,
+              studies: nextStudyAnnotations,
+            },
           };
         });
       },

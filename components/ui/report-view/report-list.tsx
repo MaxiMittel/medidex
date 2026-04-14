@@ -394,8 +394,8 @@ export function ReportList({
                     }`}
                   >
                     <div className="p-4">
-                      <div className="flex items-start justify-between gap-3 mb-2.5">
-                        <h3 className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground">
+                      <div className="relative mb-2.5 pr-9">
+                        <h3 className="min-w-0 text-sm font-semibold leading-snug text-foreground">
                           {editMode &&
                             (isRunningEvaluation ? (
                               <Spinner className="mr-1 inline h-3 w-3 text-primary" />
@@ -404,78 +404,82 @@ export function ReportList({
                             ) : null)}
                           {report.report.title}
                         </h3>
-                        {isSelected && (
-                          <div className="inline-flex items-center gap-1">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 shrink-0 text-muted-foreground"
-                                  aria-label={`More actions for ${report.report.title}`}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent
-                                align="end"
+                        <div
+                          className={`absolute right-0 top-0 inline-flex items-center gap-1 ${
+                            isSelected ? "opacity-100" : "opacity-0 pointer-events-none"
+                          }`}
+                          aria-hidden={!isSelected}
+                        >
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                disabled={!isSelected}
+                                className="h-8 w-8 shrink-0 text-muted-foreground"
+                                aria-label={`More actions for ${report.report.title}`}
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                {report.hasPdf && (
-                                  <>
-                                    <DropdownMenuItem
-                                      onSelect={() => {
-                                        window.open(pdfUrl, "_blank", "noopener,noreferrer");
-                                      }}
-                                    >
-                                      <ExternalLink className="h-4 w-4" />
-                                      Open PDF
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onSelect={() => {
-                                        void handleDownloadReportPdf(
-                                          report.report.reportId,
-                                          report.report.title
-                                        );
-                                      }}
-                                    >
-                                      <Download className="h-4 w-4" />
-                                      Download PDF
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-                                {editMode && hasFlag && report.hasPdf && <DropdownMenuSeparator />}
-                                {editMode && (
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {report.hasPdf && (
+                                <>
                                   <DropdownMenuItem
                                     onSelect={() => {
-                                      handleOpenFlagDialog(report.report.reportId, report.report.title);
+                                      window.open(pdfUrl, "_blank", "noopener,noreferrer");
                                     }}
                                   >
-                                    <Flag className="h-4 w-4" />
-                                    {hasFlag ? "Edit flag" : "Flag report"}
+                                    <ExternalLink className="h-4 w-4" />
+                                    Open PDF
                                   </DropdownMenuItem>
-                                )}
-                                {editMode && hasFlag && (
                                   <DropdownMenuItem
-                                    disabled={isDeletingFlagReportId === report.report.reportId}
                                     onSelect={() => {
-                                      void handleDeleteFlag(report.report.reportId);
+                                      void handleDownloadReportPdf(
+                                        report.report.reportId,
+                                        report.report.title
+                                      );
                                     }}
                                   >
-                                    <FlagOff className="h-4 w-4" />
-                                    {isDeletingFlagReportId === report.report.reportId
-                                      ? "Deleting flag..."
-                                      : "Delete flag"}
+                                    <Download className="h-4 w-4" />
+                                    Download PDF
                                   </DropdownMenuItem>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        )}
+                                </>
+                              )}
+                              {editMode && hasFlag && report.hasPdf && <DropdownMenuSeparator />}
+                              {editMode && (
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    handleOpenFlagDialog(report.report.reportId, report.report.title);
+                                  }}
+                                >
+                                  <Flag className="h-4 w-4" />
+                                  {hasFlag ? "Edit flag" : "Flag report"}
+                                </DropdownMenuItem>
+                              )}
+                              {editMode && hasFlag && (
+                                <DropdownMenuItem
+                                  disabled={isDeletingFlagReportId === report.report.reportId}
+                                  onSelect={() => {
+                                    void handleDeleteFlag(report.report.reportId);
+                                  }}
+                                >
+                                  <FlagOff className="h-4 w-4" />
+                                  {isDeletingFlagReportId === report.report.reportId
+                                    ? "Deleting flag..."
+                                    : "Delete flag"}
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground mb-2">
+                      <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
                         {displayDate && (
                           <div className="flex items-center gap-1.5">
                             <Calendar className="h-3.5 w-3.5 shrink-0" />
@@ -502,9 +506,9 @@ export function ReportList({
                       )}
                     </div>
 
-                    {isExpanded && hasAbstract && (
+                    {hasAbstract && isExpanded && (
                       <div className="px-4 pb-4 border-t bg-muted/30">
-                        <p className="text-xs text-muted-foreground leading-relaxed pt-3 whitespace-pre-wrap">
+                        <p className="text-xs text-muted-foreground leading-relaxed mt-2 whitespace-pre-wrap">
                           {report.report.abstract}
                         </p>
                       </div>
