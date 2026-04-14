@@ -5,8 +5,8 @@ import { adminGuard } from "@/guards/role.guard";
 import { ReportColumnClient } from "./components/report-column-client";
 import type { ProjectAnnotationsDto, ReportDetailDto } from "@/types/apiDTOs";
 import {
-  getAnnotations as fetchProjectAnnotations,
-  getProjectReports as fetchProjectReports,
+  getAnnotations,
+  getProjectReports 
 } from "@/lib/api/projectApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 import { ReviewAnnotationsProvider } from "./components/review-annotations-context";
@@ -28,8 +28,8 @@ async function loadProjectReports(projectId: string): Promise<ProjectReviewData>
 
   try {
     const [reports, annotations] = await Promise.all([
-      fetchProjectReports(projectId, false, { headers }),
-      fetchProjectAnnotations(projectId, { headers }),
+      getProjectReports(projectId, false, { headers }),
+      getAnnotations(projectId, { headers }),
     ]);
 
     const annotatedReportIds = new Set(Object.keys(annotations ?? {}));

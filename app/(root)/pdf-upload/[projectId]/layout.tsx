@@ -18,7 +18,7 @@ async function loadProjectReports(projectId: string): Promise<ReportDetailDto[]>
   const headers = await getMeerkatHeaders();
 
   try {
-    const reports = await fetchProjectReports(projectId, false, { headers });
+    const reports = await fetchProjectReports(projectId, true, { headers });
     return reports ?? [];
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) {

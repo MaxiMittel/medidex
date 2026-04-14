@@ -24,7 +24,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Calendar, UserPlus, Check, Settings, FileUp, ClipboardCheck, Trash2, Bot, ArrowDown, Microscope, AlertTriangle } from "lucide-react";
+import { Search, Calendar, UserPlus, Check, Settings, FileUp, ClipboardCheck, Trash2, Bot, ArrowDown, Microscope, AlertTriangle } from "lucide-react";
 import RelativeTime from "@/components/ui/relative-time";
 import type { ProjectDetailsDto, ProjectAssigneeDto } from "@/types/apiDTOs";
 import type { UserDto } from "@/types/user/user.dto";
@@ -241,27 +241,12 @@ export function ProjectCard({
     }
   }, [isDeleting, project.name, project.projectId, router]);
 
-  const formatDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
-    } catch {
-      return dateString;
-    }
-  };
-
-  // getRelativeTime removed; use <RelativeTime /> instead
-
-  const totalReports = Math.max(project.numberReportsTotal, 1);
-  const preprocessedCount = clamp(project.numberReportsPreProcessed ?? 0, 0, totalReports);
-  const readyForProcessingCount = clamp(project.numberReportsReadyForProcessing ?? 0, 0, totalReports);
-  const readyForReviewCount = clamp(project.numberReportsReadyForReview ?? 0, 0, totalReports);
-  const reviewCompletedCount = 0;
-
-  const progressPercent = totalReports > 0 ? Math.round((reviewCompletedCount / totalReports) * 100) : 0;
+  const totalReports = project.numberReportsTotal;
+  const preprocessedCount = project.numberReportsPreProcessed;
+  const readyForProcessingCount = project.numberReportsReadyForProcessing;
+  const readyForManualPdfSearch = project.numberReportsAutoSearchedPdf;
+  const readyForReviewCount = project.numberReportsReadyForReview;
+  const readyConfirmedCount = project.numberReportsConfirmed;
 
   const handleStartPdfUpload = useCallback(() => {
     const path = `/pdf-upload/${encodeURIComponent(project.projectId)}`;
@@ -273,42 +258,47 @@ export function ProjectCard({
     router.push(path);
   }, [project.projectId, router]);
 
-  const stageMetrics = [
-    {
-      id: "processing",
-      label: "Preprocessing",
-      icon: Settings,
-      value: preprocessedCount,
-      total: totalReports,
-      fillClass: "bg-primary/60",
-    },
-    {
-      id: "pdf",
-      label: "PDF Upload",
-      icon: FileUp,
-      value: readyForProcessingCount,
-      total: totalReports,
-      fillClass: "bg-primary",
-      onClick: handleStartPdfUpload,
-    },
-    {
-      id: "review",
-      label: "Ready for Review",
-      icon: ClipboardCheck,
-      value: readyForReviewCount,
-      total: totalReports,
-      fillClass: "bg-emerald-500/70",
-      onClick: handleStartReview,
-    },
-  ];
 
-  const processingStage = stageMetrics.find((stage) => stage.id === "processing");
-  const actionableStageMetrics = stageMetrics.filter((stage) => stage.id !== "processing");
-  const pdfStage = actionableStageMetrics.find((stage) => stage.id === "pdf");
-  const reviewStage = actionableStageMetrics.find((stage) => stage.id === "review");
-  const ProcessingStageIcon = processingStage?.icon;
+  const processingStage = {
+    label: "Preprocessing",
+    icon: Settings,
+    value: preprocessedCount,
+    total: totalReports,
+    fillClass: "bg-primary/60",
+  };
+
+  const pdfAutoSearchStage = {
+    label: "PDF Search",
+    icon: Search,
+    value: readyForManualPdfSearch,
+    total: totalReports,
+    fillClass: "bg-primary/60",
+  };
+
+  const pdfStage = {
+    label: "Upload PDFs",
+    icon: FileUp,
+    value: readyForProcessingCount,
+    total: readyForManualPdfSearch,
+    fillClass: "bg-primary",
+    onClick: handleStartPdfUpload,
+  };
+
+  const reviewStage = {
+    label: "Review results",
+    icon: ClipboardCheck,
+    value: readyConfirmedCount,
+    total: readyForReviewCount,
+    fillClass: "bg-emerald-500/70",
+    onClick: handleStartReview,
+  };
+
   const processingStagePercent = processingStage && processingStage.total > 0
     ? Math.round((processingStage.value / processingStage.total) * 100)
+    : 0;
+
+  const pdfSerchPercent = pdfAutoSearchStage && pdfAutoSearchStage .total > 0
+    ? Math.round((pdfAutoSearchStage .value / pdfAutoSearchStage .total) * 100)
     : 0;
 
   const getReviewerProgress = (userId: string) =>
@@ -421,11 +411,11 @@ export function ProjectCard({
       </div>
 
       <div className="mt-4 space-y-3">
-        {processingStage && ProcessingStageIcon && (
+        {processingStage && processingStage.icon && (
           <div className="rounded-md border border-dashed border-border/60 bg-muted/20 px-3 py-2">
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
               <div className="flex items-center gap-1 font-semibold uppercase tracking-wide">
-                <ProcessingStageIcon className="h-3.5 w-3.5" />
+                {processingStage.icon && <processingStage.icon className="h-3.5 w-3.5" />}
                 <span>{processingStage.label}</span>
               </div>
               <span className="text-sm font-semibold text-muted-foreground">
@@ -438,7 +428,22 @@ export function ProjectCard({
                 style={{ width: `${processingStagePercent}%` }}
               />
             </div>
-            
+
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground pt-4">
+              <div className="flex items-center gap-1 font-semibold uppercase tracking-wide">
+                {pdfAutoSearchStage.icon && <pdfAutoSearchStage.icon className="h-3.5 w-3.5" />}
+                <span>{pdfAutoSearchStage.label}</span>
+              </div>
+              <span className="text-sm font-semibold text-muted-foreground">
+                {pdfAutoSearchStage.value} / {pdfAutoSearchStage.total}
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+              <div
+                className={`h-full ${pdfAutoSearchStage.fillClass}`}
+                style={{ width: `${pdfSerchPercent}%` }}
+              />
+            </div>
           </div>
         )}
 
@@ -446,7 +451,7 @@ export function ProjectCard({
           <ArrowDown className="h-4 w-4" />
         </div>
 
-        {pdfStage && (
+        {pdfStage && pdfStage.icon && (
           <button
             type="button"
             className="w-full rounded-md border border-dashed border-border/60 bg-muted/20 px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted/30"
@@ -457,7 +462,7 @@ export function ProjectCard({
           >
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-foreground">
               <div className="flex items-center gap-1 font-semibold uppercase tracking-wide">
-                <FileUp className="h-3.5 w-3.5" />
+                {pdfStage.icon && <pdfStage.icon className="h-3.5 w-3.5" />}
                 <span>{pdfStage.label}</span>
               </div>
               <span className="text-sm font-semibold text-foreground">
@@ -526,7 +531,7 @@ export function ProjectCard({
           <ArrowDown className="h-4 w-4" />
         </div>
 
-        {reviewStage && (
+        {reviewStage && reviewStage.icon && (
           <button
             type="button"
             className="w-full rounded-md border border-dashed border-border/60 bg-muted/20 px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted/30"
@@ -537,7 +542,7 @@ export function ProjectCard({
           >
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-foreground">
               <div className="flex items-center gap-1 font-semibold uppercase tracking-wide">
-                <ClipboardCheck className="h-3.5 w-3.5" />
+                {reviewStage.icon && <reviewStage.icon className="h-3.5 w-3.5" />}
                 <span>{reviewStage.label}</span>
               </div>
               <span className="text-sm font-semibold text-foreground">
