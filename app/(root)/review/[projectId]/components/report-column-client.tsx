@@ -54,7 +54,7 @@ export function ReportColumnClient({ children, reports, projectId}: ReportColumn
           >
             <ReportList
               baseUrl="review"
-              useStudyBadges={false}
+              editMode={false}
               filterOptions={reportFilterOptions}
               annotations={annotations}
             />

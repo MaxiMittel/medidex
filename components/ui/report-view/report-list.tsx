@@ -6,8 +6,10 @@ import {
   Calendar,
   Users,
   Download,
+  ExternalLink,
   Flag,
-  MoreHorizontal,
+  FlagOff,
+  MoreVertical,
   Sparkles,
   Search,
   X,
@@ -19,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +34,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
@@ -41,7 +45,7 @@ import { toast } from "sonner";
 
 interface ReportListProps {
   baseUrl: string;
-  useStudyBadges: boolean;
+  editMode: boolean;
   filterOptions?: { value: string; label: string }[];
   queryParams?: Record<string, string | number | boolean | undefined>;
   annotations?: ProjectAnnotationsDto;
@@ -50,7 +54,7 @@ interface ReportListProps {
 export function ReportList({
   baseUrl,
   queryParams = { }, 
-  useStudyBadges,
+  editMode,
   filterOptions = [],
   annotations = { },
 }: ReportListProps) {
@@ -59,7 +63,9 @@ export function ReportList({
   const [flagDialogOpen, setFlagDialogOpen] = useState(false);
   const [selectedFlagReport, setSelectedFlagReport] = useState<{ id: number; title: string } | null>(null);
   const [flagDetails, setFlagDetails] = useState("");
+  const [flagVisibility, setFlagVisibility] = useState<"private" | "public">("private");
   const [isSubmittingFlag, setIsSubmittingFlag] = useState(false);
+  const [isDeletingFlagReportId, setIsDeletingFlagReportId] = useState<number | null>(null);
   const params = useParams();
   const projectId =
     typeof params.projectId === "string"
@@ -97,19 +103,74 @@ export function ReportList({
   const runningEvaluations = useGenAIEvaluationStore((state) => state.runningEvaluations);
 
   const reportsDict = useReportStore((state) => state.reports);
+  const setReportFlag = useReportStore((state) => state.setFlag);
   const reportsList = useMemo(() => Object.values(reportsDict), [reportsDict]);
 
   const filteredReports = filterReports(reportsList, annotations, searchQuery, assignmentFilter);
+
+  useEffect(() => {
+    if (!flagDialogOpen || !selectedFlagReport) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadExistingFlag = async () => {
+      try {
+        const response = await fetch(
+          `/api/meerkat/reports/${selectedFlagReport.id}/flag`,
+          { cache: "no-store" }
+        );
+
+        if (!response.ok) {
+          throw new Error("Unable to retrieve report flag.");
+        }
+
+        const payload = (await response.json()) as
+          | { message?: string; public?: boolean }
+          | null;
+
+        if (cancelled) {
+          return;
+        }
+
+        if (payload && typeof payload.message === "string") {
+          setFlagDetails(payload.message);
+          setFlagVisibility(payload.public ? "public" : "private");
+          return;
+        }
+
+        setFlagDetails("");
+        setFlagVisibility("private");
+      } catch (error) {
+        console.error("Error fetching report flag:", error);
+        if (cancelled) {
+          return;
+        }
+        setFlagDetails("");
+        setFlagVisibility("private");
+      }
+    };
+
+    void loadExistingFlag();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [flagDialogOpen, selectedFlagReport]);
 
   const handleFlagDialogChange = (open: boolean) => {
     setFlagDialogOpen(open);
     if (!open) {
       setFlagDetails("");
+      setFlagVisibility("private");
       setSelectedFlagReport(null);
     }
   };
 
   const handleOpenFlagDialog = (reportId: number, reportTitle: string) => {
+    setFlagDetails("");
+    setFlagVisibility("private");
     setSelectedFlagReport({ id: reportId, title: reportTitle });
     setFlagDialogOpen(true);
   };
@@ -127,14 +188,13 @@ export function ReportList({
     setIsSubmittingFlag(true);
     try {
       const response = await fetch(`/api/meerkat/reports/${selectedFlagReport.id}/flag`, {
-        method: "POST",
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          reportId: selectedFlagReport.id,
-          details: flagDetails.trim(),
-          reportTitle: selectedFlagReport.title,
+          message: flagDetails.trim(),
+          public: flagVisibility === "public",
         }),
       });
 
@@ -142,13 +202,69 @@ export function ReportList({
         throw new Error("Unable to submit report flag.");
       }
 
-      toast.success("Report submitted. Thanks for the feedback.");
+      setReportFlag(selectedFlagReport.id, flagDetails.trim());
+
+      toast.success("Flag saved.");
       handleFlagDialogChange(false);
     } catch (error) {
       console.error("Error submitting report flag:", error);
       toast.error("Could not submit your report. Please try again.");
     } finally {
       setIsSubmittingFlag(false);
+    }
+  };
+
+  const handleDeleteFlag = async (reportId: number) => {
+    setIsDeletingFlagReportId(reportId);
+    try {
+      const response = await fetch(`/api/meerkat/reports/${reportId}/flag`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to delete report flag.");
+      }
+
+      setReportFlag(reportId, undefined);
+      toast.success("Flag deleted.");
+
+      if (selectedFlagReport?.id === reportId) {
+        handleFlagDialogChange(false);
+      }
+    } catch (error) {
+      console.error("Error deleting report flag:", error);
+      toast.error("Could not delete your flag. Please try again.");
+    } finally {
+      setIsDeletingFlagReportId(null);
+    }
+  };
+
+  const handleDownloadReportPdf = async (
+    reportId: number,
+    reportTitle: string
+  ) => {
+    try {
+      const response = await fetch(`/api/meerkat/reports/${reportId}/pdf`, {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to download PDF");
+      }
+
+      const safeTitle = reportTitle.replace(/[\\/:*?"<>|]+/g, "-").trim();
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${reportId} - ${safeTitle || "report"}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading report PDF:", error);
+      toast.error("Could not download PDF. Please try again.");
     }
   };
 
@@ -240,6 +356,8 @@ export function ReportList({
               const isRunningEvaluation = runningEvaluations.includes(report.report.reportId);
               const reportResults = storeResults[report.report.reportId];
               const resultCount = reportResults ? Object.keys(reportResults).length : 0;
+              const flagMessage = report.flag?.trim() ?? "";
+              const hasFlag = Boolean(flagMessage);
               const params = new URLSearchParams(
                 Object.entries({ ...queryParams })
                   .filter(([_, v]) => v !== undefined)
@@ -278,7 +396,7 @@ export function ReportList({
                     <div className="p-4">
                       <div className="flex items-start justify-between gap-3 mb-2.5">
                         <h3 className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground">
-                          {useStudyBadges &&
+                          {editMode &&
                             (isRunningEvaluation ? (
                               <Spinner className="mr-1 inline h-3 w-3 text-primary" />
                             ) : resultCount > 0 ? (
@@ -288,18 +406,6 @@ export function ReportList({
                         </h3>
                         {isSelected && (
                           <div className="inline-flex items-center gap-1">
-                            {report.hasPdf && (
-                              <a
-                                href={pdfUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label={`Open PDF for ${report.report.title}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60"
-                              >
-                                <Download className="h-4 w-4" />
-                              </a>
-                            )}
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
@@ -310,22 +416,60 @@ export function ReportList({
                                   aria-label={`More actions for ${report.report.title}`}
                                   onClick={(e) => e.stopPropagation()}
                                 >
-                                  <MoreHorizontal className="h-4 w-4" />
+                                  <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent
                                 align="end"
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                <DropdownMenuItem
-                                  onSelect={(e) => {
-                                    e.preventDefault();
-                                    handleOpenFlagDialog(report.report.reportId, report.report.title);
-                                  }}
-                                >
-                                  <Flag className="h-4 w-4" />
-                                  Flag report
-                                </DropdownMenuItem>
+                                {report.hasPdf && (
+                                  <>
+                                    <DropdownMenuItem
+                                      onSelect={() => {
+                                        window.open(pdfUrl, "_blank", "noopener,noreferrer");
+                                      }}
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                      Open PDF
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onSelect={() => {
+                                        void handleDownloadReportPdf(
+                                          report.report.reportId,
+                                          report.report.title
+                                        );
+                                      }}
+                                    >
+                                      <Download className="h-4 w-4" />
+                                      Download PDF
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                                {editMode && hasFlag && report.hasPdf && <DropdownMenuSeparator />}
+                                {editMode && (
+                                  <DropdownMenuItem
+                                    onSelect={() => {
+                                      handleOpenFlagDialog(report.report.reportId, report.report.title);
+                                    }}
+                                  >
+                                    <Flag className="h-4 w-4" />
+                                    {hasFlag ? "Edit flag" : "Flag report"}
+                                  </DropdownMenuItem>
+                                )}
+                                {editMode && hasFlag && (
+                                  <DropdownMenuItem
+                                    disabled={isDeletingFlagReportId === report.report.reportId}
+                                    onSelect={() => {
+                                      void handleDeleteFlag(report.report.reportId);
+                                    }}
+                                  >
+                                    <FlagOff className="h-4 w-4" />
+                                    {isDeletingFlagReportId === report.report.reportId
+                                      ? "Deleting flag..."
+                                      : "Delete flag"}
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
@@ -353,7 +497,7 @@ export function ReportList({
                           {report.report.abstract}
                         </p>
                       )}
-                      {useStudyBadges && (
+                      {editMode && (
                         <ReportAssignedStudiesBadges report={report} />
                       )}
                     </div>
@@ -365,6 +509,13 @@ export function ReportList({
                         </p>
                       </div>
                     )}
+
+                    {editMode && hasFlag && (
+                      <div className="px-4 py-2 border-t bg-muted/20 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Flag className="h-3.5 w-3.5 text-primary" />
+                        <span className="line-clamp-2">{flagMessage}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -373,7 +524,8 @@ export function ReportList({
         </div>
       </ScrollArea>
 
-      <Dialog open={flagDialogOpen} onOpenChange={handleFlagDialogChange}>
+      {editMode && (
+        <Dialog open={flagDialogOpen} onOpenChange={handleFlagDialogChange}>
         <DialogContent
           className="sm:max-w-[560px]"
           onClick={(e) => e.stopPropagation()}
@@ -404,6 +556,41 @@ export function ReportList({
                   className="h-28 min-h-28 resize-none"
                 />
               </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Visibility</p>
+                <RadioGroup
+                  value={flagVisibility}
+                  onValueChange={(value) => setFlagVisibility(value as "private" | "public")}
+                  className="gap-2"
+                >
+                  <label
+                    htmlFor="flag-visibility-private"
+                    className="flex items-start gap-2 rounded-md border p-3 cursor-pointer"
+                  >
+                    <RadioGroupItem id="flag-visibility-private" value="private" />
+                    <span className="text-sm leading-tight">
+                      <span className="font-medium">Private</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Visible to you only.
+                      </span>
+                    </span>
+                  </label>
+
+                  <label
+                    htmlFor="flag-visibility-public"
+                    className="flex items-start gap-2 rounded-md border p-3 cursor-pointer"
+                  >
+                    <RadioGroupItem id="flag-visibility-public" value="public" />
+                    <span className="text-sm leading-tight">
+                      <span className="font-medium">Public</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Visible to you and the project owner.
+                      </span>
+                    </span>
+                  </label>
+                </RadioGroup>
+              </div>
             </div>
           )}
 
@@ -421,11 +608,12 @@ export function ReportList({
               onClick={handleSubmitFlag}
               disabled={isSubmittingFlag}
             >
-              {isSubmittingFlag ? "Submitting..." : "Submit report"}
+              {isSubmittingFlag ? "Submitting..." : "Submit"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      )}
     </div>
   );
 }

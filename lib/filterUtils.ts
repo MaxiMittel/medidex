@@ -1,6 +1,6 @@
 import { AnnotationDto, ProjectAnnotationsDto, ReportDetailDto } from "@/types/apiDTOs";
 
-export type ReportFilterType = "all" | "assigned" | "unassigned" | "newStudy" | "withPdf" | "withoutPdf" | "annotatorConsensus" | "annotatorConflict" | "annotationsReview" | "annotationsNoReview";
+export type ReportFilterType = "all" | "assigned" | "unassigned" | "newStudy" | "withPdf" | "withoutPdf" | "flagged" | "annotatorConsensus" | "annotatorConflict" | "annotationsReview" | "annotationsNoReview";
 
 const toTimestamp = (value: Date | string | number | null | undefined): number | null => {
   if (value === null || value === undefined) {
@@ -83,6 +83,9 @@ export function filterReports(
     }
     if (assignmentFilter === "withoutPdf") {
       return (report.hasPdf ?? false) == false;
+    }
+    if (assignmentFilter === "flagged") {
+      return Boolean(report.flag?.trim());
     }
     if (assignmentFilter === "newStudy") {
       return report.assignedStudies.some((study: StudyDto) =>

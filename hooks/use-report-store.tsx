@@ -51,6 +51,7 @@ type ReportState = {
     syncAssignedStudy: (reportId: number, study: StudyDto) => void
     removeAssignedStudy: (reportId: number, studyId: number) => Promise<void>
     setHasPdf: (reportId: number, hasPdf : boolean) => void;
+    setFlag: (reportId: number, flag: string | undefined) => void;
 }
 
 export const useReportStore = create<ReportState>((set, get) => ({
@@ -153,6 +154,24 @@ export const useReportStore = create<ReportState>((set, get) => ({
                     [reportId]: {
                         ...updatedReport,
                         hasPdf,
+                    },
+                },
+            };
+        });
+    },
+
+    setFlag(reportId, flag) {
+        set((state) => {
+            const updatedReport = state.reports[reportId];
+            if (!updatedReport) {
+                return state;
+            }
+            return {
+                reports: {
+                    ...state.reports,
+                    [reportId]: {
+                        ...updatedReport,
+                        flag,
                     },
                 },
             };

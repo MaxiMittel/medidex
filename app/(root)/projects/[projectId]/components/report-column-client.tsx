@@ -16,6 +16,7 @@ const reportFilterOptions = [
   { value: "assigned", label: "Assigned" },
   { value: "unassigned", label: "Unassigned" },
   { value: "newStudy", label: "New" },
+  { value: "flagged", label: "Flagged" },
 ];
 
 interface ReportColumnClientProps {
@@ -52,7 +53,7 @@ export function ReportColumnClient({ children, reports, projectId }: ReportColum
           <ReportList
             baseUrl="projects"
             queryParams={{ k: 10 }}
-            useStudyBadges={true}
+            editMode={true}
             filterOptions={reportFilterOptions}
           />
         </ResizablePanel>

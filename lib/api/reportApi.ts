@@ -3,6 +3,16 @@ import { AxiosRequestConfig } from "axios";
 import { ReportChatDto, ReportSourcesDto, SimilarTagDto, SimilarStudyDto, GetSimilarStudiesParams, GetSimilarTagsParams, StudyDto} from "../../types/apiDTOs";
 import { serializeParams } from "./helpers";    
 
+export interface ReportFlagDto {
+  message: string;
+  public: boolean;
+}
+
+export interface ReportFlagUpsertPayload {
+  message: string;
+  public: boolean;
+}
+
 export const getSimilarStudiesByReportId = (
   reportId: number,
   params: GetSimilarStudiesParams = {},
@@ -270,6 +280,49 @@ export const deleteReportChat = (
     .then(() => {})
     .catch((error) => {
       console.error(`Error deleting chat for report ${reportId}:`, error.message || error);
+      throw error;
+    });
+}
+
+export const getReportFlagByReportId = (
+  reportId: number,
+  config?: AxiosRequestConfig
+): Promise<ReportFlagDto | null> => {
+  const path = `/reports/${reportId}/flag`;
+  return apiClient
+    .get<ReportFlagDto | null>(path, config)
+    .then((response) => response.data)
+    .catch((error) => {
+      console.error(`Error fetching flag for report ${reportId}:`, error.message || error);
+      throw error;
+    });
+}
+
+export const upsertReportFlagByReportId = (
+  reportId: number,
+  payload: ReportFlagUpsertPayload,
+  config?: AxiosRequestConfig
+): Promise<ReportFlagDto> => {
+  const path = `/reports/${reportId}/flag`;
+  return apiClient
+    .put<ReportFlagDto>(path, payload, config)
+    .then((response) => response.data)
+    .catch((error) => {
+      console.error(`Error upserting flag for report ${reportId}:`, error.message || error);
+      throw error;
+    });
+}
+
+export const deleteReportFlagByReportId = (
+  reportId: number,
+  config?: AxiosRequestConfig
+): Promise<void> => {
+  const path = `/reports/${reportId}/flag`;
+  return apiClient
+    .delete<void>(path, config)
+    .then(() => {})
+    .catch((error) => {
+      console.error(`Error deleting flag for report ${reportId}:`, error.message || error);
       throw error;
     });
 }

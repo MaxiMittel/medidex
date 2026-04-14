@@ -211,13 +211,23 @@ export default function ReviewDetailsPage() {
       return;
     }
 
+    const missingStudyIds = studyIdsToLoad.filter((studyId) => !studyById[studyId]);
+    if (missingStudyIds.length === 0) {
+      return;
+    }
+
     let isMounted = true;
-    const nextLoading = new Set(studyIdsToLoad);
-    setLoadingStudyIds(nextLoading);
+    setLoadingStudyIds((prev) => {
+      const next = new Set(prev);
+      for (const studyId of missingStudyIds) {
+        next.add(studyId);
+      }
+      return next;
+    });
 
     const loadStudies = async () => {
       const entries = await Promise.all(
-        studyIdsToLoad.map(async (studyId) => {
+        missingStudyIds.map(async (studyId) => {
           try {
             const response = await fetch(`/api/meerkat/studies/${studyId}`, {
               cache: "no-store",
@@ -238,24 +248,30 @@ export default function ReviewDetailsPage() {
 
       if (!isMounted) return;
 
-      const nextStudyById: Record<number, StudyDto> = {};
-      for (const entry of entries) {
-        if (!entry) continue;
-        const [studyId, study] = entry;
-        nextStudyById[studyId] = study;
-      }
-
-      setStudyById(nextStudyById);
-      setLoadingStudyIds(new Set());
+      setStudyById((prev) => {
+        const next = { ...prev };
+        for (const entry of entries) {
+          if (!entry) continue;
+          const [studyId, study] = entry;
+          next[studyId] = study;
+        }
+        return next;
+      });
+      setLoadingStudyIds((prev) => {
+        const next = new Set(prev);
+        for (const studyId of missingStudyIds) {
+          next.delete(studyId);
+        }
+        return next;
+      });
     };
 
     void loadStudies();
 
     return () => {
       isMounted = false;
-      setLoadingStudyIds(nextLoading);
     };
-  }, [studyIdsToLoad]);
+  }, [studyById, studyIdsToLoad]);
 
   const finalDecisionStudies = useMemo<FinalDecisionStudyItem[]>(() => {
     const totalAnnotators = groupedByUser.length;
@@ -290,36 +306,25 @@ export default function ReviewDetailsPage() {
     const wasSelected = selectedFinalStudyIds.has(studyId);
     const shouldConfirm = !wasSelected;
 
-    // Optimistic UI update, then roll back if the backend toggle fails.
-    setSelectedFinalStudyIds((prev) => {
-      const next = new Set(prev);
-      if (shouldConfirm) {
-        next.add(studyId);
-      } else {
-        next.delete(studyId);
-      }
-      return next;
-    });
     setSyncingFinalStudyIds((prev) => {
       const next = new Set(prev);
       next.add(studyId);
       return next;
     });
-    updateConfirmedForReportStudy(reportIdParam, studyId, shouldConfirm);
 
     try {
       await toggleStudyConfirmation(reportIdParam, studyId, shouldConfirm);
-    } catch (error) {
       setSelectedFinalStudyIds((prev) => {
         const next = new Set(prev);
-        if (wasSelected) {
+        if (shouldConfirm) {
           next.add(studyId);
         } else {
           next.delete(studyId);
         }
         return next;
       });
-      updateConfirmedForReportStudy(reportIdParam, studyId, wasSelected);
+      updateConfirmedForReportStudy(reportIdParam, studyId, shouldConfirm);
+    } catch (error) {
       console.error("Failed to sync study confirmation state:", error);
     } finally {
       setSyncingFinalStudyIds((prev) => {
@@ -393,18 +398,21 @@ export default function ReviewDetailsPage() {
               {studyIdsToLoad.slice(0, 4).map((studyId) => (
                 <div
                   key={`loading-study-${studyId}`}
-                  className="h-32 rounded-lg border border-border bg-card p-4"
+                  className="rounded-lg border border-border bg-card p-4"
                 >
-                  <div className="flex h-full flex-col justify-between">
-                    <div className="space-y-3">
-                      <Skeleton className="h-5 w-48" />
-                      <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                  <div className="flex min-h-[132px] flex-col gap-3">
+                    <div className="flex items-start gap-3">
+                      <Skeleton className="h-6 flex-1" />
+                      <Skeleton className="h-6 w-6 shrink-0" />
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                         <Skeleton className="h-4 w-28" />
                         <Skeleton className="h-4 w-24" />
                         <Skeleton className="h-4 w-56" />
-                      </div>
                     </div>
-                    <Skeleton className="h-4 w-64" />
+                    <div className="mt-auto border-t border-border/60 pt-2">
+                      <Skeleton className="h-4 w-64" />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -453,11 +461,17 @@ export default function ReviewDetailsPage() {
                     className={`p-4 bg-card rounded-lg relative w-full max-w-full overflow-hidden transition-all duration-200 border flex items-center gap-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isSyncing ? "cursor-wait opacity-70" : "cursor-pointer"} ${rowClass}`}
                   >
                     {isLoading ? (
-                      <div className="flex flex-col gap-3 flex-1 min-w-0">
-                        <Skeleton className="h-5 w-48" />
+                      <div className="flex min-h-[132px] flex-1 min-w-0 flex-col gap-3">
+                        <div className="flex items-start gap-3">
+                          <Skeleton className="h-6 flex-1" />
+                          <Skeleton className="h-6 w-6 shrink-0" />
+                        </div>
                         <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                           <Skeleton className="h-4 w-28" />
                           <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-4 w-64" />
+                        </div>
+                        <div className="mt-auto border-t border-border/60 pt-2">
                           <Skeleton className="h-4 w-64" />
                         </div>
                       </div>

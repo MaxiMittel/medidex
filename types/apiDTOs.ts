@@ -41,6 +41,7 @@ export interface ProjectTaskDto {
 export interface ReportDetailDto {
   report: ReportDto;
   hasPdf: boolean | undefined;
+  flag: string | undefined;
   assignedStudies: StudyDto[];
 }
 

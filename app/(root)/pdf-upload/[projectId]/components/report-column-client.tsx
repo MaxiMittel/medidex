@@ -47,7 +47,7 @@ export function ReportColumnClient({ children, reports, projectId }: ReportColum
         >
           <ReportList
             baseUrl="pdf-upload"
-            useStudyBadges={false}
+            editMode={false}
             filterOptions={reportFilterOptions}
           />
         </ResizablePanel>
