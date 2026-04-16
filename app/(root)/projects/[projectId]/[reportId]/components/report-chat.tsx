@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LoaderCircle, RefreshCw, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ReportChatButtons } from "./ai-actions";
+// import { ReportChatButtons } from "./ai-actions";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -278,9 +278,11 @@ function resolveToolDisplayName(message: ChatMessage, toolCallLookup: ToolCallLo
 
 interface ReportChatProps {
   reportId: number;
+  open: boolean;
+  setOpen: (open: boolean) => void;
 }
 
-export default function ReportChat({ reportId }: ReportChatProps) {
+export default function ReportChat({ reportId, open, setOpen}: ReportChatProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -459,8 +461,15 @@ export default function ReportChat({ reportId }: ReportChatProps) {
   // Fetch chat when dialog is opened for the first time
   const hasFetchedRef = useRef(false);
 
-  // open prop will come from ReportChatButtons children
-  // so we don't need local open state
+  useEffect(() => {
+    if (open && !hasFetchedRef.current) {
+      fetchChat();
+      hasFetchedRef.current = true;
+    }
+    if (!open) {
+      hasFetchedRef.current = false;
+    }
+  }, [open, fetchChat]);
 
   const toggleToolMessage = useCallback((messageKey: string) => {
     setExpandedToolMessages((current) => ({
@@ -484,22 +493,8 @@ export default function ReportChat({ reportId }: ReportChatProps) {
   }, [isLoading, isSending, open, pendingUserMessage, visibleMessages.length]);
 
   return (
-    <ReportChatButtons>
-      {({ open, setOpen }) => {
-        // Fetch chat when dialog is opened for the first time
-        useEffect(() => {
-          if (open && payload === null && !isLoading && !hasFetchedRef.current) {
-            void fetchChat();
-            hasFetchedRef.current = true;
-          }
-          if (!open) {
-            hasFetchedRef.current = false;
-          }
-        }, [open, payload, isLoading, fetchChat]);
-
-        return (
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogContent className="h-[85vh] max-h-[85vh] overflow-hidden sm:max-w-4xl p-0 flex flex-col">
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="h-[85vh] max-h-[85vh] overflow-hidden sm:max-w-4xl p-0 flex flex-col">
             <DialogHeader className="border-b px-6 pt-6 pb-4 shrink-0">
               <div className="flex items-center justify-start gap-3">
                 <DialogTitle>Ask MediBot about the current report</DialogTitle>
@@ -668,9 +663,6 @@ export default function ReportChat({ reportId }: ReportChatProps) {
               </div>
             </div>
           </DialogContent>
-          </Dialog>
+        </Dialog>
       );
-    }}
-  </ReportChatButtons>
- );
-}
+    }

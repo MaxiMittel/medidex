@@ -99,7 +99,6 @@ export function AIMatchSettingsDialog({
         try {
             const runningCount = getRunningEvaluationsCount();
             toast.info(`Evaluating ${studies.length} studies with AI (${runningCount + 1}/4 running)...`);
-            //setHasEvaluated(true);
             evaluateStream(
                 currentReport.report,
                 studies.map((study: any) => study.study),

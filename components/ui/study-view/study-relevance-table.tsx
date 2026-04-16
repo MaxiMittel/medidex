@@ -29,8 +29,7 @@ import { AddStudyDialog } from "./add-study-dialog";
 import { AIMatchSettingsDialog } from "./ai-match-settings-dialog";
 import { LoadMoreStudiesButton } from "./load-more-studies-button";
 import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
-import type { AIModel } from "@/hooks/use-genai-evaluation-store";
-import type { NewStudySuggestion, PromptOverrides, StudyDto, StudyCreateDto } from "@/types/apiDTOs";
+import type { NewStudySuggestion, StudyDto, StudyCreateDto } from "@/types/apiDTOs";
 import { StudyAIBadge } from "./study-ai-badge";
 import { StudyAIReasonDialog } from "./study-ai-reason-dialog";
 import { AiEvaluationProgress } from "./ai-evaluation-progress";
@@ -60,7 +59,6 @@ export function StudyRelevanceTable({
   const [resolvedStudies, setResolvedStudies] = useState<RelevanceStudy[]>(() => [...studies]);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const getReport = useReportStore((state) => state.getReport);
   const addAssignedStudies = useReportStore((state) => state.addAssignedStudy);
   const syncAssignedStudy = useReportStore((state) => state.syncAssignedStudy);
   const removeAssignedStudies = useReportStore((state) => state.removeAssignedStudy);
@@ -73,8 +71,6 @@ export function StudyRelevanceTable({
   const results = useGenAIEvaluationStore((state) => state.results);
   const evaluationsByReport = useGenAIEvaluationStore((state) => state.evaluationsByReport);
   const runningEvaluations = useGenAIEvaluationStore((state) => state.runningEvaluations);
-  //const evaluateStream = useGenAIEvaluationStore((state) => state.evaluateStream);
-  //const getRunningEvaluationsCount = useGenAIEvaluationStore((state) => state.getRunningEvaluationsCount);
   const getStudyResult = useGenAIEvaluationStore((state) => state.getStudyResult);
   const dismissSuggestion = useGenAIEvaluationStore((state) => state.dismissSuggestion);
 
@@ -327,27 +323,11 @@ export function StudyRelevanceTable({
             </Badge>
           </div>
           <div className="flex items-center gap-2">
-                <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 gap-2"
-                    onClick={() => setAiDialogOpen(true)}
-                    disabled={isRunning || filteredStudies.length === 0}
-                  >
-                    {isRunning ? (
-                      <Spinner className="h-4 w-4" />
-                    ) : (
-                      <Sparkles className="h-4 w-4" />
-                    )}
-                    AI Match
-                  </Button>
-                  <AddStudyDialog
-                    currentReportId={reportId}
-                    suggestedValues={newStudySuggestion}
-                    onSaveStudy={handleSaveNewStudy}
-                  />
-                </>
+              <AddStudyDialog
+                currentReportId={reportId}
+                suggestedValues={newStudySuggestion}
+                onSaveStudy={handleSaveNewStudy}
+              />
           </div>
         </div>
 

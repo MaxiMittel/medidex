@@ -1,19 +1,36 @@
+"use client"
+
 import { Bot, MessageSquareText, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { ReactNode, useState } from "react";
+import { useState } from "react";
+import ReportChat from "./report-chat";
+import { AIMatchSettingsDialog } from "@/components/ui/study-view/ai-match-settings-dialog";
+import { RelevanceStudy } from "@/types/reports";
+import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
+import { Spinner } from "@/components/ui/spinner";
 
 interface ReportChatButtonsProps {
-  children: (dialogProps: { open: boolean; setOpen: (open: boolean) => void }) => ReactNode;
+  reportId: number;
+  studies: RelevanceStudy[];
 }
 
-export function ReportChatButtons({ children }: ReportChatButtonsProps) {
+export function ReportChatButtons({ reportId, studies }: ReportChatButtonsProps) {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [autoMatchOpen, setAutoMatchOpen] = useState(false);
+
+  const runningEvaluations = useGenAIEvaluationStore((state) => state.runningEvaluations);
+  const isRunning = reportId ? runningEvaluations.includes(reportId) : false;
 
   const handleChatClick = () => {
     setPopoverOpen(false);
     setChatOpen(true);
+  };
+
+  const handleAutoMatchClick = () => {
+    setPopoverOpen(false);
+    setAutoMatchOpen(true);
   };
 
   return (
@@ -38,9 +55,14 @@ export function ReportChatButtons({ children }: ReportChatButtonsProps) {
           <Button
             type="button"
             className="h-10 rounded-full w-full justify-start mb-2"
-            // No click handler yet
+            onClick={handleAutoMatchClick}
+            disabled={isRunning || studies.length === 0}
           >
-            <Sparkles className="h-4 w-4" />
+            {isRunning ? (
+                <Spinner className="h-4 w-4" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
             Auto Match
           </Button>
           <Button
@@ -53,7 +75,13 @@ export function ReportChatButtons({ children }: ReportChatButtonsProps) {
           </Button>
         </PopoverContent>
       </Popover>
-      {children({ open: chatOpen, setOpen: setChatOpen })}
+      <ReportChat reportId={reportId} open={chatOpen} setOpen={setChatOpen}/>
+      <AIMatchSettingsDialog
+              open={autoMatchOpen}
+              onOpenChange={setAutoMatchOpen}
+              reportId={reportId}
+              studies={studies}
+            />
     </>
   );
 }
