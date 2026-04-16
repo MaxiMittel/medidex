@@ -33,22 +33,22 @@ const categoryConfig = {
   interventions: {
     icon: Syringe,
     label: "Interventions",
-    accentClass: "text-blue-600 dark:text-blue-400",
-    bgClass: "bg-blue-50 dark:bg-blue-950/30",
+    accentClass: "text-emerald-600 dark:text-emerald-400",
+    bgClass: "bg-emerald-50 dark:bg-emerald-950/30",
     borderClass: "border-l-blue-500",
   },
   conditions: {
     icon: Stethoscope,
     label: "Conditions",
-    accentClass: "text-rose-600 dark:text-rose-400",
-    bgClass: "bg-rose-50 dark:bg-rose-950/30",
+    accentClass: "text-blue-600 dark:text-blue-400",
+    bgClass: "bg-blue-50 dark:bg-blue-950/30",
     borderClass: "border-l-rose-500",
   },
   outcomes: {
     icon: Target,
     label: "Outcomes",
-    accentClass: "text-emerald-600 dark:text-emerald-400",
-    bgClass: "bg-emerald-50 dark:bg-emerald-950/30",
+    accentClass: "text-rose-600 dark:text-rose-400",
+    bgClass: "bg-rose-50 dark:bg-rose-950/30",
     borderClass: "border-l-emerald-500",
   },
   design: {

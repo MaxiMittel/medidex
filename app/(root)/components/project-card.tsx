@@ -243,6 +243,7 @@ export function ProjectCard({
 
   const totalReports = project.numberReportsTotal;
   const preprocessedCount = project.numberReportsPreProcessed;
+  const hasPdfCount = project.numberReportsWithPdf
   const readyForProcessingCount = project.numberReportsReadyForProcessing;
   const readyForManualPdfSearch = project.numberReportsAutoSearchedPdf;
   const readyForReviewCount = project.numberReportsReadyForReview;
@@ -276,9 +277,9 @@ export function ProjectCard({
   };
 
   const pdfStage = {
-    label: "Upload PDFs",
+    label: "Upload Missing PDFs",
     icon: FileUp,
-    value: readyForProcessingCount,
+    value: hasPdfCount,
     total: readyForManualPdfSearch,
     fillClass: "bg-primary",
     onClick: handleStartPdfUpload,

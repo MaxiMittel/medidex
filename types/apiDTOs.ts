@@ -29,6 +29,7 @@ export interface ProjectDto {
 export interface ProjectDetailsDto extends ProjectDto{
   numberReportsTotal: number;
   numberReportsPreProcessed: number;
+  numberReportsWithPdf: number;
   numberReportsAutoSearchedPdf: number,
   numberReportsReadyForReview: number;
   numberReportsConfirmed: number;
