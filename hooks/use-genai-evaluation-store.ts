@@ -2,7 +2,8 @@
 
 import { create } from "zustand";
 // import { evaluateStudiesStream } from "@/lib/api/genaiStreamApi";
-import type { PromptOverrides, ReportDto, StreamEvent, StudyDto } from "@/types/apiDTOs";
+import type { PromptOverrides, ReportDto, StreamEvent, StudyDto} from "@/types/apiDTOs";
+export type { PromptOverrides, DefaultPrompts } from "@/types/apiDTOs";
 
 export type AIClassification = "match" | "likely_match" | "unsure" | "not_match" | "very_likely";
 export type AIModel = "gpt-5.2" | "gpt-5" | "gpt-5-mini" | "gpt-4.1";

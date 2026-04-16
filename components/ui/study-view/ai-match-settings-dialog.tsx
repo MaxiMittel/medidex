@@ -34,17 +34,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { CircleHelp } from "lucide-react";
-//import { fetchDefaultPrompts } from "@/lib/api/genaiApi";
-//import type { AIModel } from "@/hooks/use-genai-evaluation-store";
-//import type { DefaultPrompts, PromptOverrides } from "@/types/apiDTOs";
-
-//import { AIMatchSettingsDialog } from "./ai-match-settings-dialog";
 import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
 import { useReportStore } from "@/hooks/use-report-store";
 import { toast } from "sonner";
 import type { AIModel, PromptOverrides, DefaultPrompts } from "@/hooks/use-genai-evaluation-store";
-//import { useState } from "react";
-import { StudyDto } from "@/types/apiDTOs";
 import { RelevanceStudy } from "@/types/reports";
 
 const MODEL_OPTIONS: AIModel[] = ["gpt-5.2", "gpt-5", "gpt-5-mini", "gpt-4.1"];
@@ -72,7 +65,6 @@ export function AIMatchSettingsDialog({
   reportId,
   studies,
 }: AIMatchSettingsDialogProps) {
-    //const [hasEvaluated, setHasEvaluated] = useState(false);
     const getReport = useReportStore((state) => state.getReport);
     const evaluateStream = useGenAIEvaluationStore((state) => state.evaluateStream);
     const canStartEvaluation = useGenAIEvaluationStore((state) => state.canStartEvaluation);
@@ -182,14 +174,6 @@ export function AIMatchSettingsDialog({
     };
 
   return (
-    //<AIMatchSettingsDialog
-    //  open={open}
-    //  onOpenChange={onOpenChange}
-    //  onEvaluate={handleAIEvaluation}
-    //  isRunning={isRunning}
-    //  disableRun={studies.length === 0 || !canStartEvaluation()}
-    //  runningCount={getRunningEvaluationsCount()}
-    ///>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[720px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
