@@ -73,9 +73,8 @@ export function StudyRelevanceTable({
   const results = useGenAIEvaluationStore((state) => state.results);
   const evaluationsByReport = useGenAIEvaluationStore((state) => state.evaluationsByReport);
   const runningEvaluations = useGenAIEvaluationStore((state) => state.runningEvaluations);
-  const evaluateStream = useGenAIEvaluationStore((state) => state.evaluateStream);
-  const canStartEvaluation = useGenAIEvaluationStore((state) => state.canStartEvaluation);
-  const getRunningEvaluationsCount = useGenAIEvaluationStore((state) => state.getRunningEvaluationsCount);
+  //const evaluateStream = useGenAIEvaluationStore((state) => state.evaluateStream);
+  //const getRunningEvaluationsCount = useGenAIEvaluationStore((state) => state.getRunningEvaluationsCount);
   const getStudyResult = useGenAIEvaluationStore((state) => state.getStudyResult);
   const dismissSuggestion = useGenAIEvaluationStore((state) => state.dismissSuggestion);
 
@@ -83,16 +82,17 @@ export function StudyRelevanceTable({
   const isRunning = reportId ? runningEvaluations.includes(reportId) : false;
   const studyResults = reportId ? results[reportId] : undefined;
 
-  const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [reasonDialogOpen, setReasonDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedAIStudy, setSelectedAIStudy] = useState<{
     studyId: number;
     studyName: string;
   } | null>(null);
-  const [hasEvaluated, setHasEvaluated] = useState(false);
+  // Extracted AI dialog state and methods
+
   //const wasAddStudyDialogOpen = useRef(false);
   const [progressCollapsedByReport, setProgressCollapsedByReport] = useState<Record<string, boolean>>({});
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
 
   const summaryEvent = useMemo(
     () =>
@@ -115,7 +115,6 @@ export function StudyRelevanceTable({
   const newStudySuggestion: NewStudySuggestion | undefined =
     suggestionEvent?.details?.new_study ? suggestionEvent.details.new_study : undefined;
 
-  
 
   const suggestionKey = newStudySuggestion
     ? `${reportId}:${JSON.stringify(newStudySuggestion)}`
@@ -240,9 +239,9 @@ export function StudyRelevanceTable({
   }, [studies, currentReport?.assignedStudies]);
 
   // Reset evaluation state when report changes
-  useEffect(() => {
-    setAiDialogOpen(false);
-  }, []);
+  //useEffect(() => {
+  //  closeAIDialog();
+  //}, []);
 
   // Filter and sort studies
   const filteredStudies = useMemo(() => {
@@ -264,45 +263,6 @@ export function StudyRelevanceTable({
     });
   }, [resolvedStudies, searchQuery]);
 
-  
-  const handleAIEvaluation = async (options: {
-    model?: AIModel;
-    includePdf?: boolean;
-    promptOverrides?: PromptOverrides;
-  }) => {
-    if (reportId === undefined) {
-      toast.error("Missing report id");
-      return false;
-    }
-
-    const currentReport = getReport(reportId);
-    if (!currentReport) {
-      toast.error("Report not found");
-      return false;
-    }
-
-    try {
-      const runningCount = getRunningEvaluationsCount();
-      toast.info(`Evaluating ${filteredStudies.length} studies with AI (${runningCount + 1}/4 running)...`);
-      setHasEvaluated(true);
-      evaluateStream(
-        currentReport.report,
-        filteredStudies.map((study) => study.study),
-        options,
-        () => {
-          toast.success("AI evaluation complete!");
-        }
-      );
-
-      return true;
-    } catch (error) {
-      toast.error(
-        `AI evaluation failed: ${error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-      return false;
-    }
-  };
 
   const handleAIBadgeClick = (studyId: number, studyName: string) => {
     setSelectedAIStudy({ studyId, studyName });
@@ -345,13 +305,12 @@ export function StudyRelevanceTable({
 
   return (
     <div className="h-full flex flex-col pt-5">
+
       <AIMatchSettingsDialog
         open={aiDialogOpen}
         onOpenChange={setAiDialogOpen}
-        onEvaluate={handleAIEvaluation}
-        isRunning={isRunning}
-        disableRun={filteredStudies.length === 0 || !canStartEvaluation()}
-        runningCount={getRunningEvaluationsCount()}
+        reportId={reportId}
+        studies={filteredStudies}
       />
 
       {/* Header - Sticky */}
@@ -383,16 +342,6 @@ export function StudyRelevanceTable({
                     )}
                     AI Match
                   </Button>
-                  {hasEvaluated && evalState?.streamMessages && evalState.streamMessages.length > 0 && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 gap-2"
-                      onClick={() => setHistoryDialogOpen(true)}
-                    >
-                      Show Step History
-                    </Button>
-                  )}
                   <AddStudyDialog
                     currentReportId={reportId}
                     suggestedValues={newStudySuggestion}
@@ -439,6 +388,9 @@ export function StudyRelevanceTable({
               if (reportId !== undefined) {
                 setProgressCollapsedByReport(prev => ({ ...prev, [String(reportId)]: collapsed }));
               }
+            }}
+            onShowStepHistory={() => {
+              setHistoryDialogOpen(true)
             }}
           />
       ) : null}

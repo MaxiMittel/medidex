@@ -1,15 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LoaderCircle, MessageSquareText, RefreshCw, Send, Trash2 } from "lucide-react";
+import { LoaderCircle, RefreshCw, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ReportChatButtons } from "./ai-actions";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 
 type ChatMessage = {
@@ -203,17 +203,6 @@ function resolveToolDisplayName(message: ChatMessage, toolCallLookup: ToolCallLo
     return `Loading fulltext for report ${String(reportId)}`;
   }
 
-  if (effectiveToolName === "fetch_study_reports") {
-    const studyId =
-      (linkedArgs && getNestedValue(linkedArgs, ["study_id"])) ??
-      (parsedContent &&
-        (getNestedValue(parsedContent, ["study_id"]) ??
-          getNestedValue(parsedContent, ["args", "study_id"]) ??
-          getNestedValue(parsedContent, ["input", "study_id"])));
-
-    return `Reading report titles already linked to study ${String(studyId)}`;
-  }
-
   if (effectiveToolName === "fetch_report_abstract") {
     const reportId =
       (linkedArgs && getNestedValue(linkedArgs, ["report_id"])) ??
@@ -225,7 +214,7 @@ function resolveToolDisplayName(message: ChatMessage, toolCallLookup: ToolCallLo
     return `Reading abstract for report ${String(reportId)}`;
   }
 
-  if (effectiveToolName === "fetch_study_interventions") {
+  if (effectiveToolName === "fetch_reports_linked_to_study") {
     const studyId =
       (linkedArgs && getNestedValue(linkedArgs, ["study_id"])) ??
       (parsedContent &&
@@ -233,14 +222,28 @@ function resolveToolDisplayName(message: ChatMessage, toolCallLookup: ToolCallLo
           getNestedValue(parsedContent, ["args", "study_id"]) ??
           getNestedValue(parsedContent, ["input", "study_id"])));
 
-    if (studyId === null || typeof studyId === "undefined" || studyId === "") {
-      return "Reading interventions associated with study";
-    }
-
-    return `Reading interventions associated with study ${String(studyId)}`;
+    return `Reading report titles already linked to study ${String(studyId)}`;
   }
 
-  if (effectiveToolName === "fetch_study_persons") {
+  if (effectiveToolName === "fetch_tags_associated_with_study") {
+    const studyId =
+      (linkedArgs && getNestedValue(linkedArgs, ["study_id"])) ??
+      (parsedContent &&
+        (getNestedValue(parsedContent, ["study_id"]) ??
+          getNestedValue(parsedContent, ["args", "study_id"]) ??
+          getNestedValue(parsedContent, ["input", "study_id"])));
+
+    const tagCategory =
+      (linkedArgs && getNestedValue(linkedArgs, ["tag_category"])) ??
+      (parsedContent &&
+        (getNestedValue(parsedContent, ["tag_category"]) ??
+          getNestedValue(parsedContent, ["args", "tag_category"]) ??
+          getNestedValue(parsedContent, ["input", "tag_category"])));
+
+    return `Reading ${String(tagCategory)} associated with study ${String(studyId)}`;
+  }
+
+  if (effectiveToolName === "fetch_persons_associated_with_study") {
     const studyId =
       (linkedArgs && getNestedValue(linkedArgs, ["study_id"])) ??
       (parsedContent &&
@@ -255,7 +258,7 @@ function resolveToolDisplayName(message: ChatMessage, toolCallLookup: ToolCallLo
     return `Checking persons associated with study ${String(studyId)}`;
   }
 
-  if (effectiveToolName === "search_for_study_by_shortname") {
+  if (effectiveToolName === "fetch_study_by_shortname") {
     const shortName =
       (linkedArgs && getNestedValue(linkedArgs, ["short_name"])) ??
       (parsedContent &&
@@ -270,36 +273,6 @@ function resolveToolDisplayName(message: ChatMessage, toolCallLookup: ToolCallLo
     return `Searched for studies with shortname ${String(shortName)}`;
   }
 
-  if (effectiveToolName === "fetch_study_outcomes") {
-    const studyId =
-      (linkedArgs && getNestedValue(linkedArgs, ["study_id"])) ??
-      (parsedContent &&
-        (getNestedValue(parsedContent, ["study_id"]) ??
-          getNestedValue(parsedContent, ["args", "study_id"]) ??
-          getNestedValue(parsedContent, ["input", "study_id"])));
-
-    if (studyId === null || typeof studyId === "undefined" || studyId === "") {
-      return "Reading outcomes associated with study";
-    }
-
-    return `Reading outcomes associated with study ${String(studyId)}`;
-  }
-
-  if (effectiveToolName === "fetch_study_conditions") {
-    const studyId =
-      (linkedArgs && getNestedValue(linkedArgs, ["study_id"])) ??
-      (parsedContent &&
-        (getNestedValue(parsedContent, ["study_id"]) ??
-          getNestedValue(parsedContent, ["args", "study_id"]) ??
-          getNestedValue(parsedContent, ["input", "study_id"])));
-
-    if (studyId === null || typeof studyId === "undefined" || studyId === "") {
-      return "Reading conditions associated with study";
-    }
-
-    return `Reading conditions associated with study ${String(studyId)}`;
-  }
-
   return effectiveToolName;
 }
 
@@ -308,7 +281,6 @@ interface ReportChatProps {
 }
 
 export default function ReportChat({ reportId }: ReportChatProps) {
-  const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -483,16 +455,12 @@ export default function ReportChat({ reportId }: ReportChatProps) {
     }
   }, [fetchChat, isDeleting, reportId]);
 
-  const handleOpenChange = useCallback(
-    (nextOpen: boolean) => {
-      setOpen(nextOpen);
 
-      if (nextOpen && payload === null && !isLoading) {
-        void fetchChat();
-      }
-    },
-    [fetchChat, isLoading, payload]
-  );
+  // Fetch chat when dialog is opened for the first time
+  const hasFetchedRef = useRef(false);
+
+  // open prop will come from ReportChatButtons children
+  // so we don't need local open state
 
   const toggleToolMessage = useCallback((messageKey: string) => {
     setExpandedToolMessages((current) => ({
@@ -516,186 +484,193 @@ export default function ReportChat({ reportId }: ReportChatProps) {
   }, [isLoading, isSending, open, pendingUserMessage, visibleMessages.length]);
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <Button
-          className="fixed right-6 bottom-6 z-40 h-12 rounded-full px-4 shadow-lg"
-          size="lg"
-          type="button"
-        >
-          <MessageSquareText className="h-4 w-4" />
-          Ask MediBot
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="h-[85vh] max-h-[85vh] overflow-hidden sm:max-w-4xl p-0 flex flex-col">
-        <DialogHeader className="border-b px-6 pt-6 pb-4 shrink-0">
-          <div className="flex items-center justify-start gap-3">
-            <DialogTitle>Ask MediBot about the current report</DialogTitle>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void deleteChat()}
-              disabled={isDeleting || isLoading}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              {isDeleting ? "Clearing..." : "Clear Chat"}
-            </Button>
-          </div>
-          {deleteError && <p className="mt-2 text-sm text-destructive">{deleteError}</p>}
-        </DialogHeader>
+    <ReportChatButtons>
+      {({ open, setOpen }) => {
+        // Fetch chat when dialog is opened for the first time
+        useEffect(() => {
+          if (open && payload === null && !isLoading && !hasFetchedRef.current) {
+            void fetchChat();
+            hasFetchedRef.current = true;
+          }
+          if (!open) {
+            hasFetchedRef.current = false;
+          }
+        }, [open, payload, isLoading, fetchChat]);
 
-        <div ref={messageListRef} className="h-full w-full flex-1 min-h-0 overflow-y-auto">
-          <div className="w-full px-6 py-4 space-y-4">
-            {isLoading && (
-              <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-                Loading chat history...
-              </div>
-            )}
-
-            {!isLoading && loadError && (
-              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-                <p>{loadError}</p>
+        return (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogContent className="h-[85vh] max-h-[85vh] overflow-hidden sm:max-w-4xl p-0 flex flex-col">
+            <DialogHeader className="border-b px-6 pt-6 pb-4 shrink-0">
+              <div className="flex items-center justify-start gap-3">
+                <DialogTitle>Ask MediBot about the current report</DialogTitle>
                 <Button
-                  className="mt-3"
-                  onClick={() => void fetchChat()}
-                  size="sm"
                   type="button"
                   variant="outline"
+                  size="sm"
+                  onClick={() => void deleteChat()}
+                  disabled={isDeleting || isLoading}
                 >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Retry
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {isDeleting ? "Clearing..." : "Clear Chat"}
                 </Button>
               </div>
-            )}
+              {deleteError && <p className="mt-2 text-sm text-destructive">{deleteError}</p>}
+            </DialogHeader>
 
-            {!isLoading && !loadError && visibleMessages.length > 0 && (
-              <div className="w-full space-y-3">
-                {visibleMessages.map((message, index) => {
-                  const role = message.type || "unknown";
-                  const content = normalizeMessageContent(message.content).trim();
-                  const formattedToolContent = formatToolMessageContent(content);
-                  const messageKey = message.id ?? `${role}-${index}`;
-                  const isToolMessage = message.type === "tool";
-                  const effectiveToolName = getEffectiveToolName(message, toolCallLookup);
-                  const isStructuredFinalResponse =
-                    !!effectiveToolName && FINAL_RESPONSE_TOOL_NAMES.has(effectiveToolName);
-                  const isToolMessageExpanded = !!expandedToolMessages[messageKey];
-                  const toolDisplayName = resolveToolDisplayName(message, toolCallLookup);
-                  const isHumanMessage = message.type === "user" || message.type === "human";
-                  const messageStripeClass = isHumanMessage
-                    ? "border-l-4 border-l-emerald-500"
-                    : "border-r-4 border-r-sky-500";
-                  const finalResponseSummary =
-                    effectiveToolName === "ExistingStudy"
-                      ? `I think this report belongs to an existing study because: ${finalResponseReason}`
-                      : `I think this report belongs to a new study because: ${finalResponseReason}`;
+            <div ref={messageListRef} className="h-full w-full flex-1 min-h-0 overflow-y-auto">
+              <div className="w-full px-6 py-4 space-y-4">
+                {isLoading && (
+                  <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
+                    Loading chat history...
+                  </div>
+                )}
 
-                  return (
-                    <div key={messageKey} className={`w-full ${isHumanMessage ? "pl-6" : ""}`}>
-                      <div className={`w-full rounded-lg border bg-card p-4 ${messageStripeClass}`}>
-                      <div className="flex items-center gap-2">
-                        {(isStructuredFinalResponse
-                          ? finalResponseSummary
-                          : isToolMessage
-                            ? toolDisplayName
-                            : message.name) && (
-                          <span className="mb-3 text-xs text-muted-foreground">
-                            {isStructuredFinalResponse
+                {!isLoading && loadError && (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+                    <p>{loadError}</p>
+                    <Button
+                      className="mt-3"
+                      onClick={() => void fetchChat()}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Retry
+                    </Button>
+                  </div>
+                )}
+
+                {!isLoading && !loadError && visibleMessages.length > 0 && (
+                  <div className="w-full space-y-3">
+                    {visibleMessages.map((message, index) => {
+                      const role = message.type || "unknown";
+                      const content = normalizeMessageContent(message.content).trim();
+                      const formattedToolContent = formatToolMessageContent(content);
+                      const messageKey = message.id ?? `${role}-${index}`;
+                      const isToolMessage = message.type === "tool";
+                      const effectiveToolName = getEffectiveToolName(message, toolCallLookup);
+                      const isStructuredFinalResponse =
+                        !!effectiveToolName && FINAL_RESPONSE_TOOL_NAMES.has(effectiveToolName);
+                      const isToolMessageExpanded = !!expandedToolMessages[messageKey];
+                      const toolDisplayName = resolveToolDisplayName(message, toolCallLookup);
+                      const isHumanMessage = message.type === "user" || message.type === "human";
+                      const messageStripeClass = isHumanMessage
+                        ? "border-l-4 border-l-emerald-500"
+                        : "border-r-4 border-r-sky-500";
+                      const finalResponseSummary =
+                        effectiveToolName === "ExistingStudy"
+                          ? `I think this report belongs to an existing study because: ${finalResponseReason}`
+                          : `I think this report belongs to a new study because: ${finalResponseReason}`;
+
+                      return (
+                        <div key={messageKey} className={`w-full ${isHumanMessage ? "pl-6" : ""}`}>
+                          <div className={`w-full rounded-lg border bg-card p-4 ${messageStripeClass}`}>
+                          <div className="flex items-center gap-2">
+                            {(isStructuredFinalResponse
                               ? finalResponseSummary
                               : isToolMessage
                                 ? toolDisplayName
-                                : message.name}
-                          </span>
-                        )}
-                      </div>
-                      {isStructuredFinalResponse ? (
-                        <pre className="overflow-x-auto whitespace-pre-wrap break-all text-sm leading-relaxed">
-                          {structuredResponseWithoutReasonText || structuredResponseText || formattedToolContent}
-                        </pre>
-                      ) : isToolMessage ? (
-                        <div >
-                          <div
-                            aria-expanded={isToolMessageExpanded}
-                            className="cursor-pointer rounded-md border border-dashed bg-muted/20 px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/30"
-                            onClick={() => toggleToolMessage(messageKey)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault();
-                                toggleToolMessage(messageKey);
-                              }
-                            }}
-                            role="button"
-                            tabIndex={0}
-                          >
-                            {isToolMessageExpanded
-                              ? "Click to collapse."
-                              : "Click to view details."}
+                                : message.name) && (
+                              <span className="mb-3 text-xs text-muted-foreground">
+                                {isStructuredFinalResponse
+                                  ? finalResponseSummary
+                                  : isToolMessage
+                                    ? toolDisplayName
+                                    : message.name}
+                              </span>
+                            )}
                           </div>
-                          {isToolMessageExpanded && (
+                          {isStructuredFinalResponse ? (
                             <pre className="overflow-x-auto whitespace-pre-wrap break-all text-sm leading-relaxed">
-                              {formattedToolContent}
+                              {structuredResponseWithoutReasonText || structuredResponseText || formattedToolContent}
+                            </pre>
+                          ) : isToolMessage ? (
+                            <div >
+                              <div
+                                aria-expanded={isToolMessageExpanded}
+                                className="cursor-pointer rounded-md border border-dashed bg-muted/20 px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/30"
+                                onClick={() => toggleToolMessage(messageKey)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    toggleToolMessage(messageKey);
+                                  }
+                                }}
+                                role="button"
+                                tabIndex={0}
+                              >
+                                {isToolMessageExpanded
+                                  ? "Click to collapse."
+                                  : "Click to view details."}
+                              </div>
+                              {isToolMessageExpanded && (
+                                <pre className="overflow-x-auto whitespace-pre-wrap break-all text-sm leading-relaxed">
+                                  {formattedToolContent}
+                                </pre>
+                              )}
+                            </div>
+                          ) : (
+                            <pre className="overflow-x-auto whitespace-pre-wrap break-all text-sm leading-relaxed">
+                              {content}
                             </pre>
                           )}
                         </div>
-                      ) : (
-                        <pre className="overflow-x-auto whitespace-pre-wrap break-all text-sm leading-relaxed">
-                          {content}
-                        </pre>
-                      )}
-                    </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {!isLoading && !loadError && isSending && pendingUserMessage && (
-              <div className="w-full pl-6">
-                <div className="w-full rounded-lg border border-l-4 border-l-emerald-500 bg-card p-4">
-                  <pre className="overflow-x-auto whitespace-pre-wrap break-all text-sm leading-relaxed">
-                    {pendingUserMessage}
-                  </pre>
-                </div>
-              </div>
-            )}
-
-            {!isLoading && !loadError && isSending && (
-              <div className="w-full">
-                <div className="w-full rounded-lg border border-r-4 border-r-sky-500 bg-card p-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <LoaderCircle className="h-4 w-4 animate-spin" />
-                    MediBot is thinking...
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
+                )}
+
+                {!isLoading && !loadError && isSending && pendingUserMessage && (
+                  <div className="w-full pl-6">
+                    <div className="w-full rounded-lg border border-l-4 border-l-emerald-500 bg-card p-4">
+                      <pre className="overflow-x-auto whitespace-pre-wrap break-all text-sm leading-relaxed">
+                        {pendingUserMessage}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+
+                {!isLoading && !loadError && isSending && (
+                  <div className="w-full">
+                    <div className="w-full rounded-lg border border-r-4 border-r-sky-500 bg-card p-4">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                        MediBot is thinking...
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div ref={messageListEndRef} aria-hidden="true" />
               </div>
-            )}
+            </div>
 
-            <div ref={messageListEndRef} aria-hidden="true" />
-          </div>
-        </div>
-
-        <div className="shrink-0 border-t bg-background px-6 py-4">
-          <Textarea
-            className="min-h-[88px] resize-none"
-            id="report-chat-message"
-            placeholder="Write a message..."
-            value={messageInput}
-            onChange={(event) => setMessageInput(event.target.value)}
-          />
-          {sendError && <p className="mt-2 text-sm text-destructive">{sendError}</p>}
-          <div className="mt-3 flex justify-end">
-            <Button
-              type="button"
-              onClick={() => void sendMessage()}
-              disabled={isSending || messageInput.trim().length === 0}
-            >
-              <Send className="h-4 w-4" />
-              {isSending ? "Waiting..." : "Send"}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
+            <div className="shrink-0 border-t bg-background px-6 py-4">
+              <Textarea
+                className="min-h-[88px] resize-none"
+                id="report-chat-message"
+                placeholder="Write a message..."
+                value={messageInput}
+                onChange={(event) => setMessageInput(event.target.value)}
+              />
+              {sendError && <p className="mt-2 text-sm text-destructive">{sendError}</p>}
+              <div className="mt-3 flex justify-end">
+                <Button
+                  type="button"
+                  onClick={() => void sendMessage()}
+                  disabled={isSending || messageInput.trim().length === 0}
+                >
+                  <Send className="h-4 w-4" />
+                  {isSending ? "Waiting..." : "Send"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+          </Dialog>
+      );
+    }}
+  </ReportChatButtons>
+ );
 }

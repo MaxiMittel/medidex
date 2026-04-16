@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -34,9 +34,18 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { CircleHelp } from "lucide-react";
-import { fetchDefaultPrompts } from "@/lib/api/genaiApi";
-import type { AIModel } from "@/hooks/use-genai-evaluation-store";
-import type { DefaultPrompts, PromptOverrides } from "@/types/apiDTOs";
+//import { fetchDefaultPrompts } from "@/lib/api/genaiApi";
+//import type { AIModel } from "@/hooks/use-genai-evaluation-store";
+//import type { DefaultPrompts, PromptOverrides } from "@/types/apiDTOs";
+
+//import { AIMatchSettingsDialog } from "./ai-match-settings-dialog";
+import { useGenAIEvaluationStore } from "@/hooks/use-genai-evaluation-store";
+import { useReportStore } from "@/hooks/use-report-store";
+import { toast } from "sonner";
+import type { AIModel, PromptOverrides, DefaultPrompts } from "@/hooks/use-genai-evaluation-store";
+//import { useState } from "react";
+import { StudyDto } from "@/types/apiDTOs";
+import { RelevanceStudy } from "@/types/reports";
 
 const MODEL_OPTIONS: AIModel[] = ["gpt-5.2", "gpt-5", "gpt-5-mini", "gpt-4.1"];
 const EMPTY_PROMPT_OVERRIDES: PromptOverrides = {
@@ -53,87 +62,135 @@ const EMPTY_PROMPT_OVERRIDES: PromptOverrides = {
 interface AIMatchSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onEvaluate: (options: {
-    model?: AIModel;
-    includePdf?: boolean;
-    promptOverrides?: PromptOverrides;
-  }) => Promise<boolean>;
-  isRunning: boolean;
-  disableRun: boolean;
-  runningCount?: number;
+  reportId?: number;
+  studies: RelevanceStudy[];
 }
 
 export function AIMatchSettingsDialog({
   open,
   onOpenChange,
-  onEvaluate,
-  isRunning,
-  disableRun,
-  runningCount,
+  reportId,
+  studies,
 }: AIMatchSettingsDialogProps) {
-  const [model, setModel] = useState<AIModel>("gpt-5-mini");
-  const [includePdf, setIncludePdf] = useState(false);
-  const [promptOverrides, setPromptOverrides] = useState<PromptOverrides>(
-    EMPTY_PROMPT_OVERRIDES
-  );
-  const [defaultPrompts, setDefaultPrompts] = useState<DefaultPrompts | null>(null);
-  const [promptsError, setPromptsError] = useState<string | null>(null);
+    //const [hasEvaluated, setHasEvaluated] = useState(false);
+    const getReport = useReportStore((state) => state.getReport);
+    const evaluateStream = useGenAIEvaluationStore((state) => state.evaluateStream);
+    const canStartEvaluation = useGenAIEvaluationStore((state) => state.canStartEvaluation);
+    const getRunningEvaluationsCount = useGenAIEvaluationStore((state) => state.getRunningEvaluationsCount);
+    const runningEvaluations = useGenAIEvaluationStore((state) => state.runningEvaluations);
+    const isRunning = reportId ? runningEvaluations.includes(reportId) : false;
 
-  const updatePromptOverride = (
-    key: keyof PromptOverrides,
-    value: string
-  ) => {
-    setPromptOverrides((prev) => ({ ...prev, [key]: value }));
-  };
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const response = await fetch("/api/genai/prompts");
-        if (!response.ok) {
-          throw new Error(`Failed to fetch default prompts: ${response.statusText}`);
+    const handleAIEvaluation = async (options: {
+        model?: AIModel;
+        includePdf?: boolean;
+        promptOverrides?: PromptOverrides;
+    }) => {
+        if (reportId === undefined) {
+            toast.error("Missing report id");
+            return false;
         }
-        const data = await response.json();
-        setDefaultPrompts(data);
-        setPromptsError(null);
-      } catch (error) {
-        setPromptsError(
-          error instanceof Error ? error.message : "Failed to load default prompts."
-        );
-      }
-    })();
-  }, []);
 
-  const buildPromptOverridesPayload = () => {
-    const cleaned: PromptOverrides = {
-      background_prompt: promptOverrides.background_prompt?.trim() || undefined,
-      initial_eval_prompt:
-        promptOverrides.initial_eval_prompt?.trim() || undefined,
-      likely_group_prompt:
-        promptOverrides.likely_group_prompt?.trim() || undefined,
-      likely_compare_prompt:
-        promptOverrides.likely_compare_prompt?.trim() || undefined,
-      likely_review_prompt:
-        promptOverrides.likely_review_prompt?.trim() || undefined,
-      unsure_review_prompt:
-        promptOverrides.unsure_review_prompt?.trim() || undefined,
-      summary_prompt: promptOverrides.summary_prompt?.trim() || undefined,
-      pdf_prompt: promptOverrides.pdf_prompt?.trim() || undefined,
+        const currentReport = getReport(reportId);
+        if (!currentReport) {
+            toast.error("Report not found");
+            return false;
+        }
+
+        try {
+            const runningCount = getRunningEvaluationsCount();
+            toast.info(`Evaluating ${studies.length} studies with AI (${runningCount + 1}/4 running)...`);
+            //setHasEvaluated(true);
+            evaluateStream(
+                currentReport.report,
+                studies.map((study: any) => study.study),
+                options,
+                () => {
+                    toast.success("AI evaluation complete!");
+                }
+            );
+            return true;
+        } catch (error) {
+            toast.error(
+                `AI evaluation failed: ${error instanceof Error ? error.message : "Unknown error"}`
+            );
+            return false;
+        }
     };
-    const hasOverrides = Object.values(cleaned).some((value) => value);
-    return hasOverrides ? cleaned : undefined;
-  };
 
-  const handleRun = async () => {
-    onOpenChange(false);
-    await onEvaluate({
-      model,
-      includePdf,
-      promptOverrides: buildPromptOverridesPayload(),
-    });
-  };
+    const runningCount = getRunningEvaluationsCount();
+    const disableRun= studies.length === 0 || !canStartEvaluation();
+
+    const [model, setModel] = useState<AIModel>("gpt-5-mini");
+    const [includePdf, setIncludePdf] = useState(false);
+    const [promptOverrides, setPromptOverrides] = useState<PromptOverrides>(
+      EMPTY_PROMPT_OVERRIDES
+    );
+    const [defaultPrompts, setDefaultPrompts] = useState<DefaultPrompts | null>(null);
+    const [promptsError, setPromptsError] = useState<string | null>(null);
+  
+    const updatePromptOverride = (
+        key: keyof PromptOverrides,
+        value: string
+    ) => {
+        setPromptOverrides((prev) => ({ ...prev, [key]: value }));
+    };
+  
+    useEffect(() => {
+      void (async () => {
+        try {
+          const response = await fetch("/api/genai/prompts");
+          if (!response.ok) {
+            throw new Error(`Failed to fetch default prompts: ${response.statusText}`);
+          }
+          const data = await response.json();
+          setDefaultPrompts(data);
+          setPromptsError(null);
+        } catch (error) {
+          setPromptsError(
+            error instanceof Error ? error.message : "Failed to load default prompts."
+          );
+        }
+      })();
+    }, []);
+  
+    const buildPromptOverridesPayload = () => {
+      const cleaned: PromptOverrides = {
+        background_prompt: promptOverrides.background_prompt?.trim() || undefined,
+        initial_eval_prompt:
+          promptOverrides.initial_eval_prompt?.trim() || undefined,
+        likely_group_prompt:
+          promptOverrides.likely_group_prompt?.trim() || undefined,
+        likely_compare_prompt:
+          promptOverrides.likely_compare_prompt?.trim() || undefined,
+        likely_review_prompt:
+          promptOverrides.likely_review_prompt?.trim() || undefined,
+        unsure_review_prompt:
+          promptOverrides.unsure_review_prompt?.trim() || undefined,
+        summary_prompt: promptOverrides.summary_prompt?.trim() || undefined,
+        pdf_prompt: promptOverrides.pdf_prompt?.trim() || undefined,
+      };
+      const hasOverrides = Object.values(cleaned).some((value) => value);
+      return hasOverrides ? cleaned : undefined;
+    };
+  
+    const handleRun = async () => {
+        onOpenChange(false);
+        await handleAIEvaluation({
+        model,
+        includePdf,
+        promptOverrides: buildPromptOverridesPayload(),
+        });
+    };
 
   return (
+    //<AIMatchSettingsDialog
+    //  open={open}
+    //  onOpenChange={onOpenChange}
+    //  onEvaluate={handleAIEvaluation}
+    //  isRunning={isRunning}
+    //  disableRun={studies.length === 0 || !canStartEvaluation()}
+    //  runningCount={getRunningEvaluationsCount()}
+    ///>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[720px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>

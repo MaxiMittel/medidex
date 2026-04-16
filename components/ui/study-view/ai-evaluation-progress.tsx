@@ -5,12 +5,17 @@ import { Spinner } from "@/components/ui/spinner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+import {
+  Info
+} from "lucide-react";
+
 interface AiEvaluationProgressProps {
   message: string | null;
   isStreaming: boolean;
   hasSummary: boolean;
   collapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
+  onShowStepHistory: () => void;
 }
 
 const isMarkdown = (value: string) =>
@@ -26,6 +31,7 @@ export function AiEvaluationProgress({
   hasSummary,
   collapsed,
   onCollapsedChange,
+  onShowStepHistory,
 }: AiEvaluationProgressProps) {
   if (!isStreaming && !message) {
     return null;
@@ -80,6 +86,15 @@ export function AiEvaluationProgress({
             {collapsed ? "Show" : "Hide"}
           </button>
         ) : null}
+        {/* Info icon */}
+      <button
+        type="button"
+        onClick={onShowStepHistory} // define this handler
+        className="text-blue-700 hover:text-blue-900 dark:text-blue-200 dark:hover:text-blue-100"
+        aria-label="More info"
+      >
+        <Info className="h-4 w-4" />
+      </button>
       </div>
       {!collapsed && message ? (
         <div className="mt-3 max-h-[260px] overflow-y-auto pr-2">
