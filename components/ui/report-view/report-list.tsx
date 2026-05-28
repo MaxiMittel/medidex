@@ -241,33 +241,44 @@ export function ReportList({
   };
 
   const handleDownloadReportPdf = async (
-    reportId: number,
-    reportTitle: string
-  ) => {
-    try {
-      const response = await fetch(`/api/meerkat/reports/${reportId}/pdf`, {
-        cache: "no-store",
-      });
+  reportId: number,
+  reportTitle: string
+) => {
+  try {
+    // 1. Create a strictly Latin title to match the server request
+    const safeTitle = reportTitle
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Remove accents
+      .replace(/[\u2010-\u2015]/g, "-") // Normalize dashes (Fixes your index 88 crash)
+      .replace(/[\\/:*?"<>|]+/g, "-")   // Remove illegal filename characters
+      .replace(/[^ -~]/g, "")           // Strip any remaining non-Latin/Unicode characters
+      .trim();
 
-      if (!response.ok) {
-        throw new Error("Failed to download PDF");
-      }
+    // 2. Pass the sanitized filename to the API
+    const response = await fetch(`/api/meerkat/reports/${reportId}/pdf?filename=${encodeURIComponent(`${reportId} - ${safeTitle || "report"}.pdf`)}`, {
+      cache: "no-store",
+    });
 
-      const safeTitle = reportTitle.replace(/[\\/:*?"<>|]+/g, "-").trim();
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${reportId} - ${safeTitle || "report"}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Error downloading report PDF:", error);
-      toast.error("Could not download PDF. Please try again.");
+    if (!response.ok) {
+      throw new Error("Failed to download PDF");
     }
-  };
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    
+    // 3. Trigger the safe download
+    link.download = `${reportId} - ${safeTitle || "report"}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("Error downloading report PDF:", error);
+    toast.error("Could not download PDF. Please try again.");
+  }
+};
 
   return (
     <div className="h-full flex flex-col pt-5">
