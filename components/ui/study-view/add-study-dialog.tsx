@@ -39,6 +39,7 @@ import {
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   DurationUnit,
+  InterventionDto,
   NewStudySuggestion,
   StudyCreateDto,
   ComparisonGroup as SuggestedComparisonGroup,
@@ -48,6 +49,7 @@ import type {
   ComparisonSideKey,
 } from "@/types/comparisons";
 
+const CATALOG_SEARCH_MIN_CHARS = 2;
 const COMPARISON_CARD_VERTICAL_GAP = 12; // matches space-y-3 spacing to prevent clipping
 const COMPARISON_PANEL_MAX_HEIGHT = 1.1; // portion of viewport for comparisons scroll region (roughly 2x previous)
 const COMPARISON_PANEL_MAX_PIXEL = 900; // hard cap so dialog never exceeds viewport
@@ -122,6 +124,7 @@ export function AddStudyDialog({
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  const [allInterventions, setAllInterventions] = useState<string[]>([]);
 
   const [addStudyDialogOpen, setAddStudyDialogOpen] = useState(false);
   const [creatingStudy, setCreatingStudy] = useState(false);
@@ -236,6 +239,44 @@ export function AddStudyDialog({
       controller.abort();
     };
   }, [addStudyDialogOpen, currentReportId]);
+
+  useEffect(() => {
+    if (!addStudyDialogOpen || allInterventions.length > 0) return;
+
+    const controller = new AbortController();
+
+    const loadAllInterventions = async () => {
+      try {
+        const response = await fetch("/api/meerkat/interventions", {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to load interventions.");
+        }
+
+        const data: InterventionDto[] = await response.json();
+        const descriptions = Array.isArray(data)
+          ? data
+              .map((entry) => entry?.Description)
+              .filter((entry): entry is string => Boolean(entry))
+          : [];
+
+        setAllInterventions(Array.from(new Set(descriptions)));
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error("Failed to load interventions:", error);
+        setAllInterventions([]);
+      }
+    };
+
+    loadAllInterventions();
+
+    return () => {
+      controller.abort();
+    };
+  }, [addStudyDialogOpen, allInterventions.length]);
 
   useLayoutEffect(() => {
     if (!addStudyDialogOpen) {
@@ -397,6 +438,46 @@ export function AddStudyDialog({
     activeSuggestionField?.groupId === groupId &&
     activeSuggestionField?.side === side;
 
+  const renderSuggestionItem = (
+    group: ComparisonGroup,
+    side: ComparisonSideKey,
+    item: string,
+    source: "suggestion" | "catalog"
+  ) => {
+    const normalizedItem = item.toLowerCase();
+    const matchIndex = group[side].findIndex(
+      (entry) => entry.toLowerCase() === normalizedItem
+    );
+    const isSelected = matchIndex !== -1;
+
+    return (
+      <CommandItem
+        key={`${group.id}-${side}-${source}-${item}`}
+        value={item}
+        aria-pressed={isSelected}
+        onSelect={() => {
+          if (isSelected) {
+            removeInterventionField(group.id, side, matchIndex);
+            return;
+          }
+
+          appendComparisonValue(group.id, side, item);
+          if (isSuggestionFieldActive(group.id, side)) {
+            setSuggestionQuery("");
+          }
+        }}
+        className="flex items-center gap-2"
+      >
+        <span className="flex-1 truncate text-left">{item}</span>
+        <Check
+          className={`h-4 w-4 text-primary transition-opacity ${
+            isSelected ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      </CommandItem>
+    );
+  };
+
   const renderComparisonSideInputs = (
     group: ComparisonGroup,
     placeholderLabel: string,
@@ -409,9 +490,19 @@ export function AddStudyDialog({
           item.toLowerCase().includes(normalizedQuery)
         )
       : suggestions;
+    const suggestedSet = new Set(suggestions.map((item) => item.toLowerCase()));
+    const catalogMatches =
+      normalizedQuery.length >= CATALOG_SEARCH_MIN_CHARS
+        ? allInterventions.filter(
+            (item) =>
+              item.toLowerCase().includes(normalizedQuery) &&
+              !suggestedSet.has(item.toLowerCase())
+          )
+        : [];
     const canAddCustomValue =
       Boolean(trimmedQuery) &&
-      !suggestions.some((item) => item.toLowerCase() === normalizedQuery);
+      !suggestedSet.has(normalizedQuery) &&
+      !allInterventions.some((item) => item.toLowerCase() === normalizedQuery);
     const selectionSummary =
       group[side].length > 0
         ? `${group[side].length} ${placeholderLabel}${
@@ -459,12 +550,13 @@ export function AddStudyDialog({
                   <CommandEmpty className="py-4 text-muted-foreground">
                     Loading suggestions...
                   </CommandEmpty>
-                ) : suggestionError ? (
-                  <CommandEmpty className="py-4 text-destructive">
-                    {suggestionError}
-                  </CommandEmpty>
                 ) : (
                   <>
+                    {suggestionError && (
+                      <div className="px-3 py-2 text-destructive">
+                        {suggestionError}
+                      </div>
+                    )}
                     {canAddCustomValue && (
                       <CommandGroup heading="Custom value">
                         <CommandItem
@@ -479,52 +571,31 @@ export function AddStudyDialog({
                         </CommandItem>
                       </CommandGroup>
                     )}
-                    {filteredSuggestions.length > 0 ? (
+                    {filteredSuggestions.length > 0 && (
                       <CommandGroup heading="Suggestions">
-                        {filteredSuggestions.map((item) => {
-                          const normalizedItem = item.toLowerCase();
-                          const matchIndex = group[side].findIndex(
-                            (entry) => entry.toLowerCase() === normalizedItem
-                          );
-                          const isSelected = matchIndex !== -1;
-
-                          return (
-                            <CommandItem
-                              key={`${group.id}-${side}-suggestion-${item}`}
-                              value={item}
-                              aria-pressed={isSelected}
-                              onSelect={() => {
-                                if (isSelected) {
-                                  removeInterventionField(group.id, side, matchIndex);
-                                  return;
-                                }
-
-                                appendComparisonValue(group.id, side, item);
-                                if (isSuggestionFieldActive(group.id, side)) {
-                                  setSuggestionQuery("");
-                                }
-                              }}
-                              className="flex items-center gap-2"
-                            >
-                              <span className="flex-1 truncate text-left">{item}</span>
-                              <Check
-                                className={`h-4 w-4 text-primary transition-opacity ${
-                                  isSelected ? "opacity-100" : "opacity-0"
-                                }`}
-                              />
-                            </CommandItem>
-                          );
-                        })}
+                        {filteredSuggestions.map((item) =>
+                          renderSuggestionItem(group, side, item, "suggestion")
+                        )}
                       </CommandGroup>
-                    ) : (
-                      <CommandEmpty className="py-4 text-muted-foreground">
-                        {suggestions.length === 0
-                          ? "No intervention suggestions available."
-                          : suggestionQuery
-                            ? `No suggestions for "${suggestionQuery}".`
-                            : "No intervention suggestions available."}
-                      </CommandEmpty>
                     )}
+                    {catalogMatches.length > 0 && (
+                      <CommandGroup heading="All interventions">
+                        {catalogMatches.map((item) =>
+                          renderSuggestionItem(group, side, item, "catalog")
+                        )}
+                      </CommandGroup>
+                    )}
+                    {filteredSuggestions.length === 0 &&
+                      catalogMatches.length === 0 && (
+                        <CommandEmpty className="py-4 text-muted-foreground">
+                          {normalizedQuery.length > 0 &&
+                          normalizedQuery.length < CATALOG_SEARCH_MIN_CHARS
+                            ? `Type at least ${CATALOG_SEARCH_MIN_CHARS} characters to search all interventions.`
+                            : suggestionQuery
+                              ? `No interventions matching "${suggestionQuery}".`
+                              : "No intervention suggestions available."}
+                        </CommandEmpty>
+                      )}
                   </>
                 )}
               </CommandList>
