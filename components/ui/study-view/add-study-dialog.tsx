@@ -48,7 +48,6 @@ import type {
   ComparisonSideKey,
 } from "@/types/comparisons";
 
-const SUGGESTION_DISPLAY_LIMIT = 8;
 const COMPARISON_CARD_VERTICAL_GAP = 12; // matches space-y-3 spacing to prevent clipping
 const COMPARISON_PANEL_MAX_HEIGHT = 1.1; // portion of viewport for comparisons scroll region (roughly 2x previous)
 const COMPARISON_PANEL_MAX_PIXEL = 900; // hard cap so dialog never exceeds viewport
@@ -410,12 +409,6 @@ export function AddStudyDialog({
           item.toLowerCase().includes(normalizedQuery)
         )
       : suggestions;
-    const displayedSuggestions = filteredSuggestions.slice(
-      0,
-      SUGGESTION_DISPLAY_LIMIT
-    );
-    const suggestionsCapped =
-      filteredSuggestions.length > displayedSuggestions.length;
     const canAddCustomValue =
       Boolean(trimmedQuery) &&
       !suggestions.some((item) => item.toLowerCase() === normalizedQuery);
@@ -429,6 +422,7 @@ export function AddStudyDialog({
     return (
       <div className="space-y-2">
         <Popover
+          modal
           open={isSuggestionFieldActive(group.id, side)}
           onOpenChange={(open) => {
             if (open) {
@@ -460,7 +454,7 @@ export function AddStudyDialog({
             sideOffset={6}
           >
             <Command className="w-full min-w-[320px] text-xs">
-              <CommandList className="max-h-[280px] overflow-y-auto">
+              <CommandList className="max-h-[280px] overflow-y-auto overscroll-contain">
                 {isFetchingSuggestions ? (
                   <CommandEmpty className="py-4 text-muted-foreground">
                     Loading suggestions...
@@ -487,7 +481,7 @@ export function AddStudyDialog({
                     )}
                     {filteredSuggestions.length > 0 ? (
                       <CommandGroup heading="Suggestions">
-                        {displayedSuggestions.map((item) => {
+                        {filteredSuggestions.map((item) => {
                           const normalizedItem = item.toLowerCase();
                           const matchIndex = group[side].findIndex(
                             (entry) => entry.toLowerCase() === normalizedItem
@@ -521,11 +515,6 @@ export function AddStudyDialog({
                             </CommandItem>
                           );
                         })}
-                        {suggestionsCapped && (
-                          <CommandItem disabled className="text-muted-foreground">
-                            Refine search to see more results
-                          </CommandItem>
-                        )}
                       </CommandGroup>
                     ) : (
                       <CommandEmpty className="py-4 text-muted-foreground">
