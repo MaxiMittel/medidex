@@ -25,6 +25,31 @@ export const getStudyById = (
     });
 }
 
+export const searchStudies = (
+  query: string,
+  config?: AxiosRequestConfig
+): Promise<StudyDto[]> => {
+  const requestConfig = {
+    ...config,
+    params: {
+      ...config?.params,
+      q: query,
+    },
+    paramsSerializer: {
+      serialize: serializeParams,
+    },
+  };
+
+  return apiClient.get<StudyDto[]>("/studies", requestConfig)
+    .then(response => {
+      return response.data;
+    })
+    .catch(error => {
+      console.error(`Error searching studies for "${query}":`, error);
+      throw error;
+    });
+}
+
 export const getReportsByStudyId = (
   studyId: number,
   includePdfLinks?: boolean,

@@ -7,24 +7,14 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import type { RelevanceStudy } from "@/types/reports";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   FileText,
   Search,
-  Users,
-  Calendar,
-  X,
   Sparkles,
-  CheckCircle2,
-  Plus,
-  Link,
+  X,
   Microscope,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
+import { StudyCard } from "./study-card";
 import { AddStudyDialog } from "./add-study-dialog";
 import { AIMatchSettingsDialog } from "./ai-match-settings-dialog";
 import { LoadMoreStudiesButton } from "./load-more-studies-button";
@@ -42,22 +32,22 @@ interface StudyRelevanceTableProps {
   studies: RelevanceStudy[];
 }
 
-const formatParticipantCount = (value?: string | null) => {
-  if (!value) return "-";
-  const numericValue = Number(value.replace(/,/g, ""));
-  if (Number.isFinite(numericValue)) {
-    return numericValue.toLocaleString();
-  }
-  return value;
-};
+// The backend rejects shorter queries.
+const MIN_SEARCH_QUERY_LENGTH = 3;
+// The search endpoint is unbounded, so only the top hits are rendered.
+const MAX_VISIBLE_SEARCH_RESULTS = 25;
 
 export function StudyRelevanceTable({
   reportId,
   studies,
 }: StudyRelevanceTableProps) {
-  
+
   const [resolvedStudies, setResolvedStudies] = useState<RelevanceStudy[]>(() => [...studies]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [submittedQuery, setSubmittedQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<StudyDto[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const addAssignedStudies = useReportStore((state) => state.addAssignedStudy);
   const syncAssignedStudy = useReportStore((state) => state.syncAssignedStudy);
@@ -239,49 +229,91 @@ export function StudyRelevanceTable({
   //  closeAIDialog();
   //}, []);
 
-  // Filter and sort studies
-  const filteredStudies = useMemo(() => {
-    let filtered = [...resolvedStudies];
+  const recommendedStudies = useMemo(
+    () => [...resolvedStudies].sort((a, b) => b.relevance - a.relevance),
+    [resolvedStudies]
+  );
 
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (study) =>
-          study.study.shortName.toLowerCase().includes(query) ||
-          study.study.studyId.toString().includes(query) ||
-          (study.study.comparison || "").toLowerCase().includes(query) ||
-          (study.study.numberParticipants ?? "").toLowerCase().includes(query)
-      );
-    }
+  const recommendedStudyIds = useMemo(
+    () => new Set(recommendedStudies.map((entry) => entry.study.studyId)),
+    [recommendedStudies]
+  );
 
-    return filtered.sort((a, b) => {
-      return b.relevance - a.relevance;
+  const linkedStudyIds = useMemo(() => {
+    const ids = new Set(
+      (currentReport?.assignedStudies ?? []).map((assigned) => assigned.studyId)
+    );
+    resolvedStudies.forEach((entry) => {
+      if (entry.isLinked) {
+        ids.add(entry.study.studyId);
+      }
     });
-  }, [resolvedStudies, searchQuery]);
+    return ids;
+  }, [currentReport?.assignedStudies, resolvedStudies]);
 
+  const visibleSearchResults = useMemo(
+    () => (searchResults ?? []).slice(0, MAX_VISIBLE_SEARCH_RESULTS),
+    [searchResults]
+  );
+
+  const runSearch = useCallback(async (query: string) => {
+    setIsSearching(true);
+    setSearchError(null);
+    setSubmittedQuery(query);
+
+    try {
+      const response = await fetch(
+        `/api/meerkat/studies?q=${encodeURIComponent(query)}`,
+        { cache: "no-store" }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to search studies.");
+      }
+
+      const results = (await response.json()) as StudyDto[];
+      setSearchResults(Array.isArray(results) ? results : []);
+    } catch (error) {
+      setSearchResults(null);
+      setSearchError(
+        error instanceof Error ? error.message : "Failed to search studies."
+      );
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  const handleSearchSubmit = useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+
+      const query = searchQuery.trim();
+      if (query.length < MIN_SEARCH_QUERY_LENGTH) {
+        setSearchError(
+          `Enter at least ${MIN_SEARCH_QUERY_LENGTH} characters to search.`
+        );
+        return;
+      }
+
+      void runSearch(query);
+    },
+    [searchQuery, runSearch]
+  );
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery("");
+    setSubmittedQuery("");
+    setSearchResults(null);
+    setSearchError(null);
+  }, []);
 
   const handleAIBadgeClick = (studyId: number, studyName: string) => {
     setSelectedAIStudy({ studyId, studyName });
     setReasonDialogOpen(true);
   };
 
-  const getRelevanceColor = (relevance: number) => {
-    if (relevance >= 0.9) return "bg-emerald-500";
-    if (relevance >= 0.7) return "bg-blue-500";
-    if (relevance >= 0.5) return "bg-amber-500";
-    return "bg-orange-500";
-  };
-
-  const getRelevanceBadgeStyle = (relevance: number) => {
-    if (relevance >= 0.9) return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400";
-    if (relevance >= 0.7) return "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400";
-    if (relevance >= 0.5) return "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400";
-    return "bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-400";
-  };
-
-
-  const handleStudyClick = (study: RelevanceStudy) => {
-    openWithStudyItem(study.study)
+  const handleStudyClick = (study: StudyDto) => {
+    openWithStudyItem(study)
   };
 
   const progressMessage = evalState?.isStreaming
@@ -306,7 +338,7 @@ export function StudyRelevanceTable({
         open={aiDialogOpen}
         onOpenChange={setAiDialogOpen}
         reportId={reportId}
-        studies={filteredStudies}
+        studies={recommendedStudies}
       />
 
       {/* Header - Sticky */}
@@ -318,8 +350,7 @@ export function StudyRelevanceTable({
             </div>
             <h2 className="text-lg font-semibold">Relevant Studies</h2>
             <Badge variant="secondary" className="text-xs font-normal">
-              {filteredStudies.length}
-              {searchQuery && ` of ${studies.length}`}
+              {recommendedStudies.length}
             </Badge>
           </div>
           <div className="flex items-center gap-2">
@@ -331,30 +362,41 @@ export function StudyRelevanceTable({
           </div>
         </div>
 
-        {/* Search */}
+        {/* Global search across all studies */}
         <div className="mt-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+          <form onSubmit={handleSearchSubmit}>
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name, ID, comparison, or participants..."
+                placeholder="Search all studies by name, trial ID, intervention, author... (press Enter)"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setSearchError(null);
+                }}
                 className="pl-9 pr-8"
               />
-              {searchQuery && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
-                  onClick={() => setSearchQuery("")}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
+              {isSearching ? (
+                <Spinner className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              ) : (
+                (searchQuery || searchResults) && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Clear search"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+                    onClick={clearSearch}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )
               )}
             </div>
-          </div>
+          </form>
+          {searchError && (
+            <p className="mt-1.5 text-xs text-destructive">{searchError}</p>
+          )}
         </div>
       </div>
 
@@ -377,172 +419,106 @@ export function StudyRelevanceTable({
 
       {/* Scrollable Content */}
       <div className="flex-1 min-h-0 overflow-y-auto px-4">
-        <div className="pt-3 pb-4">
-          {filteredStudies.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <div className="p-3 rounded-full bg-muted mb-4">
-                <FileText className="h-6 w-6 opacity-50" />
+        <div className="pt-3 pb-4 space-y-6">
+
+          {/* Globally searched studies */}
+          {searchResults && (
+            <div>
+              <div className="flex items-center gap-2 pb-2">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <h3 className="text-sm font-semibold">
+                  Search results for &ldquo;{submittedQuery}&rdquo;
+                </h3>
+                <Badge variant="secondary" className="text-xs font-normal">
+                  {searchResults.length}
+                </Badge>
               </div>
-              <p className="text-sm font-medium">No studies found</p>
-              <p className="text-xs mt-1">
-                {searchQuery
-                  ? "Try adjusting your search query"
-                  : "No relevant studies available"}
-              </p>
+
+              {searchResults.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-muted-foreground border border-dashed border-border rounded-lg">
+                  <p className="text-sm font-medium">No matching studies</p>
+                  <p className="text-xs mt-1">Try a different search query</p>
+                </div>
+              ) : (
+                <>
+                  {visibleSearchResults.map((study) => (
+                    <StudyCard
+                      key={`search-${study.studyId}`}
+                      study={study}
+                      isLinked={linkedStudyIds.has(study.studyId)}
+                      alsoRecommended={recommendedStudyIds.has(study.studyId)}
+                      onClick={handleStudyClick}
+                      onLink={(target) => void handleLinkedChange(target, true)}
+                    />
+                  ))}
+                  {searchResults.length > visibleSearchResults.length && (
+                    <p className="pt-1 text-xs text-muted-foreground text-center">
+                      Showing the top {visibleSearchResults.length} of{" "}
+                      {searchResults.length} matches. Refine your query to narrow
+                      them down.
+                    </p>
+                  )}
+                </>
+              )}
+
+              <div className="pt-4 border-b border-border" />
             </div>
-          ) : (
-            <div className="space-y-3">
-              {/* Studies list */}
-              {filteredStudies.map((study) => {
-                const isLinked = study.isLinked;
-                const relevancePercentage = (study.relevance * 100).toFixed(1);
+          )}
 
-                return (
-                      <div
-                        key={study.study.studyId}
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`View details for ${study.study.shortName}`}
-                        onClick={() => handleStudyClick(study)}
-                        className="p-4 mb-2 bg-card hover:bg-muted/50 rounded-lg relative w-full max-w-full overflow-hidden transition-all duration-200 border border-border/60 hover:border-border group-hover:shadow-sm flex items-center gap-4"
-                      >
-                        {/* Left indicator bar with relevance color */}
-                        <div
-                          className={`${getRelevanceColor(
-                            study.relevance
-                          )} rounded-l-lg h-full w-1 absolute left-0 top-0 bottom-0 transition-all`}
-                        ></div>
+          {/* Recommended studies */}
+          <div>
+            {searchResults && (
+              <div className="flex items-center gap-2 pb-2">
+                <Sparkles className="h-4 w-4 text-muted-foreground" />
+                <h3 className="text-sm font-semibold">Recommended studies</h3>
+                <Badge variant="secondary" className="text-xs font-normal">
+                  {recommendedStudies.length}
+                </Badge>
+              </div>
+            )}
 
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="h-full flex items-center justify-center"
-                        >
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  aria-pressed={isLinked}
-                                  aria-label={isLinked ? "Study linked" : "Link study"}
-                                  disabled={isLinked}
-                                  onClick={() => {
-                                    if (!isLinked) {
-                                      void handleLinkedChange(study.study, true);
-                                    }
-                                  }}
-                                  className={`p-1 rounded-full transition-colors ${
-                                    isLinked
-                                      ? "text-primary/70 cursor-default"
-                                      : "text-muted-foreground/60 hover:text-primary"
-                                  }`}
-                                >
-                                  {isLinked ? (
-                                    <Link className="h-6 w-6" />
-                                  ) : (
-                                    <Plus className="h-6 w-6" />
-                                  )}
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {isLinked ? "Already linked" : "Link study"}
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
+            {recommendedStudies.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <div className="p-3 rounded-full bg-muted mb-4">
+                  <FileText className="h-6 w-6 opacity-50" />
+                </div>
+                <p className="text-sm font-medium">No studies found</p>
+                <p className="text-xs mt-1">No relevant studies available</p>
+              </div>
+            ) : (
+              <>
+                {recommendedStudies.map((entry) => (
+                  <StudyCard
+                    key={entry.study.studyId}
+                    study={entry.study}
+                    relevance={entry.relevance}
+                    isLinked={linkedStudyIds.has(entry.study.studyId)}
+                    onClick={handleStudyClick}
+                    onLink={(target) => void handleLinkedChange(target, true)}
+                    aiBadge={
+                      studyResults?.[entry.study.studyId] && (
+                        <StudyAIBadge
+                          classification={studyResults[entry.study.studyId].classification}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAIBadgeClick(
+                              entry.study.studyId,
+                              entry.study.shortName
+                            );
+                          }}
+                        />
+                      )
+                    }
+                  />
+                ))}
 
-                        <div className="flex flex-col gap-3">
-                            {/* Top row: Checkbox, Short Name, and details indicator */}
-                          <div className="flex items-start gap-3">
-                            
-                            
-                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <h3 className="text-base font-semibold truncate max-w-full">
-                                      {study.study.shortName}
-                                    </h3>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>{study.study.shortName}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
-                                <Badge
-                                  variant="secondary"
-                                  className={`font-semibold text-xs px-2 py-0.5 ${getRelevanceBadgeStyle(study.relevance)}`}
-                                >
-                                  Relevance {relevancePercentage}%
-                                </Badge>
-                                {studyResults?.[study.study.studyId] && (
-                                  <StudyAIBadge
-                                    classification={studyResults[study.study.studyId].classification}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleAIBadgeClick(
-                                        study.study.studyId,
-                                        study.study.shortName
-                                      );
-                                    }}
-                                  />
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Bottom row: Participants, Duration, Comparison */}
-                          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs w-full">
-                            {/* NumberParticipants */}
-                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                              <div className="p-0.5 rounded bg-blue-50 dark:bg-blue-950/30">
-                                <Users className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                              </div>
-                              <span>{formatParticipantCount(study.study.numberParticipants)} participants</span>
-                            </div>
-
-                            {/* Duration */}
-                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                              <div className={`p-0.5 rounded ${study.study.duration ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-muted"}`}>
-                                <Calendar className={`h-3 w-3 ${study.study.duration ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/50"}`} />
-                              </div>
-                              <span className={study.study.duration ? "" : "text-muted-foreground/50"}>
-                                {study.study.duration || "No duration"}
-                              </span>
-                            </div>
-
-                            {/* Comparison */}
-                            {study.study.comparison && (
-                              <div className="flex items-center gap-1.5 text-muted-foreground flex-1 min-w-0 basis-0 max-w-full overflow-hidden">
-                                <div className="p-0.5 rounded bg-violet-50 dark:bg-violet-950/30 shrink-0">
-                                  <CheckCircle2 className="h-3 w-3 text-violet-600 dark:text-violet-400" />
-                                </div>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="truncate block w-full max-w-full">
-                                        {study.study.comparison}
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="max-w-xs">
-                                      <p>{study.study.comparison}</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                );
-              })}
-
-            {/* Load More Button */}
-            <LoadMoreStudiesButton/>
+                {/* Load More Button */}
+                <LoadMoreStudiesButton />
+              </>
+            )}
           </div>
-        )}
+        </div>
       </div>
-    </div>
 
       {/* AI Reason Dialog */}
       {selectedAIStudy && reportId !== undefined && (

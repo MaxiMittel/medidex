@@ -1,7 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createStudy } from "@/lib/api/studiesApi";
+import { createStudy, searchStudies } from "@/lib/api/studiesApi";
 import { getMeerkatHeaders } from "@/lib/server/meerkatHeaders";
 import { StudyCreateDto, StudyDto } from "@/types/apiDTOs";
+
+// The backend rejects shorter queries with a 422.
+const MIN_QUERY_LENGTH = 3;
+
+export async function GET(request: NextRequest) {
+  const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";
+
+  if (query.length < MIN_QUERY_LENGTH) {
+    return NextResponse.json(
+      { error: `Search query must be at least ${MIN_QUERY_LENGTH} characters.` },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const headers = await getMeerkatHeaders();
+    const studies = await searchStudies(query, { headers });
+
+    return NextResponse.json(studies);
+  } catch (error) {
+    console.error("Unexpected error while searching studies:", error);
+    return NextResponse.json(
+      { error: "Unexpected error while searching studies." },
+      { status: 500 }
+    );
+  }
+}
 
 export async function PUT(request: NextRequest) {
   let body: Partial<StudyDto>;
